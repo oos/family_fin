@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { BrowserRouter as Router, Routes, Route, Link } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, Link, Navigate } from 'react-router-dom';
 import axios from 'axios';
 import Dashboard from './components/Dashboard';
 import People from './components/People';
@@ -46,6 +46,26 @@ axios.interceptors.response.use(
     return Promise.reject(error);
   }
 );
+
+// Protected Route Component
+function ProtectedRoute({ children, userRole, requiredRole, fallbackPath }) {
+  if (userRole === requiredRole) {
+    return children;
+  }
+  return <Navigate to={fallbackPath} replace />;
+}
+
+// Role-based Dashboard Component
+function RoleBasedDashboard({ userRole }) {
+  if (userRole === 'admin') {
+    return <Dashboard />;
+  } else if (userRole === 'user') {
+    return <Navigate to="/user-dashboard" replace />;
+  } else {
+    // If role is not determined yet, show loading or redirect
+    return <Navigate to="/user-dashboard" replace />;
+  }
+}
 
 function Sidebar({ userRole, sidebarOpen, setSidebarOpen }) {
   const adminMenuItems = [
@@ -128,6 +148,7 @@ function App() {
   const [userRole, setUserRole] = useState(null);
   const [currentUser, setCurrentUser] = useState(null);
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [roleLoading, setRoleLoading] = useState(true);
 
   useEffect(() => {
     const token = localStorage.getItem('token');
@@ -136,6 +157,7 @@ function App() {
       // Fetch user data for already logged in users
       const fetchUserData = async () => {
         try {
+          setRoleLoading(true);
           const response = await axios.get('/user-dashboard');
           if (response.data.success) {
             setUserRole(response.data.dashboard.user.role);
@@ -146,9 +168,13 @@ function App() {
           // If token is invalid, clear it
           localStorage.removeItem('token');
           setIsAuthenticated(false);
+        } finally {
+          setRoleLoading(false);
         }
       };
       fetchUserData();
+    } else {
+      setRoleLoading(false);
     }
     setLoading(false);
   }, []);
@@ -157,6 +183,7 @@ function App() {
     localStorage.setItem('token', token);
     setIsAuthenticated(true);
     setCurrentUser(userData);
+    setRoleLoading(true);
     
     // Fetch user role
     try {
@@ -167,6 +194,8 @@ function App() {
       }
     } catch (err) {
       console.error('Error fetching user role:', err);
+    } finally {
+      setRoleLoading(false);
     }
   };
 
@@ -176,9 +205,10 @@ function App() {
     setUserRole(null);
     setCurrentUser(null);
     setSidebarOpen(false);
+    setRoleLoading(true);
   };
 
-  if (loading) {
+  if (loading || roleLoading) {
     return <div className="loading">Loading...</div>;
   }
 
@@ -204,20 +234,77 @@ function App() {
         <div className={`main-content ${sidebarOpen ? 'sidebar-open' : ''}`} style={{ paddingTop: '70px' }}>
           <div className="container-fluid mt-2">
             <Routes>
-              <Route path="/" element={<Dashboard />} />
-              <Route path="/people" element={<People />} />
-              <Route path="/properties" element={<Properties />} />
-              <Route path="/business-accounts" element={<BusinessAccounts />} />
-              <Route path="/income" element={<Income />} />
-              <Route path="/loans" element={<Loans />} />
-              <Route path="/loan-calculator" element={<LoanCalculator />} />
-              <Route path="/taxation" element={<Taxation />} />
-              <Route path="/pension" element={<Pension />} />
-              <Route path="/company-pension" element={<CompanyPensionCalculator />} />
-              <Route path="/transactions" element={<Transactions />} />
-              <Route path="/bookings" element={<Bookings />} />
-              <Route path="/admin" element={<AdminPanel />} />
-              <Route path="/user-dashboard" element={<UserDashboard />} />
+              {/* Root route - role-based dashboard */}
+              <Route path="/" element={<RoleBasedDashboard userRole={userRole} />} />
+              
+              {/* Admin-only routes */}
+              <Route path="/people" element={
+                <ProtectedRoute userRole={userRole} requiredRole="admin" fallbackPath="/user-dashboard">
+                  <People />
+                </ProtectedRoute>
+              } />
+              <Route path="/properties" element={
+                <ProtectedRoute userRole={userRole} requiredRole="admin" fallbackPath="/user-dashboard">
+                  <Properties />
+                </ProtectedRoute>
+              } />
+              <Route path="/business-accounts" element={
+                <ProtectedRoute userRole={userRole} requiredRole="admin" fallbackPath="/user-dashboard">
+                  <BusinessAccounts />
+                </ProtectedRoute>
+              } />
+              <Route path="/income" element={
+                <ProtectedRoute userRole={userRole} requiredRole="admin" fallbackPath="/user-dashboard">
+                  <Income />
+                </ProtectedRoute>
+              } />
+              <Route path="/loans" element={
+                <ProtectedRoute userRole={userRole} requiredRole="admin" fallbackPath="/user-dashboard">
+                  <Loans />
+                </ProtectedRoute>
+              } />
+              <Route path="/loan-calculator" element={
+                <ProtectedRoute userRole={userRole} requiredRole="admin" fallbackPath="/user-dashboard">
+                  <LoanCalculator />
+                </ProtectedRoute>
+              } />
+              <Route path="/taxation" element={
+                <ProtectedRoute userRole={userRole} requiredRole="admin" fallbackPath="/user-dashboard">
+                  <Taxation />
+                </ProtectedRoute>
+              } />
+              <Route path="/pension" element={
+                <ProtectedRoute userRole={userRole} requiredRole="admin" fallbackPath="/user-dashboard">
+                  <Pension />
+                </ProtectedRoute>
+              } />
+              <Route path="/company-pension" element={
+                <ProtectedRoute userRole={userRole} requiredRole="admin" fallbackPath="/user-dashboard">
+                  <CompanyPensionCalculator />
+                </ProtectedRoute>
+              } />
+              <Route path="/transactions" element={
+                <ProtectedRoute userRole={userRole} requiredRole="admin" fallbackPath="/user-dashboard">
+                  <Transactions />
+                </ProtectedRoute>
+              } />
+              <Route path="/bookings" element={
+                <ProtectedRoute userRole={userRole} requiredRole="admin" fallbackPath="/user-dashboard">
+                  <Bookings />
+                </ProtectedRoute>
+              } />
+              <Route path="/admin" element={
+                <ProtectedRoute userRole={userRole} requiredRole="admin" fallbackPath="/user-dashboard">
+                  <AdminPanel />
+                </ProtectedRoute>
+              } />
+              
+              {/* User dashboard route */}
+              <Route path="/user-dashboard" element={
+                <ProtectedRoute userRole={userRole} requiredRole="user" fallbackPath="/">
+                  <UserDashboard />
+                </ProtectedRoute>
+              } />
             </Routes>
           </div>
         </div>
