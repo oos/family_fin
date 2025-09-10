@@ -201,7 +201,7 @@ function App() {
           sidebarOpen={sidebarOpen}
           setSidebarOpen={setSidebarOpen}
         />
-        <div className={`main-content ${sidebarOpen ? 'sidebar-open' : ''}`} style={{ paddingTop: '80px' }}>
+        <div className={`main-content ${sidebarOpen ? 'sidebar-open' : ''}`} style={{ paddingTop: '60px' }}>
           <div className="container-fluid mt-4">
             <Routes>
               <Route path="/" element={<Dashboard />} />

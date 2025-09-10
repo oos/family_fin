@@ -1,10 +1,10 @@
 /* Sidebar Styles */
 .sidebar {
   position: fixed;
-  top: 56px; /* Account for fixed navbar height */
+  top: 48px; /* Account for fixed navbar height */
   left: -300px;
   width: 300px;
-  height: calc(100vh - 56px); /* Subtract navbar height */
+  height: calc(100vh - 48px); /* Subtract navbar height */
   background-color: #343a40;
   color: white;
   z-index: 1050;
@@ -66,7 +66,7 @@
 .main-content {
   margin-left: 0;
   transition: margin-left 0.3s ease;
-  min-height: calc(100vh - 56px);
+  min-height: calc(100vh - 48px);
   padding-top: 0; /* Will be set inline for fixed navbar */
 }
 
@@ -102,19 +102,27 @@
 
 /* Navbar adjustments */
 .navbar {
-  height: 56px;
+  height: 48px;
   z-index: 1060;
 }
 
 .navbar-brand {
-  font-size: 1.25rem;
+  font-size: 1.1rem;
   font-weight: 600;
 }
 
 .navbar .container-fluid {
-  height: 56px;
+  height: 48px;
   display: flex;
   align-items: center;
+  justify-content: space-between;
+  padding: 0.5rem 1rem;
+}
+
+/* Profile section positioning */
+.navbar .d-flex.align-items-center.ms-auto {
+  margin-left: auto !important;
+  margin-right: 0 !important;
 }
 
 /* User dropdown improvements */
@@ -164,6 +172,7 @@
   padding: 0.5rem;
   border-radius: 50%;
   transition: all 0.2s ease;
+  margin-right: 0;
 }
 
 .navbar .dropdown-toggle:hover {
@@ -183,6 +192,12 @@
 /* Remove the dropdown arrow for cleaner look */
 .navbar .dropdown-toggle::after {
   display: none;
+}
+
+/* Ensure profile dropdown is at far right */
+.profile-dropdown {
+  margin-left: auto;
+  margin-right: 0;
 }
 
 /* Loading state */
