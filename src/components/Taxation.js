@@ -6,6 +6,7 @@ function Taxation() {
   const [people, setPeople] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [selectedFamily, setSelectedFamily] = useState('all');
 
   useEffect(() => {
     fetchData();
@@ -196,7 +197,13 @@ function Taxation() {
   }, {});
 
   // Process family data with tax calculations
-  const familyTaxData = Object.entries(incomeByFamily).map(([familyName, records]) => {
+  const familyTaxData = Object.entries(incomeByFamily)
+    .filter(([familyName, records]) => {
+      // Filter based on selected family
+      if (selectedFamily === 'all') return true;
+      return familyName === selectedFamily;
+    })
+    .map(([familyName, records]) => {
     const familyInfo = familyMapping[familyName] || { type: 'single', code: 'Unknown', description: 'Unknown family' };
     
     // Group records by person within each family
@@ -317,6 +324,62 @@ function Taxation() {
     return <div className="loading">Loading taxation data...</div>;
   }
 
+  // Show message if no families match the selection
+  if (familyTaxData.length === 0) {
+    return (
+      <div>
+        <div style={{ marginBottom: '30px' }}>
+          <h1>Taxation Analysis</h1>
+          <p style={{ color: '#666', fontSize: '16px', marginBottom: '20px' }}>
+            Detailed Irish tax calculations for each family unit based on 2024 tax rates and bands.
+          </p>
+          
+          {/* Family Selector */}
+          <div style={{ marginBottom: '20px' }}>
+            <label htmlFor="family-select" style={{ 
+              display: 'block', 
+              marginBottom: '8px', 
+              fontWeight: 'bold',
+              fontSize: '16px'
+            }}>
+              Select Family to View:
+            </label>
+            <select
+              id="family-select"
+              value={selectedFamily}
+              onChange={(e) => setSelectedFamily(e.target.value)}
+              style={{
+                padding: '10px 15px',
+                fontSize: '16px',
+                border: '2px solid #ddd',
+                borderRadius: '6px',
+                backgroundColor: 'white',
+                minWidth: '250px',
+                cursor: 'pointer'
+              }}
+            >
+              <option value="all">All Families</option>
+              {Object.keys(familyMapping).map(familyName => (
+                <option key={familyName} value={familyName}>
+                  {familyName} ({familyMapping[familyName].code})
+                </option>
+              ))}
+            </select>
+          </div>
+        </div>
+
+        <div className="card" style={{ textAlign: 'center', padding: '40px' }}>
+          <h3>No Data Available</h3>
+          <p style={{ color: '#666', fontSize: '16px' }}>
+            {selectedFamily === 'all' 
+              ? 'No income data found for any families.' 
+              : `No income data found for ${selectedFamily}.`}
+          </p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div>
       <div style={{ marginBottom: '30px' }}>
@@ -324,6 +387,39 @@ function Taxation() {
         <p style={{ color: '#666', fontSize: '16px', marginBottom: '20px' }}>
           Detailed Irish tax calculations for each family unit based on 2024 tax rates and bands.
         </p>
+        
+        {/* Family Selector */}
+        <div style={{ marginBottom: '20px' }}>
+          <label htmlFor="family-select" style={{ 
+            display: 'block', 
+            marginBottom: '8px', 
+            fontWeight: 'bold',
+            fontSize: '16px'
+          }}>
+            Select Family to View:
+          </label>
+          <select
+            id="family-select"
+            value={selectedFamily}
+            onChange={(e) => setSelectedFamily(e.target.value)}
+            style={{
+              padding: '10px 15px',
+              fontSize: '16px',
+              border: '2px solid #ddd',
+              borderRadius: '6px',
+              backgroundColor: 'white',
+              minWidth: '250px',
+              cursor: 'pointer'
+            }}
+          >
+            <option value="all">All Families</option>
+            {Object.keys(familyMapping).map(familyName => (
+              <option key={familyName} value={familyName}>
+                {familyName} ({familyMapping[familyName].code})
+              </option>
+            ))}
+          </select>
+        </div>
       </div>
 
       {error && <div className="error">{error}</div>}
