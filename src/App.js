@@ -1,0 +1,124 @@
+import React, { useState, useEffect } from 'react';
+import { BrowserRouter as Router, Routes, Route, Link } from 'react-router-dom';
+import axios from 'axios';
+import Dashboard from './components/Dashboard';
+import People from './components/People';
+import Properties from './components/Properties';
+import BusinessAccounts from './components/BusinessAccounts';
+import Income from './components/Income';
+import LoanCalculator from './components/LoanCalculator';
+import Loans from './components/Loans';
+import Taxation from './components/Taxation';
+import Pension from './components/Pension';
+import CompanyPensionCalculator from './components/CompanyPensionCalculator';
+import Transactions from './components/Transactions';
+import Login from './components/Login';
+
+// Set up axios defaults
+axios.defaults.baseURL = 'http://localhost:5001/api';
+
+// Add request interceptor to include JWT token
+axios.interceptors.request.use(
+  (config) => {
+    const token = localStorage.getItem('token');
+    if (token) {
+      config.headers.Authorization = `Bearer ${token}`;
+    }
+    return config;
+  },
+  (error) => {
+    return Promise.reject(error);
+  }
+);
+
+// Add response interceptor to handle 401 errors
+axios.interceptors.response.use(
+  (response) => response,
+  (error) => {
+    if (error.response?.status === 401) {
+      localStorage.removeItem('token');
+      window.location.href = '/login';
+    }
+    return Promise.reject(error);
+  }
+);
+
+function App() {
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const token = localStorage.getItem('token');
+    if (token) {
+      setIsAuthenticated(true);
+    }
+    setLoading(false);
+  }, []);
+
+  const handleLogin = (token) => {
+    localStorage.setItem('token', token);
+    setIsAuthenticated(true);
+  };
+
+  const handleLogout = () => {
+    localStorage.removeItem('token');
+    setIsAuthenticated(false);
+  };
+
+  if (loading) {
+    return <div className="loading">Loading...</div>;
+  }
+
+  if (!isAuthenticated) {
+    return <Login onLogin={handleLogin} />;
+  }
+
+  return (
+    <Router>
+      <div className="App">
+        <Navbar onLogout={handleLogout} />
+        <div className="container">
+          <Routes>
+            <Route path="/" element={<Dashboard />} />
+            <Route path="/people" element={<People />} />
+            <Route path="/properties" element={<Properties />} />
+            <Route path="/business-accounts" element={<BusinessAccounts />} />
+            <Route path="/income" element={<Income />} />
+            <Route path="/loans" element={<Loans />} />
+            <Route path="/loan-calculator" element={<LoanCalculator />} />
+            <Route path="/taxation" element={<Taxation />} />
+            <Route path="/pension" element={<Pension />} />
+            <Route path="/company-pension" element={<CompanyPensionCalculator />} />
+            <Route path="/transactions" element={<Transactions />} />
+          </Routes>
+        </div>
+      </div>
+    </Router>
+  );
+}
+
+function Navbar({ onLogout }) {
+  return (
+    <nav className="navbar">
+      <div className="container">
+        <h1>Family Finance Management</h1>
+        <ul className="navbar-nav">
+          <li><Link to="/">Dashboard</Link></li>
+          <li><Link to="/people">People</Link></li>
+          <li><Link to="/properties">Properties</Link></li>
+          <li><Link to="/business-accounts">Business Accounts</Link></li>
+          <li><Link to="/income">Income</Link></li>
+          <li><Link to="/loans">Loans</Link></li>
+          <li><Link to="/loan-calculator">Loan Calculator</Link></li>
+          <li><Link to="/taxation">Taxation</Link></li>
+          <li><Link to="/pension">Pension</Link></li>
+          <li><Link to="/company-pension">Company Pension</Link></li>
+          <li><Link to="/transactions">Transactions</Link></li>
+          <li><button className="btn btn-secondary" onClick={onLogout}>Logout</button></li>
+        </ul>
+      </div>
+    </nav>
+  );
+}
+
+export default App;

@@ -1,0 +1,11 @@
+Date,Description,Amount,Balance,Reference,Type
+2025-01-01,Initial Balance,0.00,10000.00,INIT001,opening_balance
+2025-01-02,Rental Income - Property A,2500.00,12500.00,RENT001,rental_income
+2025-01-03,Office Rent Payment,-1200.00,11300.00,OFF001,business_expense
+2025-01-04,Client Payment - Project Alpha,5000.00,16300.00,CLI001,business_income
+2025-01-05,Bank Transfer to Savings,-2000.00,14300.00,SAV001,transfer
+2025-01-06,Airbnb Income - Property B,800.00,15100.00,AB001,rental_income
+2025-01-07,Insurance Payment,-450.00,14650.00,INS001,business_expense
+2025-01-08,Client Payment - Project Beta,3200.00,17850.00,CLI002,business_income
+2025-01-09,Property Maintenance,-300.00,17550.00,MAINT001,business_expense
+2025-01-10,Revolut Business Fee,-5.00,17545.00,FEE001,bank_fee
