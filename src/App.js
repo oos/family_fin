@@ -227,6 +227,31 @@ function App() {
 }
 
 function Navbar({ onLogout, userRole, currentUser, sidebarOpen, setSidebarOpen }) {
+  const [profileDropdownOpen, setProfileDropdownOpen] = useState(false);
+
+  const handleProfileClick = () => {
+    setProfileDropdownOpen(!profileDropdownOpen);
+  };
+
+  const handleLogoutClick = () => {
+    setProfileDropdownOpen(false);
+    onLogout();
+  };
+
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (profileDropdownOpen && !event.target.closest('.profile-dropdown')) {
+        setProfileDropdownOpen(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [profileDropdownOpen]);
+
   return (
     <nav className="navbar navbar-expand-lg navbar-dark bg-dark fixed-top">
       <div className="container-fluid">
@@ -242,34 +267,36 @@ function Navbar({ onLogout, userRole, currentUser, sidebarOpen, setSidebarOpen }
         
         <div className="d-flex align-items-center ms-auto">
           {currentUser && (
-            <div className="dropdown">
+            <div className="dropdown profile-dropdown">
               <button 
                 className="btn btn-outline-light dropdown-toggle d-flex align-items-center" 
                 type="button" 
-                data-bs-toggle="dropdown"
-                aria-expanded="false"
+                onClick={handleProfileClick}
+                aria-expanded={profileDropdownOpen}
                 title={`${currentUser.email} (${userRole?.toUpperCase()})`}
               >
                 <i className="fas fa-user-circle fs-4"></i>
               </button>
-              <ul className="dropdown-menu dropdown-menu-end">
-                <li><h6 className="dropdown-header">Account</h6></li>
-                <li><span className="dropdown-item-text">
-                  <i className="fas fa-envelope me-2"></i>
-                  {currentUser.email}
-                </span></li>
-                <li><span className="dropdown-item-text">
-                  <i className="fas fa-shield-alt me-2"></i>
-                  Role: {userRole?.toUpperCase()}
-                </span></li>
-                <li><hr className="dropdown-divider" /></li>
-                <li>
-                  <button className="dropdown-item" onClick={onLogout}>
-                    <i className="fas fa-sign-out-alt me-2"></i>
-                    Logout
-                  </button>
-                </li>
-              </ul>
+              {profileDropdownOpen && (
+                <ul className="dropdown-menu dropdown-menu-end show">
+                  <li><h6 className="dropdown-header">Account</h6></li>
+                  <li><span className="dropdown-item-text">
+                    <i className="fas fa-envelope me-2"></i>
+                    {currentUser.email}
+                  </span></li>
+                  <li><span className="dropdown-item-text">
+                    <i className="fas fa-shield-alt me-2"></i>
+                    Role: {userRole?.toUpperCase()}
+                  </span></li>
+                  <li><hr className="dropdown-divider" /></li>
+                  <li>
+                    <button className="dropdown-item" onClick={handleLogoutClick}>
+                      <i className="fas fa-sign-out-alt me-2"></i>
+                      Logout
+                    </button>
+                  </li>
+                </ul>
+              )}
             </div>
           )}
         </div>

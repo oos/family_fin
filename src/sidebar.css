@@ -124,11 +124,29 @@
 
 .dropdown-menu {
   min-width: 250px;
+  z-index: 1070;
+  position: absolute;
+  top: 100%;
+  right: 0;
+  margin-top: 0.125rem;
 }
 
 .dropdown-item-text {
   color: #6c757d;
   font-size: 0.875rem;
+}
+
+/* Profile dropdown specific styling */
+.profile-dropdown {
+  position: relative;
+}
+
+.profile-dropdown .dropdown-menu {
+  display: block;
+  opacity: 1;
+  visibility: visible;
+  transform: translateY(0);
+  transition: all 0.15s ease-in-out;
 }
 
 /* Profile icon button styling */
