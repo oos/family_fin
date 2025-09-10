@@ -142,11 +142,18 @@
 }
 
 .profile-dropdown .dropdown-menu {
+  display: none;
+  opacity: 0;
+  visibility: hidden;
+  transform: translateY(-10px);
+  transition: all 0.15s ease-in-out;
+}
+
+.profile-dropdown .dropdown-menu.show {
   display: block;
   opacity: 1;
   visibility: visible;
   transform: translateY(0);
-  transition: all 0.15s ease-in-out;
 }
 
 /* Profile icon button styling */
