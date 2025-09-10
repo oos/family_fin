@@ -1,154 +1,229 @@
 # Family Finance Management System
 
-A comprehensive web application for managing family business finances, properties, and income tracking.
+A comprehensive, role-based financial management application for family businesses with property management, loan tracking, and multi-platform booking integration.
 
-## Features
+## 🚀 Features
 
-- **People Management**: Track family members, their relationships, and roles
-- **Property Management**: Manage rental properties with ownership details and financial information
-- **Business Accounts**: Track business bank accounts for different companies
-- **Income Tracking**: Monitor both family business and external income sources
-- **Dashboard**: Financial overview with charts and summaries
-- **Authentication**: Secure login system
-- **CRUD Operations**: Full create, read, update, delete functionality for all entities
+### 👥 User Management
+- **Role-based Access Control**: Admin and User roles with different permissions
+- **Secure Authentication**: JWT-based authentication with password management
+- **User Dashboard**: Personalized dashboards based on admin settings
+- **Password Management**: Admin can view and reset user passwords
 
-## Technology Stack
+### 🏠 Property Management
+- **Property Portfolio**: Track multiple properties with values and equity
+- **Rental Income**: Monitor rental income across all properties
+- **Property Details**: Comprehensive property information management
+
+### 💰 Financial Management
+- **Loan Tracking**: Complete loan management with payment schedules
+- **Interest Calculations**: Support for various loan types including interest-only
+- **Early Repayment Charges**: Multiple ERC periods per loan
+- **Over-payments**: Regular and lump-sum payment tracking
+- **Bank Accounts**: Business account management with API integration
+
+### 📊 Multi-Platform Bookings
+- **Airbnb Integration**: Live iCal feed synchronization
+- **VRBO Support**: Multi-platform booking management
+- **Booking Details**: Comprehensive booking data extraction
+- **Historical Data**: Manual entry for past bookings
+- **Platform Detection**: Automatic platform identification
+
+### 💳 Transaction Management
+- **Bank Integration**: Revolut Business API support
+- **CSV Import**: Flexible import for multiple bank formats
+- **Transaction Filtering**: Advanced filtering and search
+- **Warning System**: Automatic detection of suspicious transactions
+- **Category Management**: Dynamic transaction categorization
+
+### 📈 Income & Tax Management
+- **Family Grouping**: Income tracking by family units
+- **Irish Tax Calculations**: Complete Irish tax system implementation
+- **Gross/Net Toggle**: Switch between gross and net income views
+- **Tax Credits**: Married couple and individual tax credits
+- **Pension Integration**: Company and personal pension calculations
+
+### 🎛️ Admin Features
+- **User Management**: Create, manage, and control user access
+- **Dashboard Control**: Control what each user can see
+- **Password Reset**: Secure password management for all users
+- **System Monitoring**: Complete system oversight
+
+## 🛠️ Technology Stack
 
 ### Backend
-- Flask (Python web framework)
-- SQLAlchemy (ORM)
-- Flask-JWT-Extended (Authentication)
-- SQLite (Database)
+- **Flask**: Python web framework
+- **SQLAlchemy**: ORM for database management
+- **JWT**: Secure authentication
+- **Alembic**: Database migrations
+- **SQLite**: Database (production-ready for PostgreSQL)
 
 ### Frontend
-- React 18
-- React Router (Navigation)
-- Axios (HTTP client)
-- Recharts (Charts and visualizations)
-- CSS3 (Styling)
+- **React 18**: Modern React with hooks
+- **React Router**: Client-side routing
+- **Axios**: HTTP client
+- **Recharts**: Data visualization
+- **Bootstrap**: Responsive UI framework
 
-## Setup Instructions
+### External Integrations
+- **Airbnb iCal**: Live booking synchronization
+- **VRBO iCal**: Multi-platform booking support
+- **Revolut Business API**: Bank transaction integration
+- **CSV Import**: Flexible data import system
+
+## 🚀 Quick Start
 
 ### Prerequisites
 - Python 3.8+
 - Node.js 16+
 - npm or yarn
 
-### Backend Setup
+### Installation
 
-1. Install Python dependencies:
-```bash
-pip install -r requirements.txt
+1. **Clone the repository**
+   ```bash
+   git clone https://github.com/oos/family_fin.git
+   cd family_fin
+   ```
+
+2. **Backend Setup**
+   ```bash
+   python -m venv venv
+   source venv/bin/activate  # On Windows: venv\Scripts\activate
+   pip install -r requirements.txt
+   flask db upgrade
+   python setup_users.py
+   python app.py
+   ```
+
+3. **Frontend Setup**
+   ```bash
+   npm install
+   npm start
+   ```
+
+4. **Access the Application**
+   - Frontend: http://localhost:3001
+   - Backend API: http://localhost:5001
+
+### Default Login Credentials
+
+**Admin Account:**
+- Email: `omarosullivan@gmail.com`
+- Password: `Gestalt,69`
+
+**User Account:**
+- Email: `seanosullivan@gmail.com`
+- Password: `Secodwom01!`
+
+## 📱 User Roles
+
+### Admin (Omar)
+- Full access to all features
+- User management and password reset
+- Dashboard settings control
+- Complete system oversight
+- All financial data access
+
+### User (Sean)
+- Personalized dashboard only
+- Account balance management
+- View only data allowed by admin
+- Cannot access admin features
+- Limited to assigned sections
+
+## 🔧 Configuration
+
+### Environment Variables
+Create a `.env` file in the root directory:
+```env
+JWT_SECRET_KEY=your-secret-key
+FLASK_ENV=development
 ```
 
-2. Set up environment variables:
-```bash
-cp env.example .env
-# Edit .env with your preferred secret keys
+### Database
+The application uses SQLite by default. For production, configure PostgreSQL:
+```python
+SQLALCHEMY_DATABASE_URI=postgresql://user:password@localhost/family_finance
 ```
 
-3. Initialize the database and seed with sample data:
-```bash
-python seed_data.py
-```
-
-4. Start the Flask server:
-```bash
-python app.py
-```
-
-The backend will be available at `http://localhost:5000`
-
-### Frontend Setup
-
-1. Install Node.js dependencies:
-```bash
-npm install
-```
-
-2. Start the React development server:
-```bash
-npm start
-```
-
-The frontend will be available at `http://localhost:3000`
-
-## Default Login Credentials
-
-- Username: `admin`
-- Password: `admin123`
-
-## Data Structure
-
-### People
-- Name, relationship, director status, deceased status
-
-### Properties
-- Address, nickname, valuation, mortgage balance
-- Rental income, lender information
-- Ownership percentages for each family member
-
-### Business Accounts
-- Account name, number, bank, company
-- Active/inactive status
-
-### Income
-- Person, income type (family business/outside business)
-- Annual and monthly amounts
-
-## API Endpoints
+## 📊 API Endpoints
 
 ### Authentication
 - `POST /api/auth/login` - User login
+- `POST /api/auth/logout` - User logout
 
-### People
-- `GET /api/people` - List all people
-- `POST /api/people` - Create new person
-- `PUT /api/people/{id}` - Update person
-- `DELETE /api/people/{id}` - Delete person
+### User Management (Admin Only)
+- `GET /api/users` - Get all users
+- `POST /api/users` - Create new user
+- `POST /api/users/{id}/reset-password` - Reset user password
 
-### Properties
-- `GET /api/properties` - List all properties
-- `POST /api/properties` - Create new property
-- `PUT /api/properties/{id}` - Update property
-- `DELETE /api/properties/{id}` - Delete property
+### Dashboard Settings (Admin Only)
+- `GET /api/dashboard-settings/{user_id}` - Get user dashboard settings
+- `PUT /api/dashboard-settings/{user_id}` - Update dashboard settings
 
-### Business Accounts
-- `GET /api/business-accounts` - List all accounts
-- `POST /api/business-accounts` - Create new account
-- `PUT /api/business-accounts/{id}` - Update account
-- `DELETE /api/business-accounts/{id}` - Delete account
+### User Dashboard
+- `GET /api/user-dashboard` - Get personalized dashboard data
+- `GET /api/account-balances` - Get user account balances
+- `POST /api/account-balances` - Create account balance entry
+- `PUT /api/account-balances/{id}` - Update account balance
+- `DELETE /api/account-balances/{id}` - Delete account balance
 
-### Income
-- `GET /api/income` - List all income records
-- `POST /api/income` - Create new income record
-- `PUT /api/income/{id}` - Update income record
-- `DELETE /api/income/{id}` - Delete income record
+### Bookings
+- `GET /api/bookings` - Get all bookings
+- `POST /api/bookings/sync` - Sync bookings from iCal
+- `PUT /api/bookings/{id}` - Update booking
+- `DELETE /api/bookings/{id}` - Delete booking
 
-### Dashboard
-- `GET /api/dashboard/summary` - Get financial summary
+## 🏗️ Database Schema
 
-## Sample Data
+### Core Tables
+- `user` - User accounts with roles
+- `property` - Property portfolio
+- `loan` - Loan information
+- `business_account` - Bank accounts
+- `bank_transaction` - Transaction records
+- `airbnb_booking` - Booking data
+- `account_balance` - User balance entries
+- `dashboard_settings` - User access control
 
-The application comes pre-populated with your family's data:
+## 🔒 Security Features
 
-- **People**: Omar, Heidi, Dwayne, Lena, Sean, Coral
-- **Properties**: 7 properties with ownership details and financial information
-- **Business Accounts**: Revolut accounts for both companies, AIB account
-- **Income**: Family business and external income for each person
+- JWT-based authentication
+- Role-based access control
+- Password hashing with bcrypt
+- CORS protection
+- Input validation and sanitization
+- SQL injection prevention
 
-## Security Notes
+## 📈 Future Enhancements
 
-- Change default credentials in production
-- Use strong secret keys in environment variables
-- Consider implementing proper user management
-- Add HTTPS in production environment
+- [ ] Mobile app (React Native)
+- [ ] Advanced reporting and analytics
+- [ ] Multi-currency support
+- [ ] Automated tax filing integration
+- [ ] Property valuation tracking
+- [ ] Investment portfolio management
+- [ ] Document management system
+- [ ] Email notifications
+- [ ] Advanced booking analytics
 
-## Future Enhancements
+## 🤝 Contributing
 
-- Loan refinancing calculations
-- Cash flow projections
-- Property performance analytics
-- Document management
-- Multi-currency support
-- Advanced reporting features
+1. Fork the repository
+2. Create a feature branch
+3. Make your changes
+4. Add tests if applicable
+5. Submit a pull request
+
+## 📄 License
+
+This project is private and proprietary. All rights reserved.
+
+## 📞 Support
+
+For support and questions, contact the development team.
+
+---
+
+**Built with ❤️ for family business management**
