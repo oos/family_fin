@@ -132,7 +132,7 @@ function Dashboard() {
 
   return (
     <div>
-      <h1>Dashboard</h1>
+      <h1 style={{ marginTop: '0', marginBottom: '1rem' }}>Dashboard</h1>
       
       {/* Summary Cards - Single Row */}
       <div className="dashboard-single-row">

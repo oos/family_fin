@@ -231,8 +231,8 @@ function App() {
           sidebarOpen={sidebarOpen}
           setSidebarOpen={setSidebarOpen}
         />
-        <div className={`main-content ${sidebarOpen ? 'sidebar-open' : ''}`} style={{ paddingTop: '70px' }}>
-          <div className="container-fluid mt-2">
+        <div className={`main-content ${sidebarOpen ? 'sidebar-open' : ''}`} style={{ paddingTop: '50px' }}>
+          <div className="container-fluid mt-1">
             <Routes>
               {/* Root route - role-based dashboard */}
               <Route path="/" element={<RoleBasedDashboard userRole={userRole} />} />
