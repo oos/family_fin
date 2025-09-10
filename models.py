@@ -9,6 +9,7 @@ class User(db.Model):
     username = db.Column(db.String(80), unique=True, nullable=False)
     email = db.Column(db.String(120), unique=True, nullable=False)
     password_hash = db.Column(db.String(255), nullable=False)
+    role = db.Column(db.String(20), default='user')  # admin, user
     is_active = db.Column(db.Boolean, default=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
@@ -24,6 +25,7 @@ class User(db.Model):
             'id': self.id,
             'username': self.username,
             'email': self.email,
+            'role': self.role,
             'is_active': self.is_active,
             'created_at': self.created_at.isoformat() if self.created_at else None,
             'updated_at': self.updated_at.isoformat() if self.updated_at else None
@@ -483,4 +485,163 @@ class BankTransaction(db.Model):
             'spend_program': self.spend_program,
             
             'created_at': self.created_at.isoformat()
+        }
+
+class AirbnbBooking(db.Model):
+    """Model for Airbnb bookings from iCal feeds"""
+    id = db.Column(db.Integer, primary_key=True)
+    property_id = db.Column(db.Integer, db.ForeignKey('property.id'), nullable=True)
+    listing_id = db.Column(db.String(50), nullable=False)  # e.g., "22496407"
+    booking_uid = db.Column(db.String(200), unique=True, nullable=False)  # Unique ID from iCal
+    reservation_url = db.Column(db.String(500), nullable=True)
+    phone_last_4 = db.Column(db.String(4), nullable=True)
+    
+    # Booking details
+    check_in_date = db.Column(db.Date, nullable=False)
+    check_out_date = db.Column(db.Date, nullable=False)
+    nights = db.Column(db.Integer, nullable=False)
+    status = db.Column(db.String(20), default='reserved')  # reserved, confirmed, cancelled
+    
+    # Additional iCal data
+    summary = db.Column(db.String(200), nullable=True)  # "Reserved", "Blocked", etc.
+    description = db.Column(db.Text, nullable=True)  # Full description from iCal
+    dtstamp = db.Column(db.DateTime, nullable=True)  # When the event was created/modified
+    confirmation_code = db.Column(db.String(50), nullable=True)  # Extracted from reservation URL
+    
+    # Guest information (if available)
+    guest_name = db.Column(db.String(100), nullable=True)
+    guest_phone = db.Column(db.String(20), nullable=True)
+    guest_email = db.Column(db.String(100), nullable=True)
+    number_of_guests = db.Column(db.Integer, nullable=True)
+    
+    # Financial details (if available)
+    estimated_income = db.Column(db.Float, nullable=True)
+    currency = db.Column(db.String(3), default='EUR')
+    nightly_rate = db.Column(db.Float, nullable=True)
+    cleaning_fee = db.Column(db.Float, nullable=True)
+    service_fee = db.Column(db.Float, nullable=True)
+    total_amount = db.Column(db.Float, nullable=True)
+    
+    # Additional metadata
+    booking_source = db.Column(db.String(50), default='airbnb')  # airbnb, vrbo, manual
+    cancellation_policy = db.Column(db.String(50), nullable=True)
+    special_requests = db.Column(db.Text, nullable=True)
+    
+    # Additional iCal fields
+    location = db.Column(db.String(200), nullable=True)
+    organizer = db.Column(db.String(200), nullable=True)
+    attendee = db.Column(db.String(200), nullable=True)
+    created = db.Column(db.DateTime, nullable=True)
+    last_modified = db.Column(db.DateTime, nullable=True)
+    
+    # Metadata
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    last_synced = db.Column(db.DateTime, default=datetime.utcnow)
+    
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'property_id': self.property_id,
+            'listing_id': self.listing_id,
+            'booking_uid': self.booking_uid,
+            'reservation_url': self.reservation_url,
+            'phone_last_4': self.phone_last_4,
+            'check_in_date': self.check_in_date.isoformat() if self.check_in_date else None,
+            'check_out_date': self.check_out_date.isoformat() if self.check_out_date else None,
+            'nights': self.nights,
+            'status': self.status,
+            'estimated_income': self.estimated_income,
+            'currency': self.currency,
+            
+            # Additional iCal data
+            'summary': self.summary,
+            'description': self.description,
+            'dtstamp': self.dtstamp.isoformat() if self.dtstamp else None,
+            'confirmation_code': self.confirmation_code,
+            
+            # Guest information
+            'guest_name': self.guest_name,
+            'guest_phone': self.guest_phone,
+            'guest_email': self.guest_email,
+            'number_of_guests': self.number_of_guests,
+            
+            # Financial details
+            'nightly_rate': self.nightly_rate,
+            'cleaning_fee': self.cleaning_fee,
+            'service_fee': self.service_fee,
+            'total_amount': self.total_amount,
+            
+            # Additional metadata
+            'booking_source': self.booking_source,
+            'cancellation_policy': self.cancellation_policy,
+            'special_requests': self.special_requests,
+            
+            # Additional iCal fields
+            'location': self.location,
+            'organizer': self.organizer,
+            'attendee': self.attendee,
+            'created': self.created.isoformat() if self.created else None,
+            'last_modified': self.last_modified.isoformat() if self.last_modified else None,
+            
+            # Metadata
+            'created_at': self.created_at.isoformat() if self.created_at else None,
+            'updated_at': self.updated_at.isoformat() if self.updated_at else None,
+            'last_synced': self.last_synced.isoformat() if self.last_synced else None
+        }
+
+class DashboardSettings(db.Model):
+    """Model for controlling what data users can see on their dashboard"""
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+    section = db.Column(db.String(50), nullable=False)  # properties, loans, income, etc.
+    is_visible = db.Column(db.Boolean, default=True)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    
+    # Relationships
+    user = db.relationship('User', backref='dashboard_settings', lazy=True)
+    
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'user_id': self.user_id,
+            'section': self.section,
+            'is_visible': self.is_visible,
+            'created_at': self.created_at.isoformat() if self.created_at else None,
+            'updated_at': self.updated_at.isoformat() if self.updated_at else None
+        }
+
+class AccountBalance(db.Model):
+    """Model for users to enter and track account balances"""
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+    account_id = db.Column(db.Integer, db.ForeignKey('business_account.id'), nullable=True)
+    loan_id = db.Column(db.Integer, db.ForeignKey('loan.id'), nullable=True)
+    balance = db.Column(db.Float, nullable=False)
+    currency = db.Column(db.String(3), default='EUR')
+    notes = db.Column(db.Text, nullable=True)
+    date_entered = db.Column(db.Date, nullable=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    
+    # Relationships
+    user = db.relationship('User', backref='account_balances', lazy=True)
+    account = db.relationship('BusinessAccount', backref='balances', lazy=True)
+    loan = db.relationship('Loan', backref='balances', lazy=True)
+    
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'user_id': self.user_id,
+            'account_id': self.account_id,
+            'loan_id': self.loan_id,
+            'balance': self.balance,
+            'currency': self.currency,
+            'notes': self.notes,
+            'date_entered': self.date_entered.isoformat() if self.date_entered else None,
+            'created_at': self.created_at.isoformat() if self.created_at else None,
+            'updated_at': self.updated_at.isoformat() if self.updated_at else None,
+            'account_name': self.account.name if self.account else None,
+            'loan_name': f"{self.loan.bank} - {self.loan.property_name}" if self.loan else None
         }

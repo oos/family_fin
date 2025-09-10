@@ -16,7 +16,7 @@ function Login({ onLogin }) {
 
     try {
       const response = await axios.post('/auth/login', credentials);
-      onLogin(response.data.access_token);
+      onLogin(response.data.access_token, response.data.user);
     } catch (err) {
       setError('Invalid credentials. Please try again.');
     } finally {

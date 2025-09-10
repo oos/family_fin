@@ -8,6 +8,9 @@ from datetime import datetime, timedelta
 import os
 import csv
 import io
+import requests
+import re
+from icalendar import Calendar
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -20,7 +23,7 @@ app.config['JWT_SECRET_KEY'] = os.getenv('JWT_SECRET_KEY', 'jwt-secret-string')
 app.config['JWT_ACCESS_TOKEN_EXPIRES'] = timedelta(hours=24)
 
 # Import models and db
-from models import db, User, Person, Property, Income, Loan, Family, BusinessAccount, Pension, LoanERC, LoanPayment, BankTransaction
+from models import db, User, Person, Property, Income, Loan, Family, BusinessAccount, Pension, LoanERC, LoanPayment, BankTransaction, AirbnbBooking, DashboardSettings, AccountBalance
 
 # Initialize extensions
 db.init_app(app)
@@ -35,7 +38,7 @@ def health_check():
 @app.route('/api/auth/login', methods=['POST'])
 def login():
     data = request.get_json()
-    username = data.get('username')
+    username = data.get('username') or data.get('email')  # Accept both username and email
     password = data.get('password')
     
     if not username or not password:
@@ -847,6 +850,601 @@ def _safe_float(value):
     except (ValueError, TypeError):
         return None
 
+def _parse_airbnb_ical(ical_url, airbnb_listing_id):
+    """Parse Airbnb iCal feed and return booking data with maximum extraction"""
+    try:
+        response = requests.get(ical_url, timeout=30)
+        response.raise_for_status()
+        
+        cal = Calendar.from_ical(response.content)
+        bookings = []
+        
+        for component in cal.walk():
+            if component.name == "VEVENT":
+                # Extract all available fields from iCal
+                summary = str(component.get('summary', ''))
+                uid = str(component.get('uid', ''))
+                description = str(component.get('description', ''))
+                
+                # Get dates and timestamps
+                dtstart = component.get('dtstart')
+                dtend = component.get('dtend')
+                dtstamp = component.get('dtstamp')
+                created = component.get('created')
+                last_modified = component.get('last-modified')
+                
+                if not dtstart or not dtend:
+                    continue
+                
+                check_in = dtstart.dt.date() if hasattr(dtstart.dt, 'date') else dtstart.dt
+                check_out = dtend.dt.date() if hasattr(dtend.dt, 'date') else dtend.dt
+                
+                # Calculate nights
+                nights = (check_out - check_in).days
+                
+                # Extract all possible data from description
+                reservation_url = None
+                phone_last_4 = None
+                confirmation_code = None
+                guest_name = None
+                guest_phone = None
+                guest_email = None
+                number_of_guests = None
+                nightly_rate = None
+                cleaning_fee = None
+                service_fee = None
+                total_amount = None
+                cancellation_policy = None
+                special_requests = None
+                location = None
+                organizer = None
+                attendee = None
+                
+                # Extract reservation URL and confirmation code
+                url_match = re.search(r'Reservation URL:\s*(https://[^\s\n]+)', description, re.IGNORECASE)
+                if url_match:
+                    reservation_url = url_match.group(1).strip()
+                    # Extract confirmation code from URL
+                    code_match = re.search(r'/([A-Z0-9]{10,})(?:\?|$)', reservation_url)
+                    if code_match:
+                        confirmation_code = code_match.group(1)
+                
+                # Extract phone number (multiple patterns)
+                phone_patterns = [
+                    r'Phone Number \(Last 4 Digits\):\s*(\d{4})',
+                    r'Phone:\s*(\d{4})',
+                    r'Last 4 Digits:\s*(\d{4})',
+                    r'Phone Number:\s*.*?(\d{4})',
+                    r'Contact:\s*.*?(\d{4})'
+                ]
+                for pattern in phone_patterns:
+                    phone_match = re.search(pattern, description, re.IGNORECASE)
+                    if phone_match:
+                        phone_last_4 = phone_match.group(1)
+                        break
+                
+                # Extract guest information (multiple patterns)
+                guest_patterns = [
+                    r'Guest:\s*([^\n]+)',
+                    r'Guest Name:\s*([^\n]+)',
+                    r'Name:\s*([^\n]+)',
+                    r'Booked by:\s*([^\n]+)'
+                ]
+                for pattern in guest_patterns:
+                    guest_match = re.search(pattern, description, re.IGNORECASE)
+                    if guest_match:
+                        guest_name = guest_match.group(1).strip()
+                        break
+                
+                # Extract number of guests
+                guests_patterns = [
+                    r'Guests:\s*(\d+)',
+                    r'Number of Guests:\s*(\d+)',
+                    r'People:\s*(\d+)',
+                    r'Adults:\s*(\d+)'
+                ]
+                for pattern in guests_patterns:
+                    guests_match = re.search(pattern, description, re.IGNORECASE)
+                    if guests_match:
+                        number_of_guests = int(guests_match.group(1))
+                        break
+                
+                # Extract financial information (multiple patterns)
+                rate_patterns = [
+                    r'Nightly Rate:\s*€?([\d,]+\.?\d*)',
+                    r'Rate:\s*€?([\d,]+\.?\d*)',
+                    r'Price per Night:\s*€?([\d,]+\.?\d*)',
+                    r'Cost:\s*€?([\d,]+\.?\d*)'
+                ]
+                for pattern in rate_patterns:
+                    rate_match = re.search(pattern, description, re.IGNORECASE)
+                    if rate_match:
+                        nightly_rate = float(rate_match.group(1).replace(',', ''))
+                        break
+                
+                cleaning_patterns = [
+                    r'Cleaning Fee:\s*€?([\d,]+\.?\d*)',
+                    r'Cleaning:\s*€?([\d,]+\.?\d*)',
+                    r'Cleaning Cost:\s*€?([\d,]+\.?\d*)'
+                ]
+                for pattern in cleaning_patterns:
+                    cleaning_match = re.search(pattern, description, re.IGNORECASE)
+                    if cleaning_match:
+                        cleaning_fee = float(cleaning_match.group(1).replace(',', ''))
+                        break
+                
+                service_patterns = [
+                    r'Service Fee:\s*€?([\d,]+\.?\d*)',
+                    r'Service:\s*€?([\d,]+\.?\d*)',
+                    r'Platform Fee:\s*€?([\d,]+\.?\d*)'
+                ]
+                for pattern in service_patterns:
+                    service_match = re.search(pattern, description, re.IGNORECASE)
+                    if service_match:
+                        service_fee = float(service_match.group(1).replace(',', ''))
+                        break
+                
+                total_patterns = [
+                    r'Total:\s*€?([\d,]+\.?\d*)',
+                    r'Total Amount:\s*€?([\d,]+\.?\d*)',
+                    r'Grand Total:\s*€?([\d,]+\.?\d*)'
+                ]
+                for pattern in total_patterns:
+                    total_match = re.search(pattern, description, re.IGNORECASE)
+                    if total_match:
+                        total_amount = float(total_match.group(1).replace(',', ''))
+                        break
+                
+                # Extract cancellation policy
+                policy_patterns = [
+                    r'Cancellation Policy:\s*([^\n]+)',
+                    r'Policy:\s*([^\n]+)',
+                    r'Cancel:\s*([^\n]+)'
+                ]
+                for pattern in policy_patterns:
+                    policy_match = re.search(pattern, description, re.IGNORECASE)
+                    if policy_match:
+                        cancellation_policy = policy_match.group(1).strip()
+                        break
+                
+                # Extract special requests
+                requests_patterns = [
+                    r'Special Requests:\s*([^\n]+)',
+                    r'Requests:\s*([^\n]+)',
+                    r'Notes:\s*([^\n]+)',
+                    r'Comments:\s*([^\n]+)'
+                ]
+                for pattern in requests_patterns:
+                    requests_match = re.search(pattern, description, re.IGNORECASE)
+                    if requests_match:
+                        special_requests = requests_match.group(1).strip()
+                        break
+                
+                # Extract location if available
+                location = str(component.get('location', '')) if component.get('location') else None
+                
+                # Extract organizer and attendee info
+                organizer = str(component.get('organizer', '')) if component.get('organizer') else None
+                attendee = str(component.get('attendee', '')) if component.get('attendee') else None
+                
+                # Process timestamps
+                dtstamp_dt = None
+                if dtstamp:
+                    dtstamp_dt = dtstamp.dt if hasattr(dtstamp.dt, 'date') else dtstamp.dt
+                
+                created_dt = None
+                if created:
+                    created_dt = created.dt if hasattr(created.dt, 'date') else created.dt
+                
+                last_modified_dt = None
+                if last_modified:
+                    last_modified_dt = last_modified.dt if hasattr(last_modified.dt, 'date') else last_modified.dt
+                
+                # Determine status based on summary and other indicators
+                status = 'reserved'
+                if 'confirmed' in summary.lower():
+                    status = 'confirmed'
+                elif 'blocked' in summary.lower() or 'not available' in summary.lower():
+                    status = 'blocked'
+                elif 'cancelled' in summary.lower():
+                    status = 'cancelled'
+                elif 'completed' in summary.lower():
+                    status = 'completed'
+                
+                # Calculate estimated income if we have financial data
+                estimated_income = None
+                if nightly_rate and nights:
+                    estimated_income = nightly_rate * nights
+                    if cleaning_fee:
+                        estimated_income += cleaning_fee
+                    if service_fee:
+                        estimated_income -= service_fee  # Service fee is typically deducted
+                
+                booking = {
+                    'listing_id': listing_id,
+                    'booking_uid': uid,
+                    'reservation_url': reservation_url,
+                    'phone_last_4': phone_last_4,
+                    'check_in_date': check_in,
+                    'check_out_date': check_out,
+                    'nights': nights,
+                    'status': status,
+                    'estimated_income': estimated_income,
+                    
+                    # Additional iCal data
+                    'summary': summary,
+                    'description': description,
+                    'dtstamp': dtstamp_dt,
+                    'confirmation_code': confirmation_code,
+                    'location': location,
+                    'organizer': organizer,
+                    'attendee': attendee,
+                    'created': created_dt,
+                    'last_modified': last_modified_dt,
+                    
+                    # Guest information
+                    'guest_name': guest_name,
+                    'guest_phone': guest_phone,
+                    'guest_email': guest_email,
+                    'number_of_guests': number_of_guests,
+                    
+                    # Financial details
+                    'nightly_rate': nightly_rate,
+                    'cleaning_fee': cleaning_fee,
+                    'service_fee': service_fee,
+                    'total_amount': total_amount,
+                    
+                    # Additional metadata
+                    'booking_source': platform,
+                    'cancellation_policy': cancellation_policy,
+                    'special_requests': special_requests
+                }
+                
+                bookings.append(booking)
+        
+        return bookings
+        
+    except Exception as e:
+        print(f"Error parsing iCal feed: {str(e)}")
+        return []
+
+def _parse_vrbo_ical(ical_url, listing_id):
+    """Parse VRBO iCal feed and return booking data with maximum extraction"""
+    try:
+        response = requests.get(ical_url, timeout=30)
+        response.raise_for_status()
+        
+        cal = Calendar.from_ical(response.content)
+        bookings = []
+        
+        for component in cal.walk():
+            if component.name == "VEVENT":
+                # Extract all available fields from iCal
+                summary = str(component.get('summary', ''))
+                uid = str(component.get('uid', ''))
+                description = str(component.get('description', ''))
+                
+                # Get dates and timestamps
+                dtstart = component.get('dtstart')
+                dtend = component.get('dtend')
+                dtstamp = component.get('dtstamp')
+                created = component.get('created')
+                last_modified = component.get('last-modified')
+                
+                if not dtstart or not dtend:
+                    continue
+                
+                check_in = dtstart.dt.date() if hasattr(dtstart.dt, 'date') else dtstart.dt
+                check_out = dtend.dt.date() if hasattr(dtend.dt, 'date') else dtend.dt
+                
+                # Calculate nights
+                nights = (check_out - check_in).days
+                
+                # Extract all possible data from description
+                reservation_url = None
+                phone_last_4 = None
+                confirmation_code = None
+                guest_name = None
+                guest_phone = None
+                guest_email = None
+                number_of_guests = None
+                nightly_rate = None
+                cleaning_fee = None
+                service_fee = None
+                total_amount = None
+                cancellation_policy = None
+                special_requests = None
+                location = None
+                organizer = None
+                attendee = None
+                
+                # Extract reservation URL and confirmation code
+                url_match = re.search(r'Reservation URL:\s*(https://[^\s\n]+)', description, re.IGNORECASE)
+                if url_match:
+                    reservation_url = url_match.group(1).strip()
+                    # Extract confirmation code from URL
+                    code_match = re.search(r'/([A-Z0-9]{10,})(?:\?|$)', reservation_url)
+                    if code_match:
+                        confirmation_code = code_match.group(1)
+                
+                # Extract phone number (VRBO patterns)
+                phone_patterns = [
+                    r'Phone Number \(Last 4 Digits\):\s*(\d{4})',
+                    r'Phone:\s*(\d{4})',
+                    r'Last 4 Digits:\s*(\d{4})',
+                    r'Contact:\s*.*?(\d{4})',
+                    r'Guest Phone:\s*.*?(\d{4})'
+                ]
+                for pattern in phone_patterns:
+                    phone_match = re.search(pattern, description, re.IGNORECASE)
+                    if phone_match:
+                        phone_last_4 = phone_match.group(1)
+                        break
+                
+                # Extract guest information (VRBO patterns)
+                guest_patterns = [
+                    r'Guest:\s*([^\n]+)',
+                    r'Guest Name:\s*([^\n]+)',
+                    r'Name:\s*([^\n]+)',
+                    r'Booked by:\s*([^\n]+)',
+                    r'Traveler:\s*([^\n]+)'
+                ]
+                for pattern in guest_patterns:
+                    guest_match = re.search(pattern, description, re.IGNORECASE)
+                    if guest_match:
+                        guest_name = guest_match.group(1).strip()
+                        break
+                
+                # Extract number of guests
+                guests_patterns = [
+                    r'Guests:\s*(\d+)',
+                    r'Number of Guests:\s*(\d+)',
+                    r'People:\s*(\d+)',
+                    r'Adults:\s*(\d+)',
+                    r'Travelers:\s*(\d+)'
+                ]
+                for pattern in guests_patterns:
+                    guests_match = re.search(pattern, description, re.IGNORECASE)
+                    if guests_match:
+                        number_of_guests = int(guests_match.group(1))
+                        break
+                
+                # Extract financial information (VRBO patterns)
+                rate_patterns = [
+                    r'Nightly Rate:\s*\$?([\d,]+\.?\d*)',
+                    r'Rate:\s*\$?([\d,]+\.?\d*)',
+                    r'Price per Night:\s*\$?([\d,]+\.?\d*)',
+                    r'Cost:\s*\$?([\d,]+\.?\d*)',
+                    r'Rental Rate:\s*\$?([\d,]+\.?\d*)'
+                ]
+                for pattern in rate_patterns:
+                    rate_match = re.search(pattern, description, re.IGNORECASE)
+                    if rate_match:
+                        nightly_rate = float(rate_match.group(1).replace(',', ''))
+                        break
+                
+                cleaning_patterns = [
+                    r'Cleaning Fee:\s*\$?([\d,]+\.?\d*)',
+                    r'Cleaning:\s*\$?([\d,]+\.?\d*)',
+                    r'Cleaning Cost:\s*\$?([\d,]+\.?\d*)',
+                    r'Housekeeping:\s*\$?([\d,]+\.?\d*)'
+                ]
+                for pattern in cleaning_patterns:
+                    cleaning_match = re.search(pattern, description, re.IGNORECASE)
+                    if cleaning_match:
+                        cleaning_fee = float(cleaning_match.group(1).replace(',', ''))
+                        break
+                
+                service_patterns = [
+                    r'Service Fee:\s*\$?([\d,]+\.?\d*)',
+                    r'Service:\s*\$?([\d,]+\.?\d*)',
+                    r'Platform Fee:\s*\$?([\d,]+\.?\d*)',
+                    r'Booking Fee:\s*\$?([\d,]+\.?\d*)'
+                ]
+                for pattern in service_patterns:
+                    service_match = re.search(pattern, description, re.IGNORECASE)
+                    if service_match:
+                        service_fee = float(service_match.group(1).replace(',', ''))
+                        break
+                
+                total_patterns = [
+                    r'Total:\s*\$?([\d,]+\.?\d*)',
+                    r'Total Amount:\s*\$?([\d,]+\.?\d*)',
+                    r'Grand Total:\s*\$?([\d,]+\.?\d*)',
+                    r'Total Cost:\s*\$?([\d,]+\.?\d*)'
+                ]
+                for pattern in total_patterns:
+                    total_match = re.search(pattern, description, re.IGNORECASE)
+                    if total_match:
+                        total_amount = float(total_match.group(1).replace(',', ''))
+                        break
+                
+                # Extract cancellation policy
+                policy_patterns = [
+                    r'Cancellation Policy:\s*([^\n]+)',
+                    r'Policy:\s*([^\n]+)',
+                    r'Cancel:\s*([^\n]+)',
+                    r'Refund Policy:\s*([^\n]+)'
+                ]
+                for pattern in policy_patterns:
+                    policy_match = re.search(pattern, description, re.IGNORECASE)
+                    if policy_match:
+                        cancellation_policy = policy_match.group(1).strip()
+                        break
+                
+                # Extract special requests
+                requests_patterns = [
+                    r'Special Requests:\s*([^\n]+)',
+                    r'Requests:\s*([^\n]+)',
+                    r'Notes:\s*([^\n]+)',
+                    r'Comments:\s*([^\n]+)',
+                    r'Message:\s*([^\n]+)'
+                ]
+                for pattern in requests_patterns:
+                    requests_match = re.search(pattern, description, re.IGNORECASE)
+                    if requests_match:
+                        special_requests = requests_match.group(1).strip()
+                        break
+                
+                # Extract location if available
+                location = str(component.get('location', '')) if component.get('location') else None
+                
+                # Extract organizer and attendee info
+                organizer = str(component.get('organizer', '')) if component.get('organizer') else None
+                attendee = str(component.get('attendee', '')) if component.get('attendee') else None
+                
+                # Process timestamps
+                dtstamp_dt = None
+                if dtstamp:
+                    dtstamp_dt = dtstamp.dt if hasattr(dtstamp.dt, 'date') else dtstamp.dt
+                
+                created_dt = None
+                if created:
+                    created_dt = created.dt if hasattr(created.dt, 'date') else created.dt
+                
+                last_modified_dt = None
+                if last_modified:
+                    last_modified_dt = last_modified.dt if hasattr(last_modified.dt, 'date') else last_modified.dt
+                
+                # Determine status based on summary and other indicators
+                status = 'reserved'
+                if 'confirmed' in summary.lower():
+                    status = 'confirmed'
+                elif 'blocked' in summary.lower() or 'not available' in summary.lower():
+                    status = 'blocked'
+                elif 'cancelled' in summary.lower():
+                    status = 'cancelled'
+                elif 'completed' in summary.lower():
+                    status = 'completed'
+                elif 'booked' in summary.lower():
+                    status = 'booked'
+                
+                # Calculate estimated income if we have financial data
+                estimated_income = None
+                if nightly_rate and nights:
+                    estimated_income = nightly_rate * nights
+                    if cleaning_fee:
+                        estimated_income += cleaning_fee
+                    if service_fee:
+                        estimated_income -= service_fee  # Service fee is typically deducted
+                
+                booking = {
+                    'listing_id': listing_id,
+                    'booking_uid': uid,
+                    'reservation_url': reservation_url,
+                    'phone_last_4': phone_last_4,
+                    'check_in_date': check_in,
+                    'check_out_date': check_out,
+                    'nights': nights,
+                    'status': status,
+                    'estimated_income': estimated_income,
+                    
+                    # Additional iCal data
+                    'summary': summary,
+                    'description': description,
+                    'dtstamp': dtstamp_dt,
+                    'confirmation_code': confirmation_code,
+                    'location': location,
+                    'organizer': organizer,
+                    'attendee': attendee,
+                    'created': created_dt,
+                    'last_modified': last_modified_dt,
+                    
+                    # Guest information
+                    'guest_name': guest_name,
+                    'guest_phone': guest_phone,
+                    'guest_email': guest_email,
+                    'number_of_guests': number_of_guests,
+                    
+                    # Financial details
+                    'nightly_rate': nightly_rate,
+                    'cleaning_fee': cleaning_fee,
+                    'service_fee': service_fee,
+                    'total_amount': total_amount,
+                    
+                    # Additional metadata
+                    'booking_source': 'vrbo',
+                    'cancellation_policy': cancellation_policy,
+                    'special_requests': special_requests
+                }
+                
+                bookings.append(booking)
+        
+        return bookings
+        
+    except Exception as e:
+        print(f"Error parsing VRBO iCal feed: {str(e)}")
+        return []
+
+def _detect_transaction_warnings(transaction, all_transactions):
+    """Detect warnings for a transaction based on patterns and anomalies"""
+    warnings = []
+    
+    # Check for duplicates based on ID, date, amount, and description
+    if transaction.transaction_id:
+        duplicate_count = sum(1 for t in all_transactions 
+                            if t.transaction_id == transaction.transaction_id and t.id != transaction.id)
+        if duplicate_count > 0:
+            warnings.append("Duplicate ID")
+    
+    # Check for duplicate based on date, amount, and description
+    duplicate_pattern = sum(1 for t in all_transactions 
+                          if (t.transaction_date == transaction.transaction_date and 
+                              t.amount == transaction.amount and 
+                              t.description == transaction.description and 
+                              t.id != transaction.id))
+    if duplicate_pattern > 0:
+        warnings.append("Duplicate Pattern")
+    
+    # Check for unusual amounts
+    if transaction.amount:
+        if abs(transaction.amount) > 50000:  # Very large transaction
+            warnings.append("Large Amount")
+        elif abs(transaction.amount) < 0.01:  # Very small transaction
+            warnings.append("Micro Amount")
+    
+    # Check for suspicious patterns
+    if transaction.description:
+        desc_lower = transaction.description.lower()
+        
+        # Check for test transactions
+        if any(word in desc_lower for word in ['test', 'testing', 'sample', 'demo']):
+            warnings.append("Test Transaction")
+        
+        # Check for suspicious merchants
+        if any(word in desc_lower for word in ['casino', 'gambling', 'bet', 'poker']):
+            warnings.append("Gambling")
+        
+        # Check for crypto-related
+        if any(word in desc_lower for word in ['bitcoin', 'crypto', 'cryptocurrency', 'btc', 'eth']):
+            warnings.append("Crypto")
+    
+    # Check for unusual timing (transactions outside business hours)
+    if transaction.transaction_date:
+        # This is a simplified check - in reality you'd check the actual time
+        # For now, we'll just flag weekend transactions as potentially unusual
+        weekday = transaction.transaction_date.weekday()
+        if weekday >= 5:  # Saturday = 5, Sunday = 6
+            warnings.append("Weekend")
+    
+    # Check for currency mismatches
+    if transaction.orig_currency and transaction.payment_currency:
+        if transaction.orig_currency != transaction.payment_currency and not transaction.exchange_rate:
+            warnings.append("Currency Mismatch")
+    
+    # Check for missing critical data
+    if not transaction.transaction_id and not transaction.reference:
+        warnings.append("No Reference")
+    
+    if not transaction.description or transaction.description.strip() == '':
+        warnings.append("No Description")
+    
+    # Check for round amounts (might indicate test or suspicious activity)
+    if transaction.amount and transaction.amount % 100 == 0 and abs(transaction.amount) > 1000:
+        warnings.append("Round Amount")
+    
+    return warnings
+
 def _parse_datetime(value):
     """Safely parse datetime string, handling empty strings and various formats"""
     if not value or value == '' or value.strip() == '':
@@ -909,11 +1507,11 @@ def import_csv_transactions(account_id):
         
         csv_reader = csv.DictReader(io.StringIO(csv_content), delimiter=delimiter)
         
-        # Expected CSV columns (flexible mapping) - Enhanced for Revolut and other banks
+        # Expected CSV columns (flexible mapping) - Enhanced for Revolut, AIB, and other banks
         expected_columns = {
-            'date': ['date', 'transaction_date', 'Date', 'Transaction Date', 'Transaction date', 'Date completed', 'Completed date', 'Date completed (Europe/Dublin)', 'Date completed (UTC)'],
-            'description': ['description', 'Description', 'Transaction Description', 'Narrative', 'Transaction details', 'Details', 'Payee', 'Merchant'],
-            'amount': ['amount', 'Amount', 'Transaction Amount', 'Value', 'Paid out', 'Paid in', 'Money out', 'Money in', 'Out', 'In', 'Total amount'],
+            'date': ['date', 'transaction_date', 'Date', 'Transaction Date', 'Transaction date', 'Date completed', 'Completed date', 'Date completed (Europe/Dublin)', 'Date completed (UTC)', 'Posted Transactions Date'],
+            'description': ['description', 'Description', 'Transaction Description', 'Narrative', 'Transaction details', 'Details', 'Payee', 'Merchant', 'Description1', 'Description2', 'Description3'],
+            'amount': ['amount', 'Amount', 'Transaction Amount', 'Value', 'Paid out', 'Paid in', 'Money out', 'Money in', 'Out', 'In', 'Total amount', 'Debit Amount', 'Credit Amount', 'Local Currency Amount'],
             'balance': ['balance', 'Balance', 'Running Balance', 'Account balance', 'Balance after'],
             'reference': ['reference', 'Reference', 'Transaction Reference', 'Ref', 'Reference number', 'Transaction reference'],
             'type': ['type', 'Type', 'Transaction Type', 'Category', 'Category name', 'Transaction category']
@@ -948,6 +1546,21 @@ def import_csv_transactions(account_id):
             'spend_program': 'Spend program'
         }
         
+        # AIB specific column mappings
+        aib_columns = {
+            'posted_account': 'Posted Account',
+            'posted_transactions_date': 'Posted Transactions Date',
+            'description1': 'Description1',
+            'description2': 'Description2',
+            'description3': 'Description3',
+            'debit_amount': 'Debit Amount',
+            'credit_amount': 'Credit Amount',
+            'posted_currency': 'Posted Currency',
+            'transaction_type': 'Transaction Type',
+            'local_currency_amount': 'Local Currency Amount',
+            'local_currency': 'Local Currency'
+        }
+        
         # Find column mappings
         headers = csv_reader.fieldnames
         column_mapping = {}
@@ -957,6 +1570,18 @@ def import_csv_transactions(account_id):
                 if header.lower() in [name.lower() for name in possible_names]:
                     column_mapping[field] = header
                     break
+        
+        # Also map Revolut specific columns
+        revolut_mapping = {}
+        for field, column_name in revolut_columns.items():
+            if column_name in headers:
+                revolut_mapping[field] = column_name
+        
+        # Also map AIB specific columns
+        aib_mapping = {}
+        for field, column_name in aib_columns.items():
+            if column_name in headers:
+                aib_mapping[field] = column_name
         
         # Validate required columns
         required_columns = ['date', 'description', 'amount']
@@ -1005,7 +1630,7 @@ def import_csv_transactions(account_id):
                     errors.append(f"Row {row_num}: {str(e)}")
                     continue
                 
-                # Parse amount - handle Revolut's separate "Paid out" and "Paid in" columns
+                # Parse amount - handle different bank formats
                 amount = 0.0
                 if 'amount' in column_mapping:
                     # Standard amount column
@@ -1015,6 +1640,24 @@ def import_csv_transactions(account_id):
                     except ValueError:
                         errors.append(f"Row {row_num}: Invalid amount format: {amount_str}")
                         continue
+                elif 'Debit Amount' in headers and 'Credit Amount' in headers:
+                    # AIB format: separate Debit Amount and Credit Amount columns
+                    debit_amount = 0.0
+                    credit_amount = 0.0
+                    
+                    try:
+                        debit_str = row['Debit Amount'].strip().replace(',', '')
+                        debit_amount = float(debit_str) if debit_str else 0.0
+                    except ValueError:
+                        pass
+                    
+                    try:
+                        credit_str = row['Credit Amount'].strip().replace(',', '')
+                        credit_amount = float(credit_str) if credit_str else 0.0
+                    except ValueError:
+                        pass
+                    
+                    amount = credit_amount - debit_amount  # Positive for credits, negative for debits
                 else:
                     # Try to find separate "Paid out" and "Paid in" columns (Revolut format)
                     paid_out = 0.0
@@ -1037,7 +1680,14 @@ def import_csv_transactions(account_id):
                     amount = paid_in - paid_out  # Positive for money in, negative for money out
                 
                 # Get other fields
-                description = row[column_mapping['description']].strip()
+                if 'Description1' in headers and 'Description2' in headers and 'Description3' in headers:
+                    # AIB format: combine multiple description columns
+                    desc1 = row.get('Description1', '').strip()
+                    desc2 = row.get('Description2', '').strip()
+                    desc3 = row.get('Description3', '').strip()
+                    description = ' '.join([d for d in [desc1, desc2, desc3] if d])
+                else:
+                    description = row[column_mapping['description']].strip()
                 balance = None
                 if 'balance' in column_mapping:
                     balance_str = row[column_mapping['balance']].strip().replace(',', '')
@@ -1053,6 +1703,8 @@ def import_csv_transactions(account_id):
                 transaction_type = None
                 if 'type' in column_mapping:
                     transaction_type = row[column_mapping['type']].strip() or None
+                elif 'Transaction Type' in headers:
+                    transaction_type = row['Transaction Type'].strip() or None
                 
                 # Create transaction record with ALL Revolut data
                 transaction = BankTransaction(
@@ -1064,32 +1716,33 @@ def import_csv_transactions(account_id):
                     reference=reference,
                     transaction_type=transaction_type,
                     
-                    # Revolut specific fields - capture ALL data
-                    date_started_utc=_parse_datetime(row.get('Date started (UTC)')),
-                    date_completed_utc=_parse_datetime(row.get('Date completed (UTC)')),
-                    date_started_dublin=_parse_datetime(row.get('Date started (Europe/Dublin)')),
-                    date_completed_dublin=_parse_datetime(row.get('Date completed (Europe/Dublin)')),
-                    transaction_id=row.get('ID', '').strip() if row.get('ID') else None,
-                    state=row.get('State', '').strip() if row.get('State') else None,
-                    payer=row.get('Payer', '').strip() if row.get('Payer') else None,
-                    card_number=row.get('Card number', '').strip() if row.get('Card number') else None,
-                    card_label=row.get('Card label', '').strip() if row.get('Card label') else None,
-                    card_state=row.get('Card state', '').strip() if row.get('Card state') else None,
-                    orig_currency=row.get('Orig currency', '').strip() if row.get('Orig currency') else None,
-                    orig_amount=_safe_float(row.get('Orig amount')),
-                    payment_currency=row.get('Payment currency', '').strip() if row.get('Payment currency') else None,
-                    total_amount=_safe_float(row.get('Total amount')),
-                    exchange_rate=_safe_float(row.get('Exchange rate')),
-                    fee=_safe_float(row.get('Fee')),
-                    fee_currency=row.get('Fee currency', '').strip() if row.get('Fee currency') else None,
-                    account=row.get('Account', '').strip() if row.get('Account') else None,
-                    beneficiary_account_number=row.get('Beneficiary account number', '').strip() if row.get('Beneficiary account number') else None,
-                    beneficiary_sort_code=row.get('Beneficiary sort code or routing number', '').strip() if row.get('Beneficiary sort code or routing number') else None,
-                    beneficiary_iban=row.get('Beneficiary IBAN', '').strip() if row.get('Beneficiary IBAN') else None,
-                    beneficiary_bic=row.get('Beneficiary BIC', '').strip() if row.get('Beneficiary BIC') else None,
-                    mcc=row.get('MCC', '').strip() if row.get('MCC') else None,
-                    related_transaction_id=row.get('Related transaction id', '').strip() if row.get('Related transaction id') else None,
-                    spend_program=row.get('Spend program', '').strip() if row.get('Spend program') else None
+                    # Revolut specific fields - use mapped column names
+                    date_started_utc=_parse_datetime(row.get(revolut_mapping.get('date_started_utc', ''))),
+                    date_completed_utc=_parse_datetime(row.get(revolut_mapping.get('date_completed_utc', ''))),
+                    date_started_dublin=_parse_datetime(row.get(revolut_mapping.get('date_started_dublin', ''))),
+                    date_completed_dublin=_parse_datetime(row.get(revolut_mapping.get('date_completed_dublin', ''))),
+                    transaction_id=row.get(revolut_mapping.get('transaction_id', ''), '').strip() if row.get(revolut_mapping.get('transaction_id', '')) else None,
+                    state=row.get(revolut_mapping.get('state', ''), '').strip() if row.get(revolut_mapping.get('state', '')) else None,
+                    payer=row.get(revolut_mapping.get('payer', ''), '').strip() if row.get(revolut_mapping.get('payer', '')) else None,
+                    card_number=row.get(revolut_mapping.get('card_number', ''), '').strip() if row.get(revolut_mapping.get('card_number', '')) else None,
+                    card_label=row.get(revolut_mapping.get('card_label', ''), '').strip() if row.get(revolut_mapping.get('card_label', '')) else None,
+                    card_state=row.get(revolut_mapping.get('card_state', ''), '').strip() if row.get(revolut_mapping.get('card_state', '')) else None,
+                    orig_currency=row.get(revolut_mapping.get('orig_currency', ''), '').strip() if row.get(revolut_mapping.get('orig_currency', '')) else None,
+                    orig_amount=_safe_float(row.get(revolut_mapping.get('orig_amount', ''))),
+                    # Use AIB data if available, otherwise use Revolut data
+                    account=row.get(aib_mapping.get('posted_account', ''), '').strip() if row.get(aib_mapping.get('posted_account', '')) else (row.get(revolut_mapping.get('account', ''), '').strip() if row.get(revolut_mapping.get('account', '')) else None),
+                    payment_currency=row.get(aib_mapping.get('posted_currency', ''), '').strip() if row.get(aib_mapping.get('posted_currency', '')) else (row.get(revolut_mapping.get('payment_currency', ''), '').strip() if row.get(revolut_mapping.get('payment_currency', '')) else None),
+                    total_amount=_safe_float(row.get(aib_mapping.get('local_currency_amount', ''))) if aib_mapping.get('local_currency_amount') else _safe_float(row.get(revolut_mapping.get('total_amount', ''))),
+                    exchange_rate=_safe_float(row.get(revolut_mapping.get('exchange_rate', ''))),
+                    fee=_safe_float(row.get(revolut_mapping.get('fee', ''))),
+                    fee_currency=row.get(revolut_mapping.get('fee_currency', ''), '').strip() if row.get(revolut_mapping.get('fee_currency', '')) else None,
+                    beneficiary_account_number=row.get(revolut_mapping.get('beneficiary_account_number', ''), '').strip() if row.get(revolut_mapping.get('beneficiary_account_number', '')) else None,
+                    beneficiary_sort_code=row.get(revolut_mapping.get('beneficiary_sort_code', ''), '').strip() if row.get(revolut_mapping.get('beneficiary_sort_code', '')) else None,
+                    beneficiary_iban=row.get(revolut_mapping.get('beneficiary_iban', ''), '').strip() if row.get(revolut_mapping.get('beneficiary_iban', '')) else None,
+                    beneficiary_bic=row.get(revolut_mapping.get('beneficiary_bic', ''), '').strip() if row.get(revolut_mapping.get('beneficiary_bic', '')) else None,
+                    mcc=row.get(revolut_mapping.get('mcc', ''), '').strip() if row.get(revolut_mapping.get('mcc', '')) else None,
+                    related_transaction_id=row.get(revolut_mapping.get('related_transaction_id', ''), '').strip() if row.get(revolut_mapping.get('related_transaction_id', '')) else None,
+                    spend_program=row.get(revolut_mapping.get('spend_program', ''), '').strip() if row.get(revolut_mapping.get('spend_program', '')) else None
                 )
                 
                 db.session.add(transaction)
@@ -1138,10 +1791,18 @@ def get_account_transactions(account_id):
         account = BusinessAccount.query.get_or_404(account_id)
         transactions = BankTransaction.query.filter_by(business_account_id=account_id).order_by(BankTransaction.transaction_date.desc()).all()
         
+        # Add warnings to each transaction
+        transactions_with_warnings = []
+        for transaction in transactions:
+            transaction_dict = transaction.to_dict()
+            warnings = _detect_transaction_warnings(transaction, transactions)
+            transaction_dict['warnings'] = warnings
+            transactions_with_warnings.append(transaction_dict)
+        
         return jsonify({
             'success': True,
             'account': account.to_dict(),
-            'transactions': [transaction.to_dict() for transaction in transactions],
+            'transactions': transactions_with_warnings,
             'count': len(transactions)
         })
         
@@ -1149,6 +1810,598 @@ def get_account_transactions(account_id):
         return jsonify({
             'success': False,
             'message': f'Failed to fetch transactions: {str(e)}'
+        }), 500
+
+# User Management API
+@app.route('/api/users', methods=['POST'])
+@jwt_required()
+def create_user():
+    """Create a new user (admin only)"""
+    try:
+        current_user_id = get_jwt_identity()
+        current_user = User.query.get(current_user_id)
+        
+        if current_user.role != 'admin':
+            return jsonify({
+                'success': False,
+                'message': 'Admin access required'
+            }), 403
+        
+        data = request.get_json()
+        email = data.get('email')
+        password = data.get('password')
+        role = data.get('role', 'user')
+        
+        if not email or not password:
+            return jsonify({
+                'success': False,
+                'message': 'Email and password are required'
+            }), 400
+        
+        # Check if user already exists
+        if User.query.filter_by(email=email).first():
+            return jsonify({
+                'success': False,
+                'message': 'User with this email already exists'
+            }), 400
+        
+        # Create new user
+        new_user = User(
+            username=email.split('@')[0],  # Use email prefix as username
+            email=email,
+            role=role
+        )
+        new_user.set_password(password)
+        
+        db.session.add(new_user)
+        db.session.commit()
+        
+        return jsonify({
+            'success': True,
+            'message': 'User created successfully',
+            'user': new_user.to_dict()
+        })
+        
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({
+            'success': False,
+            'message': f'Failed to create user: {str(e)}'
+        }), 500
+
+@app.route('/api/users', methods=['GET'])
+@jwt_required()
+def get_users():
+    """Get all users (admin only)"""
+    try:
+        current_user_username = get_jwt_identity()
+        current_user = User.query.filter_by(username=current_user_username).first()
+        
+        if not current_user or current_user.role != 'admin':
+            return jsonify({
+                'success': False,
+                'message': 'Admin access required'
+            }), 403
+        
+        users = User.query.all()
+        return jsonify({
+            'success': True,
+            'users': [user.to_dict() for user in users]
+        })
+        
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'message': f'Failed to fetch users: {str(e)}'
+        }), 500
+
+@app.route('/api/users/<int:user_id>/reset-password', methods=['POST'])
+@jwt_required()
+def reset_user_password(user_id):
+    """Reset password for a user (admin only)"""
+    try:
+        current_user_username = get_jwt_identity()
+        current_user = User.query.filter_by(username=current_user_username).first()
+        
+        if not current_user or current_user.role != 'admin':
+            return jsonify({
+                'success': False,
+                'message': 'Admin access required'
+            }), 403
+        
+        data = request.get_json()
+        new_password = data.get('password')
+        
+        if not new_password:
+            return jsonify({
+                'success': False,
+                'message': 'New password is required'
+            }), 400
+        
+        # Find the user to reset
+        target_user = User.query.get(user_id)
+        if not target_user:
+            return jsonify({
+                'success': False,
+                'message': 'User not found'
+            }), 404
+        
+        # Update the password
+        target_user.set_password(new_password)
+        db.session.commit()
+        
+        return jsonify({
+            'success': True,
+            'message': 'Password reset successfully'
+        })
+        
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({
+            'success': False,
+            'message': f'Failed to reset password: {str(e)}'
+        }), 500
+
+# Dashboard Settings API
+@app.route('/api/dashboard-settings/<int:user_id>', methods=['GET'])
+@jwt_required()
+def get_dashboard_settings(user_id):
+    """Get dashboard settings for a user (admin only)"""
+    try:
+        current_user_id = get_jwt_identity()
+        current_user = User.query.get(current_user_id)
+        
+        if current_user.role != 'admin':
+            return jsonify({
+                'success': False,
+                'message': 'Admin access required'
+            }), 403
+        
+        settings = DashboardSettings.query.filter_by(user_id=user_id).all()
+        return jsonify({
+            'success': True,
+            'settings': [setting.to_dict() for setting in settings]
+        })
+        
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'message': f'Failed to fetch dashboard settings: {str(e)}'
+        }), 500
+
+@app.route('/api/dashboard-settings/<int:user_id>', methods=['PUT'])
+@jwt_required()
+def update_dashboard_settings(user_id):
+    """Update dashboard settings for a user (admin only)"""
+    try:
+        current_user_id = get_jwt_identity()
+        current_user = User.query.get(current_user_id)
+        
+        if current_user.role != 'admin':
+            return jsonify({
+                'success': False,
+                'message': 'Admin access required'
+            }), 403
+        
+        data = request.get_json()
+        settings = data.get('settings', [])
+        
+        # Delete existing settings
+        DashboardSettings.query.filter_by(user_id=user_id).delete()
+        
+        # Create new settings
+        for setting_data in settings:
+            new_setting = DashboardSettings(
+                user_id=user_id,
+                section=setting_data['section'],
+                is_visible=setting_data['is_visible']
+            )
+            db.session.add(new_setting)
+        
+        db.session.commit()
+        
+        return jsonify({
+            'success': True,
+            'message': 'Dashboard settings updated successfully'
+        })
+        
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({
+            'success': False,
+            'message': f'Failed to update dashboard settings: {str(e)}'
+        }), 500
+
+# Account Balances API
+@app.route('/api/account-balances', methods=['GET'])
+@jwt_required()
+def get_account_balances():
+    """Get account balances for current user"""
+    try:
+        current_user_id = get_jwt_identity()
+        balances = AccountBalance.query.filter_by(user_id=current_user_id).order_by(AccountBalance.date_entered.desc()).all()
+        
+        return jsonify({
+            'success': True,
+            'balances': [balance.to_dict() for balance in balances]
+        })
+        
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'message': f'Failed to fetch account balances: {str(e)}'
+        }), 500
+
+@app.route('/api/account-balances', methods=['POST'])
+@jwt_required()
+def create_account_balance():
+    """Create a new account balance entry"""
+    try:
+        current_user_id = get_jwt_identity()
+        data = request.get_json()
+        
+        new_balance = AccountBalance(
+            user_id=current_user_id,
+            account_id=data.get('account_id'),
+            loan_id=data.get('loan_id'),
+            balance=data.get('balance'),
+            currency=data.get('currency', 'EUR'),
+            notes=data.get('notes'),
+            date_entered=datetime.strptime(data.get('date_entered'), '%Y-%m-%d').date()
+        )
+        
+        db.session.add(new_balance)
+        db.session.commit()
+        
+        return jsonify({
+            'success': True,
+            'message': 'Account balance created successfully',
+            'balance': new_balance.to_dict()
+        })
+        
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({
+            'success': False,
+            'message': f'Failed to create account balance: {str(e)}'
+        }), 500
+
+@app.route('/api/account-balances/<int:balance_id>', methods=['PUT'])
+@jwt_required()
+def update_account_balance(balance_id):
+    """Update an account balance entry"""
+    try:
+        current_user_id = get_jwt_identity()
+        balance = AccountBalance.query.filter_by(id=balance_id, user_id=current_user_id).first()
+        
+        if not balance:
+            return jsonify({
+                'success': False,
+                'message': 'Account balance not found'
+            }), 404
+        
+        data = request.get_json()
+        balance.account_id = data.get('account_id', balance.account_id)
+        balance.loan_id = data.get('loan_id', balance.loan_id)
+        balance.balance = data.get('balance', balance.balance)
+        balance.currency = data.get('currency', balance.currency)
+        balance.notes = data.get('notes', balance.notes)
+        balance.date_entered = datetime.strptime(data.get('date_entered'), '%Y-%m-%d').date()
+        
+        db.session.commit()
+        
+        return jsonify({
+            'success': True,
+            'message': 'Account balance updated successfully',
+            'balance': balance.to_dict()
+        })
+        
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({
+            'success': False,
+            'message': f'Failed to update account balance: {str(e)}'
+        }), 500
+
+@app.route('/api/account-balances/<int:balance_id>', methods=['DELETE'])
+@jwt_required()
+def delete_account_balance(balance_id):
+    """Delete an account balance entry"""
+    try:
+        current_user_id = get_jwt_identity()
+        balance = AccountBalance.query.filter_by(id=balance_id, user_id=current_user_id).first()
+        
+        if not balance:
+            return jsonify({
+                'success': False,
+                'message': 'Account balance not found'
+            }), 404
+        
+        db.session.delete(balance)
+        db.session.commit()
+        
+        return jsonify({
+            'success': True,
+            'message': 'Account balance deleted successfully'
+        })
+        
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({
+            'success': False,
+            'message': f'Failed to delete account balance: {str(e)}'
+        }), 500
+
+# User Dashboard API
+@app.route('/api/user-dashboard', methods=['GET'])
+@jwt_required()
+def get_user_dashboard():
+    """Get personalized dashboard data for current user"""
+    try:
+        current_user_username = get_jwt_identity()
+        current_user = User.query.filter_by(username=current_user_username).first()
+        
+        if not current_user:
+            return jsonify({
+                'success': False,
+                'message': 'User not found'
+            }), 404
+        
+        # Get dashboard settings
+        settings = DashboardSettings.query.filter_by(user_id=current_user.id).all()
+        visible_sections = {setting.section: setting.is_visible for setting in settings}
+        
+        dashboard_data = {
+            'user': current_user.to_dict(),
+            'visible_sections': visible_sections,
+            'data': {}
+        }
+        
+        # Only include data for visible sections
+        if visible_sections.get('properties', True):
+            properties = Property.query.all()
+            dashboard_data['data']['properties'] = [prop.to_dict() for prop in properties]
+        
+        if visible_sections.get('loans', True):
+            loans = Loan.query.all()
+            dashboard_data['data']['loans'] = [loan.to_dict() for loan in loans]
+        
+        if visible_sections.get('account_balances', True):
+            balances = AccountBalance.query.filter_by(user_id=current_user.id).order_by(AccountBalance.date_entered.desc()).all()
+            dashboard_data['data']['account_balances'] = [balance.to_dict() for balance in balances]
+        
+        if visible_sections.get('bank_accounts', True):
+            accounts = BusinessAccount.query.all()
+            dashboard_data['data']['bank_accounts'] = [account.to_dict() for account in accounts]
+        
+        return jsonify({
+            'success': True,
+            'dashboard': dashboard_data
+        })
+        
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'message': f'Failed to fetch dashboard data: {str(e)}'
+        }), 500
+
+@app.route('/api/bookings/sync', methods=['POST'])
+@jwt_required()
+def sync_bookings():
+    """Sync bookings from iCal feed (supports multiple platforms)"""
+    try:
+        data = request.get_json()
+        ical_url = data.get('ical_url')
+        listing_id = data.get('listing_id')
+        platform = data.get('platform', 'airbnb')
+        property_id = data.get('property_id')  # Optional: link to property
+        
+        if not ical_url or not listing_id:
+            return jsonify({
+                'success': False,
+                'message': 'ical_url and listing_id are required'
+            }), 400
+        
+        # Parse iCal feed based on platform
+        if platform == 'airbnb':
+            bookings_data = _parse_airbnb_ical(ical_url, listing_id)
+        elif platform == 'vrbo':
+            bookings_data = _parse_vrbo_ical(ical_url, listing_id)
+        else:
+            return jsonify({
+                'success': False,
+                'message': f'Unsupported platform: {platform}'
+            }), 400
+        
+        if not bookings_data:
+            return jsonify({
+                'success': False,
+                'message': 'No bookings found in iCal feed or error parsing feed'
+            }), 400
+        
+        # Process bookings
+        synced_count = 0
+        updated_count = 0
+        
+        for booking_data in bookings_data:
+            # Check if booking already exists
+            existing_booking = AirbnbBooking.query.filter_by(
+                booking_uid=booking_data['booking_uid']
+            ).first()
+            
+            if existing_booking:
+                # Update existing booking with all fields
+                existing_booking.check_in_date = booking_data['check_in_date']
+                existing_booking.check_out_date = booking_data['check_out_date']
+                existing_booking.nights = booking_data['nights']
+                existing_booking.reservation_url = booking_data['reservation_url']
+                existing_booking.phone_last_4 = booking_data['phone_last_4']
+                existing_booking.status = booking_data['status']
+                
+                # Update additional iCal data
+                existing_booking.summary = booking_data.get('summary')
+                existing_booking.description = booking_data.get('description')
+                existing_booking.dtstamp = booking_data.get('dtstamp')
+                existing_booking.confirmation_code = booking_data.get('confirmation_code')
+                
+                # Update guest information
+                existing_booking.guest_name = booking_data.get('guest_name')
+                existing_booking.guest_phone = booking_data.get('guest_phone')
+                existing_booking.guest_email = booking_data.get('guest_email')
+                existing_booking.number_of_guests = booking_data.get('number_of_guests')
+                
+                # Update financial details
+                existing_booking.nightly_rate = booking_data.get('nightly_rate')
+                existing_booking.cleaning_fee = booking_data.get('cleaning_fee')
+                existing_booking.service_fee = booking_data.get('service_fee')
+                existing_booking.total_amount = booking_data.get('total_amount')
+                
+                # Update additional metadata
+                existing_booking.booking_source = booking_data.get('booking_source', 'airbnb')
+                existing_booking.cancellation_policy = booking_data.get('cancellation_policy')
+                existing_booking.special_requests = booking_data.get('special_requests')
+                
+                # Update additional iCal fields
+                existing_booking.location = booking_data.get('location')
+                existing_booking.organizer = booking_data.get('organizer')
+                existing_booking.attendee = booking_data.get('attendee')
+                existing_booking.created = booking_data.get('created')
+                existing_booking.last_modified = booking_data.get('last_modified')
+                
+                existing_booking.last_synced = datetime.utcnow()
+                if property_id:
+                    existing_booking.property_id = property_id
+                updated_count += 1
+            else:
+                # Create new booking with all fields
+                new_booking = AirbnbBooking(
+                    property_id=property_id,
+                    listing_id=booking_data['listing_id'],
+                    booking_uid=booking_data['booking_uid'],
+                    reservation_url=booking_data['reservation_url'],
+                    phone_last_4=booking_data['phone_last_4'],
+                    check_in_date=booking_data['check_in_date'],
+                    check_out_date=booking_data['check_out_date'],
+                    nights=booking_data['nights'],
+                    status=booking_data['status'],
+                    
+                    # Additional iCal data
+                    summary=booking_data.get('summary'),
+                    description=booking_data.get('description'),
+                    dtstamp=booking_data.get('dtstamp'),
+                    confirmation_code=booking_data.get('confirmation_code'),
+                    
+                    # Guest information
+                    guest_name=booking_data.get('guest_name'),
+                    guest_phone=booking_data.get('guest_phone'),
+                    guest_email=booking_data.get('guest_email'),
+                    number_of_guests=booking_data.get('number_of_guests'),
+                    
+                    # Financial details
+                    nightly_rate=booking_data.get('nightly_rate'),
+                    cleaning_fee=booking_data.get('cleaning_fee'),
+                    service_fee=booking_data.get('service_fee'),
+                    total_amount=booking_data.get('total_amount'),
+                    
+                    # Additional metadata
+                    booking_source=booking_data.get('booking_source', 'airbnb'),
+                    cancellation_policy=booking_data.get('cancellation_policy'),
+                    special_requests=booking_data.get('special_requests'),
+                    
+                    # Additional iCal fields
+                    location=booking_data.get('location'),
+                    organizer=booking_data.get('organizer'),
+                    attendee=booking_data.get('attendee'),
+                    created=booking_data.get('created'),
+                    last_modified=booking_data.get('last_modified')
+                )
+                db.session.add(new_booking)
+                synced_count += 1
+        
+        db.session.commit()
+        
+        return jsonify({
+            'success': True,
+            'message': f'Successfully synced {synced_count} new bookings and updated {updated_count} existing bookings',
+            'synced_count': synced_count,
+            'updated_count': updated_count,
+            'total_bookings': len(bookings_data)
+        })
+        
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({
+            'success': False,
+            'message': f'Failed to sync Airbnb bookings: {str(e)}'
+        }), 500
+
+@app.route('/api/bookings', methods=['GET'])
+@jwt_required()
+def get_bookings():
+    """Get all Airbnb bookings"""
+    try:
+        bookings = AirbnbBooking.query.order_by(AirbnbBooking.check_in_date.desc()).all()
+        
+        return jsonify({
+            'success': True,
+            'bookings': [booking.to_dict() for booking in bookings],
+            'count': len(bookings)
+        })
+        
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'message': f'Failed to fetch Airbnb bookings: {str(e)}'
+        }), 500
+
+@app.route('/api/airbnb/bookings/<int:booking_id>', methods=['PUT'])
+@jwt_required()
+def update_airbnb_booking(booking_id):
+    """Update an Airbnb booking"""
+    try:
+        booking = AirbnbBooking.query.get_or_404(booking_id)
+        data = request.get_json()
+        
+        # Update fields
+        booking.estimated_income = data.get('estimated_income', booking.estimated_income)
+        booking.currency = data.get('currency', booking.currency)
+        booking.status = data.get('status', booking.status)
+        booking.property_id = data.get('property_id', booking.property_id)
+        
+        db.session.commit()
+        
+        return jsonify({
+            'success': True,
+            'message': 'Booking updated successfully',
+            'booking': booking.to_dict()
+        })
+        
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({
+            'success': False,
+            'message': f'Failed to update booking: {str(e)}'
+        }), 500
+
+@app.route('/api/airbnb/bookings/<int:booking_id>', methods=['DELETE'])
+@jwt_required()
+def delete_airbnb_booking(booking_id):
+    """Delete an Airbnb booking"""
+    try:
+        booking = AirbnbBooking.query.get_or_404(booking_id)
+        db.session.delete(booking)
+        db.session.commit()
+        
+        return jsonify({
+            'success': True,
+            'message': 'Booking deleted successfully'
+        })
+        
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({
+            'success': False,
+            'message': f'Failed to delete booking: {str(e)}'
         }), 500
 
 if __name__ == '__main__':
