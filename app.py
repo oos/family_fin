@@ -1061,7 +1061,7 @@ def _parse_airbnb_ical(ical_url, airbnb_listing_id):
                         estimated_income -= service_fee  # Service fee is typically deducted
                 
                 booking = {
-                    'listing_id': listing_id,
+                    'listing_id': airbnb_listing_id,
                     'booking_uid': uid,
                     'reservation_url': reservation_url,
                     'phone_last_4': phone_last_4,
@@ -1095,7 +1095,7 @@ def _parse_airbnb_ical(ical_url, airbnb_listing_id):
                     'total_amount': total_amount,
                     
                     # Additional metadata
-                    'booking_source': platform,
+                    'booking_source': 'airbnb',
                     'cancellation_policy': cancellation_policy,
                     'special_requests': special_requests
                 }
@@ -1329,7 +1329,7 @@ def _parse_vrbo_ical(ical_url, listing_id):
                         estimated_income -= service_fee  # Service fee is typically deducted
                 
                 booking = {
-                    'listing_id': listing_id,
+                    'listing_id': airbnb_listing_id,
                     'booking_uid': uid,
                     'reservation_url': reservation_url,
                     'phone_last_4': phone_last_4,
