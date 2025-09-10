@@ -201,7 +201,7 @@ function App() {
           sidebarOpen={sidebarOpen}
           setSidebarOpen={setSidebarOpen}
         />
-        <div className={`main-content ${sidebarOpen ? 'sidebar-open' : ''}`}>
+        <div className={`main-content ${sidebarOpen ? 'sidebar-open' : ''}`} style={{ paddingTop: '80px' }}>
           <div className="container-fluid mt-4">
             <Routes>
               <Route path="/" element={<Dashboard />} />
@@ -228,7 +228,7 @@ function App() {
 
 function Navbar({ onLogout, userRole, currentUser, sidebarOpen, setSidebarOpen }) {
   return (
-    <nav className="navbar navbar-expand-lg navbar-dark bg-dark">
+    <nav className="navbar navbar-expand-lg navbar-dark bg-dark fixed-top">
       <div className="container-fluid">
         <button 
           className="btn btn-outline-light me-3" 
