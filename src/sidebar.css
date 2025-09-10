@@ -1,10 +1,10 @@
 /* Sidebar Styles */
 .sidebar {
   position: fixed;
-  top: 48px; /* Account for fixed navbar height */
+  top: 56px; /* Account for fixed navbar height */
   left: -300px;
   width: 300px;
-  height: calc(100vh - 48px); /* Subtract navbar height */
+  height: calc(100vh - 56px); /* Subtract navbar height */
   background-color: #343a40;
   color: white;
   z-index: 1050;
@@ -66,7 +66,7 @@
 .main-content {
   margin-left: 0;
   transition: margin-left 0.3s ease;
-  min-height: calc(100vh - 48px);
+  min-height: calc(100vh - 56px);
   padding-top: 0; /* Will be set inline for fixed navbar */
 }
 
@@ -102,21 +102,20 @@
 
 /* Navbar adjustments */
 .navbar {
-  height: 48px;
+  height: 56px;
   z-index: 1060;
 }
 
 .navbar-brand {
-  font-size: 1.1rem;
+  font-size: 1.25rem;
   font-weight: 600;
 }
 
 .navbar .container-fluid {
-  height: 48px;
+  height: 56px;
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 0.5rem 1rem;
 }
 
 /* Profile section positioning */
