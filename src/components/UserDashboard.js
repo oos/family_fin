@@ -223,7 +223,7 @@ const UserDashboard = () => {
                         const latestBalance = getLatestLoanBalance(loan.id);
                         return (
                           <tr key={loan.id}>
-                            <td>{loan.bank}</td>
+                            <td>{loan.lender}</td>
                             <td>
                               {latestBalance ? formatDate(latestBalance.date_entered) : 'No entries'}
                             </td>
@@ -421,7 +421,7 @@ const UserDashboard = () => {
                       <option value="">Select Loan</option>
                       {data.loans && data.loans.map(loan => (
                         <option key={loan.id} value={loan.id}>
-                          {loan.bank} - {loan.property_name}
+                          {loan.lender} - {loan.property_name}
                         </option>
                       ))}
                     </select>
