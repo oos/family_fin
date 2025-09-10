@@ -1818,10 +1818,10 @@ def get_account_transactions(account_id):
 def create_user():
     """Create a new user (admin only)"""
     try:
-        current_user_id = get_jwt_identity()
-        current_user = User.query.get(current_user_id)
+        current_user_username = get_jwt_identity()
+        current_user = User.query.filter_by(username=current_user_username).first()
         
-        if current_user.role != 'admin':
+        if not current_user or current_user.role != 'admin':
             return jsonify({
                 'success': False,
                 'message': 'Admin access required'
@@ -1948,10 +1948,10 @@ def reset_user_password(user_id):
 def get_dashboard_settings(user_id):
     """Get dashboard settings for a user (admin only)"""
     try:
-        current_user_id = get_jwt_identity()
-        current_user = User.query.get(current_user_id)
+        current_user_username = get_jwt_identity()
+        current_user = User.query.filter_by(username=current_user_username).first()
         
-        if current_user.role != 'admin':
+        if not current_user or current_user.role != 'admin':
             return jsonify({
                 'success': False,
                 'message': 'Admin access required'
@@ -1974,10 +1974,10 @@ def get_dashboard_settings(user_id):
 def update_dashboard_settings(user_id):
     """Update dashboard settings for a user (admin only)"""
     try:
-        current_user_id = get_jwt_identity()
-        current_user = User.query.get(current_user_id)
+        current_user_username = get_jwt_identity()
+        current_user = User.query.filter_by(username=current_user_username).first()
         
-        if current_user.role != 'admin':
+        if not current_user or current_user.role != 'admin':
             return jsonify({
                 'success': False,
                 'message': 'Admin access required'
@@ -2018,8 +2018,12 @@ def update_dashboard_settings(user_id):
 def get_account_balances():
     """Get account balances for current user"""
     try:
-        current_user_id = get_jwt_identity()
-        balances = AccountBalance.query.filter_by(user_id=current_user_id).order_by(AccountBalance.date_entered.desc()).all()
+        current_user_username = get_jwt_identity()
+        current_user = User.query.filter_by(username=current_user_username).first()
+        if not current_user:
+            return jsonify({'success': False, 'message': 'User not found'}), 404
+        
+        balances = AccountBalance.query.filter_by(user_id=current_user.id).order_by(AccountBalance.date_entered.desc()).all()
         
         return jsonify({
             'success': True,
@@ -2037,11 +2041,15 @@ def get_account_balances():
 def create_account_balance():
     """Create a new account balance entry"""
     try:
-        current_user_id = get_jwt_identity()
+        current_user_username = get_jwt_identity()
+        current_user = User.query.filter_by(username=current_user_username).first()
+        if not current_user:
+            return jsonify({'success': False, 'message': 'User not found'}), 404
+        
         data = request.get_json()
         
         new_balance = AccountBalance(
-            user_id=current_user_id,
+            user_id=current_user.id,
             account_id=data.get('account_id'),
             loan_id=data.get('loan_id'),
             balance=data.get('balance'),
@@ -2071,8 +2079,12 @@ def create_account_balance():
 def update_account_balance(balance_id):
     """Update an account balance entry"""
     try:
-        current_user_id = get_jwt_identity()
-        balance = AccountBalance.query.filter_by(id=balance_id, user_id=current_user_id).first()
+        current_user_username = get_jwt_identity()
+        current_user = User.query.filter_by(username=current_user_username).first()
+        if not current_user:
+            return jsonify({'success': False, 'message': 'User not found'}), 404
+        
+        balance = AccountBalance.query.filter_by(id=balance_id, user_id=current_user.id).first()
         
         if not balance:
             return jsonify({
@@ -2108,8 +2120,12 @@ def update_account_balance(balance_id):
 def delete_account_balance(balance_id):
     """Delete an account balance entry"""
     try:
-        current_user_id = get_jwt_identity()
-        balance = AccountBalance.query.filter_by(id=balance_id, user_id=current_user_id).first()
+        current_user_username = get_jwt_identity()
+        current_user = User.query.filter_by(username=current_user_username).first()
+        if not current_user:
+            return jsonify({'success': False, 'message': 'User not found'}), 404
+        
+        balance = AccountBalance.query.filter_by(id=balance_id, user_id=current_user.id).first()
         
         if not balance:
             return jsonify({
