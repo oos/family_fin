@@ -17,6 +17,9 @@ const UserDashboard = () => {
     date_entered: new Date().toISOString().split('T')[0]
   });
 
+  const [selectedLoan, setSelectedLoan] = useState(null);
+  const [selectedAccount, setSelectedAccount] = useState(null);
+
   useEffect(() => {
     fetchDashboardData();
   }, []);
@@ -53,6 +56,8 @@ const UserDashboard = () => {
       if (response.data.success) {
         setShowBalanceForm(false);
         setEditingBalance(null);
+        setSelectedLoan(null);
+        setSelectedAccount(null);
         setBalanceForm({
           account_id: '',
           loan_id: '',
@@ -111,6 +116,50 @@ const UserDashboard = () => {
     return new Date(dateString).toLocaleDateString('en-GB');
   };
 
+  const getLatestLoanBalance = (loanId) => {
+    if (!data.account_balances) return null;
+    const loanBalances = data.account_balances
+      .filter(balance => balance.loan_id === loanId)
+      .sort((a, b) => new Date(b.date_entered) - new Date(a.date_entered));
+    return loanBalances[0] || null;
+  };
+
+  const getLatestAccountBalance = (accountId) => {
+    if (!data.account_balances) return null;
+    const accountBalances = data.account_balances
+      .filter(balance => balance.account_id === accountId)
+      .sort((a, b) => new Date(b.date_entered) - new Date(a.date_entered));
+    return accountBalances[0] || null;
+  };
+
+  const handleAddLoanBalance = (loan) => {
+    setSelectedLoan(loan);
+    setSelectedAccount(null);
+    setBalanceForm({
+      account_id: '',
+      loan_id: loan.id,
+      balance: '',
+      currency: 'EUR',
+      notes: '',
+      date_entered: new Date().toISOString().split('T')[0]
+    });
+    setShowBalanceForm(true);
+  };
+
+  const handleAddAccountBalance = (account) => {
+    setSelectedAccount(account);
+    setSelectedLoan(null);
+    setBalanceForm({
+      account_id: account.id,
+      loan_id: '',
+      balance: '',
+      currency: 'EUR',
+      notes: '',
+      date_entered: new Date().toISOString().split('T')[0]
+    });
+    setShowBalanceForm(true);
+  };
+
   if (loading) {
     return (
       <div className="container">
@@ -150,39 +199,6 @@ const UserDashboard = () => {
       <h1>Welcome, {user.username}!</h1>
       
       <div className="row">
-        {/* Properties Section */}
-        {visible_sections.properties && data.properties && (
-          <div className="col-md-6 mb-4">
-            <div className="card">
-              <div className="card-header">
-                <h5>Properties</h5>
-              </div>
-              <div className="card-body">
-                <div className="table-responsive">
-                  <table className="table table-sm">
-                    <thead>
-                      <tr>
-                        <th>Property</th>
-                        <th>Value</th>
-                        <th>Equity</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {data.properties.map(property => (
-                        <tr key={property.id}>
-                          <td>{property.name}</td>
-                          <td>{formatCurrency(property.current_value)}</td>
-                          <td>{formatCurrency(property.equity)}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
-
         {/* Loans Section */}
         {visible_sections.loans && data.loans && (
           <div className="col-md-6 mb-4">
@@ -196,18 +212,38 @@ const UserDashboard = () => {
                     <thead>
                       <tr>
                         <th>Bank</th>
-                        <th>Property</th>
-                        <th>Balance</th>
+                        <th>Date of Latest Entry</th>
+                        <th>Balance of Latest Entry</th>
+                        <th>Comment</th>
+                        <th>Actions</th>
                       </tr>
                     </thead>
                     <tbody>
-                      {data.loans.map(loan => (
-                        <tr key={loan.id}>
-                          <td>{loan.bank}</td>
-                          <td>{loan.property_name}</td>
-                          <td>{formatCurrency(loan.remaining_balance)}</td>
-                        </tr>
-                      ))}
+                      {data.loans.map(loan => {
+                        const latestBalance = getLatestLoanBalance(loan.id);
+                        return (
+                          <tr key={loan.id}>
+                            <td>{loan.bank}</td>
+                            <td>
+                              {latestBalance ? formatDate(latestBalance.date_entered) : 'No entries'}
+                            </td>
+                            <td>
+                              {latestBalance ? formatCurrency(latestBalance.balance, latestBalance.currency) : 'N/A'}
+                            </td>
+                            <td>
+                              {latestBalance ? (latestBalance.notes || 'No comment') : 'N/A'}
+                            </td>
+                            <td>
+                              <button 
+                                className="btn btn-sm btn-primary"
+                                onClick={() => handleAddLoanBalance(loan)}
+                              >
+                                Add Balance
+                              </button>
+                            </td>
+                          </tr>
+                        );
+                      })}
                     </tbody>
                   </table>
                 </div>
@@ -228,19 +264,39 @@ const UserDashboard = () => {
                   <table className="table table-sm">
                     <thead>
                       <tr>
-                        <th>Account</th>
                         <th>Bank</th>
-                        <th>Type</th>
+                        <th>Date of Latest Entry</th>
+                        <th>Balance of Latest Entry</th>
+                        <th>Comment</th>
+                        <th>Actions</th>
                       </tr>
                     </thead>
                     <tbody>
-                      {data.bank_accounts.map(account => (
-                        <tr key={account.id}>
-                          <td>{account.name}</td>
-                          <td>{account.bank_name}</td>
-                          <td>{account.account_type}</td>
-                        </tr>
-                      ))}
+                      {data.bank_accounts.map(account => {
+                        const latestBalance = getLatestAccountBalance(account.id);
+                        return (
+                          <tr key={account.id}>
+                            <td>{account.bank_name}</td>
+                            <td>
+                              {latestBalance ? formatDate(latestBalance.date_entered) : 'No entries'}
+                            </td>
+                            <td>
+                              {latestBalance ? formatCurrency(latestBalance.balance, latestBalance.currency) : 'N/A'}
+                            </td>
+                            <td>
+                              {latestBalance ? (latestBalance.notes || 'No comment') : 'N/A'}
+                            </td>
+                            <td>
+                              <button 
+                                className="btn btn-sm btn-primary"
+                                onClick={() => handleAddAccountBalance(account)}
+                              >
+                                Add Balance
+                              </button>
+                            </td>
+                          </tr>
+                        );
+                      })}
                     </tbody>
                   </table>
                 </div>
@@ -313,7 +369,10 @@ const UserDashboard = () => {
             <div className="modal-content">
               <div className="modal-header">
                 <h5 className="modal-title">
-                  {editingBalance ? 'Edit Account Balance' : 'Add Account Balance'}
+                  {editingBalance ? 'Edit Account Balance' : 
+                   selectedLoan ? `Add Balance for ${selectedLoan.bank} - ${selectedLoan.property_name}` :
+                   selectedAccount ? `Add Balance for ${selectedAccount.bank_name} - ${selectedAccount.name}` :
+                   'Add Account Balance'}
                 </h5>
                 <button 
                   type="button" 
@@ -321,6 +380,8 @@ const UserDashboard = () => {
                   onClick={() => {
                     setShowBalanceForm(false);
                     setEditingBalance(null);
+                    setSelectedLoan(null);
+                    setSelectedAccount(null);
                     setBalanceForm({
                       account_id: '',
                       loan_id: '',
@@ -419,6 +480,8 @@ const UserDashboard = () => {
                     onClick={() => {
                       setShowBalanceForm(false);
                       setEditingBalance(null);
+                      setSelectedLoan(null);
+                      setSelectedAccount(null);
                     }}
                   >
                     Cancel
