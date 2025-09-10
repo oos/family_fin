@@ -265,6 +265,7 @@ const UserDashboard = () => {
                     <thead>
                       <tr>
                         <th>Bank</th>
+                        <th>Account Number</th>
                         <th>Date of Latest Entry</th>
                         <th>Balance of Latest Entry</th>
                         <th>Comment</th>
@@ -277,6 +278,7 @@ const UserDashboard = () => {
                         return (
                           <tr key={account.id}>
                             <td>{account.bank_name}</td>
+                            <td>{account.account_number}</td>
                             <td>
                               {latestBalance ? formatDate(latestBalance.date_entered) : 'No entries'}
                             </td>
@@ -405,7 +407,7 @@ const UserDashboard = () => {
                       <option value="">Select Account</option>
                       {data.bank_accounts && data.bank_accounts.map(account => (
                         <option key={account.id} value={account.id}>
-                          {account.name} - {account.bank_name}
+                          {account.account_name} ({account.account_number}) - {account.bank_name}
                         </option>
                       ))}
                     </select>
