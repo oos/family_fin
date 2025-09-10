@@ -27,7 +27,7 @@ def create_app():
     # Initialize extensions
     db.init_app(app)
     jwt = JWTManager(app)
-    CORS(app, origins=['http://localhost:3000', 'https://your-netlify-site.netlify.app'])
+    CORS(app, origins=['http://localhost:3000', 'http://localhost:3001', 'http://localhost:5002', 'https://your-netlify-site.netlify.app'])
     
     # Import all routes from the main app
     from app import register_routes

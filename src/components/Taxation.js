@@ -329,7 +329,7 @@ function Taxation() {
     return (
       <div>
         <div style={{ marginBottom: '30px' }}>
-          <h1>Taxation Analysis</h1>
+          <h1>Family Taxation Analysis</h1>
           <p style={{ color: '#666', fontSize: '16px', marginBottom: '20px' }}>
             Detailed Irish tax calculations for each family unit based on 2024 tax rates and bands.
           </p>
@@ -383,7 +383,7 @@ function Taxation() {
   return (
     <div>
       <div style={{ marginBottom: '30px' }}>
-        <h1>Taxation Analysis</h1>
+        <h1>Family Taxation Analysis</h1>
         <p style={{ color: '#666', fontSize: '16px', marginBottom: '20px' }}>
           Detailed Irish tax calculations for each family unit based on 2024 tax rates and bands.
         </p>
@@ -479,7 +479,7 @@ function Taxation() {
                 <tr>
                   <th>Person</th>
                   <th>External Source</th>
-                  <th>RRltd</th>
+                  <th>RRltd (Salary)</th>
                   <th>OmHe Props</th>
                   <th>Total Annual Income</th>
                 </tr>
@@ -676,6 +676,107 @@ function Taxation() {
               </div>
             </div>
           </div>
+
+          {/* RRltd Pension Contribution Strategy */}
+          {family.familyInfo.type === 'married' && family.personTotals.length === 2 && (
+            <div style={{ 
+              marginTop: '20px',
+              padding: '20px', 
+              backgroundColor: '#e3f2fd', 
+              borderRadius: '8px',
+              border: '2px solid #2196f3'
+            }}>
+              <h4 style={{ marginTop: 0, color: '#1976d2' }}>RRltd Pension Contribution Strategy</h4>
+              <p style={{ marginBottom: '15px', color: '#666' }}>
+                Calculate how much RRltd should contribute to Omar and Heidi's pensions to minimize their tax bill.
+              </p>
+              
+              {(() => {
+                // Get current RRltd salaries
+                const omarPerson = family.personTotals.find(p => p.person_name === 'Omar');
+                const heidiPerson = family.personTotals.find(p => p.person_name === 'Heidi');
+                
+                if (!omarPerson || !heidiPerson) {
+                  return <div>Unable to find Omar and Heidi in the family data.</div>;
+                }
+                
+                const omarRrltd = omarPerson.rrltd || 0;
+                const heidiRrltd = heidiPerson.rrltd || 0;
+                
+                // Calculate current tax without additional pension contributions
+                const currentTax = family.taxCalculation.totalTax;
+                
+                // Calculate optimal pension contributions for each person
+                const omarTotalIncome = (omarPerson.external || 0) + (omarPerson.rrltd || 0) + (omarPerson.omhe_props || 0);
+                const heidiTotalIncome = (heidiPerson.external || 0) + (heidiPerson.rrltd || 0) + (heidiPerson.omhe_props || 0);
+                
+                const omarOptimal = calculateOptimalPension(
+                  omarTotalIncome,
+                  'married', false, false, 40
+                );
+                
+                const heidiOptimal = calculateOptimalPension(
+                  heidiTotalIncome,
+                  'married', false, true, 40
+                );
+                
+                // Calculate tax with optimal pension contributions
+                const omarWithPension = calculateIrishTax(
+                  (omarPerson.external || 0) + (omarPerson.omhe_props || 0),
+                  'married', false, false, omarOptimal.maxContribution
+                );
+                
+                const heidiWithPension = calculateIrishTax(
+                  (heidiPerson.external || 0) + (heidiPerson.omhe_props || 0),
+                  'married', false, true, heidiOptimal.maxContribution
+                );
+                
+                const combinedTaxWithPension = omarWithPension.totalTax + heidiWithPension.totalTax;
+                const totalPensionContribution = omarOptimal.maxContribution + heidiOptimal.maxContribution;
+                const taxSavings = currentTax - combinedTaxWithPension;
+                
+                return (
+                  <div>
+                    <div style={{ 
+                      padding: '15px', 
+                      backgroundColor: '#f8f9fa', 
+                      borderRadius: '6px',
+                      marginBottom: '15px'
+                    }}>
+                      <h5 style={{ marginTop: 0, color: '#1976d2' }}>Current vs Optimized Tax</h5>
+                      <p><strong>Current Tax Bill:</strong> {formatCurrency(currentTax)}</p>
+                      <p><strong>Optimized Tax Bill:</strong> {formatCurrency(combinedTaxWithPension)}</p>
+                      <p><strong>Tax Savings:</strong> {formatCurrency(taxSavings)}</p>
+                    </div>
+                    
+                    <div style={{ 
+                      padding: '15px', 
+                      backgroundColor: '#e8f5e8', 
+                      borderRadius: '6px',
+                      marginBottom: '15px'
+                    }}>
+                      <h5 style={{ marginTop: 0, color: '#2e7d32' }}>Recommended RRltd Pension Contributions</h5>
+                      <p><strong>Omar's Pension Contribution:</strong> {formatCurrency(omarOptimal.maxContribution)}</p>
+                      <p><strong>Heidi's Pension Contribution:</strong> {formatCurrency(heidiOptimal.maxContribution)}</p>
+                      <p><strong>Total RRltd Pension Contributions:</strong> {formatCurrency(totalPensionContribution)}</p>
+                    </div>
+                    
+                    <div style={{ 
+                      padding: '15px', 
+                      backgroundColor: '#fff3e0', 
+                      borderRadius: '6px',
+                      border: '1px solid #ff9800'
+                    }}>
+                      <h5 style={{ marginTop: 0, color: '#f57c00' }}>Implementation Strategy</h5>
+                      <p><strong>RRltd should contribute {formatCurrency(totalPensionContribution)} to pensions to reduce the tax bill by {formatCurrency(taxSavings)}.</strong></p>
+                      <p><strong>Net Cost to RRltd:</strong> {formatCurrency(totalPensionContribution - taxSavings)} (after tax relief)</p>
+                      <p><strong>Effective Tax Relief Rate:</strong> {((taxSavings / totalPensionContribution) * 100).toFixed(1)}%</p>
+                    </div>
+                  </div>
+                );
+              })()}
+            </div>
+          )}
 
           {/* Pension Optimization */}
           {family.pensionOptimization && (

@@ -13,6 +13,7 @@ const Bookings = () => {
   const [selectedBooking, setSelectedBooking] = useState(null);
   const [autoSyncing, setAutoSyncing] = useState(false);
   const [newBooking, setNewBooking] = useState({
+    property: '',
     check_in_date: '',
     check_out_date: '',
     estimated_income: '',
@@ -482,6 +483,19 @@ const Bookings = () => {
             <div className="mt-3">
               <div className="row">
                 <div className="col-md-3">
+                  <label className="form-label">Property</label>
+                  <select
+                    className="form-control"
+                    value={newBooking.property}
+                    onChange={(e) => setNewBooking({...newBooking, property: e.target.value})}
+                  >
+                    <option value="">Select Property</option>
+                    {Object.entries(properties).map(([key, property]) => (
+                      <option key={key} value={key}>{property.name}</option>
+                    ))}
+                  </select>
+                </div>
+                <div className="col-md-3">
                   <label className="form-label">Check-in Date</label>
                   <input
                     type="date"
@@ -542,7 +556,7 @@ const Bookings = () => {
                     const nightsCount = Math.ceil(nights / (1000 * 60 * 60 * 24));
                     
                     // Create booking object
-                    const property = properties[selectedProperty];
+                    const property = properties[newBooking.property];
                     const booking = {
                       airbnb_listing_id: property.listing_id,
                       booking_uid: `manual-${Date.now()}`,
@@ -557,6 +571,7 @@ const Bookings = () => {
                     // Add to local state (in a real app, you'd save to backend)
                     setBookings([booking, ...bookings]);
                     setNewBooking({
+                      property: '',
                       check_in_date: '',
                       check_out_date: '',
                       estimated_income: '',

@@ -30,7 +30,7 @@ python3 seed_data.py
 
 # Start the Flask backend in the background
 echo "Starting Flask backend..."
-python3 app.py &
+PORT=5002 python3 app.py &
 BACKEND_PID=$!
 
 # Wait a moment for the backend to start
@@ -45,7 +45,7 @@ echo ""
 echo "=========================================="
 echo "Family Finance Management System Started!"
 echo "=========================================="
-echo "Backend: http://localhost:5000"
+echo "Backend: http://localhost:5002"
 echo "Frontend: http://localhost:3000"
 echo "Login: admin / admin123"
 echo ""

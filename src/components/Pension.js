@@ -2,23 +2,36 @@ import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 
 const Pension = () => {
-  const [pensions, setPensions] = useState([]);
+  const [income, setIncome] = useState([]);
+  const [properties, setProperties] = useState([]);
   const [people, setPeople] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  const [editingPension, setEditingPension] = useState(null);
-  const [showForm, setShowForm] = useState(false);
-  const [formData, setFormData] = useState({
-    person_id: '',
-    pension_type: 'personal',
-    contribution_amount: '',
-    contribution_frequency: 'annual',
-    tax_year: new Date().getFullYear(),
-    is_company_contribution: false,
-    company_name: '',
-    pension_provider: '',
-    notes: ''
-  });
+
+  useEffect(() => {
+    fetchData();
+  }, []);
+
+  const fetchData = async () => {
+    try {
+      const [incomeRes, propertiesRes, peopleRes] = await Promise.all([
+        axios.get('/income'),
+        axios.get('/properties'),
+        axios.get('/people')
+      ]);
+      console.log('Income data:', incomeRes.data);
+      console.log('Properties data:', propertiesRes.data);
+      console.log('People data:', peopleRes.data);
+      setIncome(incomeRes.data);
+      setProperties(propertiesRes.data);
+      setPeople(peopleRes.data);
+    } catch (err) {
+      setError('Failed to fetch data');
+      console.error('Fetch error:', err);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   // Format currency
   const formatCurrency = (amount) => {
@@ -30,471 +43,329 @@ const Pension = () => {
     }).format(amount);
   };
 
-  // Calculate pension limits based on age and income
-  const calculatePensionLimits = (personAge, grossIncome) => {
-    const PENSION_LIMITS = {
-      under30: 0.15,
-      under40: 0.20,
-      under50: 0.25,
-      under55: 0.30,
-      under60: 0.35,
-      over60: 0.40
-    };
+  // Calculate RRltd available funds for pension contributions
+  const calculateRRltdFunds = () => {
+    console.log('All properties:', properties);
+    // RRltd income from properties (short-term rentals)
+    const rrltdProperties = properties.filter(prop => 
+      ['2SA', '87HP', '28LC'].includes(prop.nickname)
+    );
+    console.log('RRltd properties:', rrltdProperties);
+    
+    const grossIncome = rrltdProperties.reduce((sum, prop) => {
+      console.log(`Property ${prop.nickname}: income_yearly = ${prop.income_yearly}`);
+      return sum + (prop.income_yearly || 0);
+    }, 0);
+    console.log('Gross income:', grossIncome);
 
+    // After VAT (23%)
+    const netIncome = grossIncome * 0.77;
+    
+    // 40% expenses
+    const expenses = netIncome * 0.4;
+    const tradingIncome = netIncome - expenses;
+    
+    // Corporation Tax (12.5%)
+    const corporationTax = tradingIncome * 0.125;
+    const afterTaxProfit = tradingIncome - corporationTax;
+
+    return {
+      grossIncome,
+      netIncome,
+      expenses,
+      tradingIncome,
+      corporationTax,
+      afterTaxProfit
+    };
+  };
+
+  // Calculate optimal pension contribution for each RRltd employee
+  const calculateOptimalPension = (personName, currentSalary) => {
     const MAX_ANNUAL_CONTRIBUTION = 115000;
-
-    let ageLimit;
-    if (personAge < 30) ageLimit = PENSION_LIMITS.under30;
-    else if (personAge < 40) ageLimit = PENSION_LIMITS.under40;
-    else if (personAge < 50) ageLimit = PENSION_LIMITS.under50;
-    else if (personAge < 55) ageLimit = PENSION_LIMITS.under55;
-    else if (personAge < 60) ageLimit = PENSION_LIMITS.under60;
-    else ageLimit = PENSION_LIMITS.over60;
-
-    const maxContributionByAge = grossIncome * ageLimit;
-    const maxContribution = Math.min(maxContributionByAge, MAX_ANNUAL_CONTRIBUTION);
-
+    const INCOME_PERCENTAGE_LIMIT = 0.25; // 25% of income
+    
+    // Personal contribution limit (25% of income or €115k)
+    const personalLimit = Math.min(currentSalary * INCOME_PERCENTAGE_LIMIT, MAX_ANNUAL_CONTRIBUTION);
+    
+    // Company contribution limit (€115k per person)
+    const companyLimit = MAX_ANNUAL_CONTRIBUTION;
+    
+    // Total possible contribution
+    const totalLimit = Math.min(personalLimit + companyLimit, currentSalary + MAX_ANNUAL_CONTRIBUTION);
+    
+    // Tax rates
+    const PERSONAL_TAX_RATE = 0.20; // 20% for most income
+    const CORPORATION_TAX_RATE = 0.125; // 12.5%
+    const PRSI_RATE = 0.04; // 4%
+    const USC_RATE = 0.08; // 8% (simplified)
+    
+    // Current tax without pension
+    const currentTax = currentSalary * (PERSONAL_TAX_RATE + PRSI_RATE + USC_RATE);
+    
+    // Optimal strategy: Company pays maximum possible
+    const optimalCompanyContribution = Math.min(companyLimit, currentSalary);
+    const personalContribution = Math.min(personalLimit, currentSalary - optimalCompanyContribution);
+    const totalContribution = optimalCompanyContribution + personalContribution;
+    
+    // Tax savings
+    const personalTaxSavings = personalContribution * PERSONAL_TAX_RATE;
+    const companyTaxSavings = optimalCompanyContribution * PERSONAL_TAX_RATE;
+    const corporationTaxRelief = optimalCompanyContribution * CORPORATION_TAX_RATE;
+    
+    const totalTaxSavings = personalTaxSavings + companyTaxSavings;
+    const totalRelief = totalTaxSavings + corporationTaxRelief;
+    
+    // Remaining tax (PRSI and USC cannot be eliminated)
+    const remainingTax = currentSalary * (PRSI_RATE + USC_RATE);
+    
+    // Net cost to company
+    const netCostToCompany = optimalCompanyContribution - corporationTaxRelief;
+    
     return {
-      ageLimit: ageLimit * 100,
-      maxContributionByAge,
-      maxContribution,
-      maxAnnualLimit: MAX_ANNUAL_CONTRIBUTION
+      currentSalary,
+      currentTax,
+      personalContribution,
+      companyContribution: optimalCompanyContribution,
+      totalContribution,
+      personalTaxSavings,
+      companyTaxSavings,
+      corporationTaxRelief,
+      totalTaxSavings,
+      totalRelief,
+      remainingTax,
+      netCostToCompany,
+      finalTax: remainingTax
     };
   };
 
-  // Calculate tax savings from pension contribution
-  const calculateTaxSavings = (contributionAmount, grossIncome, familyType, isSecondEarner = false) => {
-    // Simplified tax calculation for pension relief
-    const TAX_BANDS = {
-      single: [
-        { min: 0, max: 42000, rate: 0.20 },
-        { min: 42000, max: Infinity, rate: 0.40 }
-      ],
-      married_first_earner: [
-        { min: 0, max: 53000, rate: 0.20 },
-        { min: 53000, max: Infinity, rate: 0.40 }
-      ],
-      married_second_earner: [
-        { min: 0, max: 35000, rate: 0.20 },
-        { min: 35000, max: Infinity, rate: 0.40 }
-      ]
-    };
+  // Get RRltd employees (people with RRltd salary income)
+  const getRRltdEmployees = () => {
+    const rrltdSalaries = income.filter(inc => 
+      inc.company_name === 'RRltd' && inc.income_type === 'salary'
+    );
+    
+    return rrltdSalaries.map(salary => {
+      const person = people.find(p => p.name === salary.person_name);
+      return {
+        person: person,
+        salary: salary.amount_yearly,
+        pensionCalc: calculateOptimalPension(salary.person_name, salary.amount_yearly)
+      };
+    });
+  };
 
-    const TAX_CREDITS = {
-      single: 3750,
-      married: 7500,
-      pensioner: 3750 + 1650
-    };
-
-    // Determine tax bands
-    let taxBands;
-    if (familyType === 'married') {
-      taxBands = isSecondEarner ? TAX_BANDS.married_second_earner : TAX_BANDS.married_first_earner;
-    } else {
-      taxBands = TAX_BANDS.single;
-    }
-
-    const taxCredit = TAX_CREDITS[familyType === 'married' ? 'married' : 'single'];
-
-    // Calculate tax without pension
-    let incomeTaxWithout = 0;
-    let remainingIncome = grossIncome;
-    for (const band of taxBands) {
-      if (remainingIncome <= 0) break;
-      const taxableInBand = Math.min(remainingIncome, band.max - band.min);
-      incomeTaxWithout += taxableInBand * band.rate;
-      remainingIncome -= taxableInBand;
-    }
-    incomeTaxWithout = Math.max(0, incomeTaxWithout - taxCredit);
-
-    // Calculate tax with pension
-    let incomeTaxWith = 0;
-    remainingIncome = Math.max(0, grossIncome - contributionAmount);
-    for (const band of taxBands) {
-      if (remainingIncome <= 0) break;
-      const taxableInBand = Math.min(remainingIncome, band.max - band.min);
-      incomeTaxWith += taxableInBand * band.rate;
-      remainingIncome -= taxableInBand;
-    }
-    incomeTaxWith = Math.max(0, incomeTaxWith - taxCredit);
-
-    const taxSavings = incomeTaxWithout - incomeTaxWith;
-    const netCost = contributionAmount - taxSavings;
-
+  // Calculate total pension strategy
+  const calculateTotalStrategy = () => {
+    const rrltdFunds = calculateRRltdFunds();
+    const employees = getRRltdEmployees();
+    
+    const totalCompanyContribution = employees.reduce((sum, emp) => 
+      sum + emp.pensionCalc.companyContribution, 0
+    );
+    
+    const totalCorporationTaxRelief = employees.reduce((sum, emp) => 
+      sum + emp.pensionCalc.corporationTaxRelief, 0
+    );
+    
+    const totalNetCost = totalCompanyContribution - totalCorporationTaxRelief;
+    
     return {
-      taxSavings,
-      netCost,
-      effectiveTaxRate: (taxSavings / contributionAmount) * 100
+      rrltdFunds,
+      employees,
+      totalCompanyContribution,
+      totalCorporationTaxRelief,
+      totalNetCost,
+      availableFunds: rrltdFunds.afterTaxProfit
     };
   };
-
-  useEffect(() => {
-    fetchPensions();
-    fetchPeople();
-  }, []);
-
-  const fetchPensions = async () => {
-    try {
-      const response = await axios.get('/pensions');
-      setPensions(response.data);
-    } catch (err) {
-      setError('Failed to fetch pension data');
-      console.error(err);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const fetchPeople = async () => {
-    try {
-      const response = await axios.get('/people');
-      setPeople(response.data);
-    } catch (err) {
-      console.error('Failed to fetch people:', err);
-    }
-  };
-
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    try {
-      if (editingPension) {
-        await axios.put(`/pensions/${editingPension.id}`, formData);
-      } else {
-        await axios.post('/pensions', formData);
-      }
-      await fetchPensions();
-      handleCloseModal();
-    } catch (err) {
-      setError('Failed to save pension record');
-      console.error(err);
-    }
-  };
-
-  const handleEdit = (pension) => {
-    setEditingPension(pension);
-    setFormData({
-      person_id: pension.person_id.toString(),
-      pension_type: pension.pension_type,
-      contribution_amount: pension.contribution_amount.toString(),
-      contribution_frequency: pension.contribution_frequency,
-      tax_year: pension.tax_year.toString(),
-      is_company_contribution: pension.is_company_contribution,
-      company_name: pension.company_name || '',
-      pension_provider: pension.pension_provider || '',
-      notes: pension.notes || ''
-    });
-    setShowForm(true);
-  };
-
-  const handleDelete = async (id) => {
-    if (window.confirm('Are you sure you want to delete this pension record?')) {
-      try {
-        await axios.delete(`/pensions/${id}`);
-        await fetchPensions();
-      } catch (err) {
-        setError('Failed to delete pension record');
-        console.error(err);
-      }
-    }
-  };
-
-  const handleAddNew = () => {
-    setEditingPension(null);
-    setFormData({
-      person_id: '',
-      pension_type: 'personal',
-      contribution_amount: '',
-      contribution_frequency: 'annual',
-      tax_year: new Date().getFullYear(),
-      is_company_contribution: false,
-      company_name: '',
-      pension_provider: '',
-      notes: ''
-    });
-    setShowForm(true);
-  };
-
-  const handleCloseModal = () => {
-    setShowForm(false);
-    setEditingPension(null);
-    setError('');
-  };
-
-  const resetForm = () => {
-    setFormData({
-      person_id: '',
-      pension_type: 'personal',
-      contribution_amount: '',
-      contribution_frequency: 'annual',
-      tax_year: new Date().getFullYear(),
-      is_company_contribution: false,
-      company_name: '',
-      pension_provider: '',
-      notes: ''
-    });
-  };
-
-  // Group pensions by person
-  const pensionsByPerson = pensions.reduce((groups, pension) => {
-    const personName = pension.person_name || 'Unknown';
-    if (!groups[personName]) {
-      groups[personName] = [];
-    }
-    groups[personName].push(pension);
-    return groups;
-  }, {});
 
   if (loading) {
     return <div className="loading">Loading pension data...</div>;
   }
 
+  if (error) {
+    return <div className="error">{error}</div>;
+  }
+
+  const strategy = calculateTotalStrategy();
+
   return (
     <div className="pension-page">
       <div className="page-header">
         <h2>Pension Management</h2>
-        <button onClick={handleAddNew} className="btn btn-primary">
-          Add New Pension Contribution
-        </button>
+        <p style={{ color: '#666', fontSize: '16px', marginBottom: '20px' }}>
+          Calculate optimal pension contributions that RRltd can pay to employees on top of their salaries.
+        </p>
       </div>
 
-      {error && <div className="error">{error}</div>}
+      {/* RRltd Funds Analysis */}
+      <div className="card" style={{ marginBottom: '30px' }}>
+        <h3>RRltd Available Funds for Pension Contributions</h3>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '15px' }}>
+          <div style={{ padding: '15px', backgroundColor: '#f8f9fa', borderRadius: '6px' }}>
+            <div style={{ fontSize: '14px', color: '#666', marginBottom: '5px' }}>Gross Income</div>
+            <div style={{ fontSize: '18px', fontWeight: 'bold', color: '#1976d2' }}>
+              {formatCurrency(strategy.rrltdFunds.grossIncome)}
+            </div>
+          </div>
+          <div style={{ padding: '15px', backgroundColor: '#f8f9fa', borderRadius: '6px' }}>
+            <div style={{ fontSize: '14px', color: '#666', marginBottom: '5px' }}>After VAT (23%)</div>
+            <div style={{ fontSize: '18px', fontWeight: 'bold', color: '#1976d2' }}>
+              {formatCurrency(strategy.rrltdFunds.netIncome)}
+            </div>
+          </div>
+          <div style={{ padding: '15px', backgroundColor: '#f8f9fa', borderRadius: '6px' }}>
+            <div style={{ fontSize: '14px', color: '#666', marginBottom: '5px' }}>Expenses (40%)</div>
+            <div style={{ fontSize: '18px', fontWeight: 'bold', color: '#d32f2f' }}>
+              -{formatCurrency(strategy.rrltdFunds.expenses)}
+            </div>
+          </div>
+          <div style={{ padding: '15px', backgroundColor: '#f8f9fa', borderRadius: '6px' }}>
+            <div style={{ fontSize: '14px', color: '#666', marginBottom: '5px' }}>Trading Income</div>
+            <div style={{ fontSize: '18px', fontWeight: 'bold', color: '#2e7d32' }}>
+              {formatCurrency(strategy.rrltdFunds.tradingIncome)}
+            </div>
+          </div>
+          <div style={{ padding: '15px', backgroundColor: '#f8f9fa', borderRadius: '6px' }}>
+            <div style={{ fontSize: '14px', color: '#666', marginBottom: '5px' }}>Corporation Tax (12.5%)</div>
+            <div style={{ fontSize: '18px', fontWeight: 'bold', color: '#d32f2f' }}>
+              -{formatCurrency(strategy.rrltdFunds.corporationTax)}
+            </div>
+          </div>
+          <div style={{ padding: '15px', backgroundColor: '#e8f5e8', borderRadius: '6px' }}>
+            <div style={{ fontSize: '14px', color: '#666', marginBottom: '5px' }}>Available for Pensions</div>
+            <div style={{ fontSize: '18px', fontWeight: 'bold', color: '#4caf50' }}>
+              {formatCurrency(strategy.rrltdFunds.afterTaxProfit)}
+            </div>
+          </div>
+        </div>
+      </div>
 
-      {/* Pension Summary by Person */}
-      <div className="card">
-        <h3>Pension Contributions by Person</h3>
-        {Object.keys(pensionsByPerson).length === 0 ? (
-          <p>No pension contributions recorded.</p>
+      {/* Key Information */}
+      <div style={{ marginBottom: '30px', padding: '20px', backgroundColor: '#e3f2fd', borderRadius: '8px' }}>
+        <h3>Key Information</h3>
+        <ul>
+          <li><strong>Personal Contribution Limit:</strong> 25% of income or €115,000 (whichever is lower)</li>
+          <li><strong>Company Contribution Limit:</strong> €115,000 per person per year</li>
+          <li><strong>Corporation Tax Relief:</strong> 12.5% on company pension contributions</li>
+          <li><strong>Personal Tax Relief:</strong> 20% on personal contributions</li>
+          <li><strong>PRSI & USC:</strong> Still calculated on gross income (cannot be reduced by pension contributions)</li>
+        </ul>
+      </div>
+
+      {/* Individual Employee Analysis */}
+      <div className="card" style={{ marginBottom: '30px' }}>
+        <h3>Optimal Pension Contributions by RRltd Employee</h3>
+        {strategy.employees.length === 0 ? (
+          <p>No RRltd employees found with salary income.</p>
         ) : (
-          <div className="pension-summary">
-            {Object.entries(pensionsByPerson).map(([personName, personPensions]) => {
-              const totalContribution = personPensions.reduce((sum, pension) => 
-                sum + (pension.contribution_frequency === 'monthly' ? pension.contribution_amount * 12 : pension.contribution_amount), 0
-              );
-              
-              // Get person details for calculations
-              const person = people.find(p => p.name === personName);
-              const personAge = person ? (new Date().getFullYear() - new Date(person.date_of_birth).getFullYear()) : 40;
-              
-              // Estimate gross income (this would ideally come from income data)
-              const estimatedIncome = 100000; // Placeholder - would be calculated from actual income data
-              const limits = calculatePensionLimits(personAge, estimatedIncome);
-              const taxSavings = calculateTaxSavings(totalContribution, estimatedIncome, 'married', false);
-              
-              return (
-                <div key={personName} className="person-pension-summary">
-                  <h4>{personName}</h4>
-                  <div className="summary-stats">
-                    <div className="stat">
-                      <span className="label">Total Annual Contribution:</span>
-                      <span className="value">{formatCurrency(totalContribution)}</span>
+          <div>
+            {strategy.employees.map((employee, index) => (
+              <div key={index} style={{ marginBottom: '20px', padding: '15px', backgroundColor: '#f8f9fa', borderRadius: '8px' }}>
+                <h4>{employee.person?.name || 'Unknown'} - Pension Strategy</h4>
+                <p><strong>Current Annual Salary:</strong> {formatCurrency(employee.salary)}</p>
+                
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '15px', marginTop: '15px' }}>
+                  <div style={{ padding: '15px', backgroundColor: '#f3e5f5', borderRadius: '8px' }}>
+                    <h5 style={{ color: '#7b1fa2', marginBottom: '10px' }}>Personal Contribution</h5>
+                    <div style={{ marginBottom: '8px' }}>
+                      <strong>Amount:</strong><br/>
+                      {formatCurrency(employee.pensionCalc.personalContribution)}
                     </div>
-                    <div className="stat">
-                      <span className="label">Age-Based Limit ({personAge} years):</span>
-                      <span className="value">{limits.ageLimit}% (€{formatCurrency(limits.maxContributionByAge)})</span>
+                    <div style={{ marginBottom: '8px' }}>
+                      <strong>Tax Savings:</strong><br/>
+                      {formatCurrency(employee.pensionCalc.personalTaxSavings)}
                     </div>
-                    <div className="stat">
-                      <span className="label">Annual Limit:</span>
-                      <span className="value">€{formatCurrency(limits.maxAnnualLimit)}</span>
+                  </div>
+
+                  <div style={{ padding: '15px', backgroundColor: '#e8f5e8', borderRadius: '8px' }}>
+                    <h5 style={{ color: '#2e7d32', marginBottom: '10px' }}>Company Contribution</h5>
+                    <div style={{ marginBottom: '8px' }}>
+                      <strong>Amount:</strong><br/>
+                      {formatCurrency(employee.pensionCalc.companyContribution)}
                     </div>
-                    <div className="stat">
-                      <span className="label">Estimated Tax Savings:</span>
-                      <span className="value">{formatCurrency(taxSavings.taxSavings)}</span>
+                    <div style={{ marginBottom: '8px' }}>
+                      <strong>Corporation Tax Relief:</strong><br/>
+                      {formatCurrency(employee.pensionCalc.corporationTaxRelief)}
                     </div>
-                    <div className="stat">
-                      <span className="label">Net Cost:</span>
-                      <span className="value">{formatCurrency(taxSavings.netCost)}</span>
+                    <div style={{ marginBottom: '8px' }}>
+                      <strong>Net Cost to Company:</strong><br/>
+                      {formatCurrency(employee.pensionCalc.netCostToCompany)}
+                    </div>
+                  </div>
+
+                  <div style={{ padding: '15px', backgroundColor: '#fff3e0', borderRadius: '8px' }}>
+                    <h5 style={{ color: '#ef6c00', marginBottom: '10px' }}>Total Strategy</h5>
+                    <div style={{ marginBottom: '8px' }}>
+                      <strong>Total Contribution:</strong><br/>
+                      {formatCurrency(employee.pensionCalc.totalContribution)}
+                    </div>
+                    <div style={{ marginBottom: '8px' }}>
+                      <strong>Total Tax Relief:</strong><br/>
+                      {formatCurrency(employee.pensionCalc.totalRelief)}
+                    </div>
+                    <div style={{ marginBottom: '8px' }}>
+                      <strong>Remaining Tax:</strong><br/>
+                      {formatCurrency(employee.pensionCalc.remainingTax)}
                     </div>
                   </div>
                 </div>
-              );
-            })}
+              </div>
+            ))}
           </div>
         )}
       </div>
 
-      {/* Pension Details Table */}
-      <div className="card">
-        <h3>Pension Contribution Details</h3>
-        <div className="table-container">
-          <table className="data-table">
-            <thead>
-              <tr>
-                <th>Person</th>
-                <th>Type</th>
-                <th>Amount</th>
-                <th>Frequency</th>
-                <th>Tax Year</th>
-                <th>Company</th>
-                <th>Provider</th>
-                <th>Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {pensions.map((pension) => (
-                <tr key={pension.id}>
-                  <td>{pension.person_name}</td>
-                  <td>
-                    <span className={`badge ${pension.pension_type === 'personal' ? 'badge-primary' : 'badge-secondary'}`}>
-                      {pension.pension_type}
-                    </span>
-                  </td>
-                  <td>{formatCurrency(pension.contribution_amount)}</td>
-                  <td>{pension.contribution_frequency}</td>
-                  <td>{pension.tax_year}</td>
-                  <td>{pension.is_company_contribution ? pension.company_name : 'N/A'}</td>
-                  <td>{pension.pension_provider || 'N/A'}</td>
-                  <td>
-                    <button 
-                      onClick={() => handleEdit(pension)}
-                      className="btn btn-sm btn-outline"
-                    >
-                      Edit
-                    </button>
-                    <button 
-                      onClick={() => handleDelete(pension.id)}
-                      className="btn btn-sm btn-danger"
-                    >
-                      Delete
-                    </button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </div>
-
-      {/* Pension Form Modal */}
-      {showForm && (
-        <div className="modal-overlay">
-          <div className="modal">
-            <div className="modal-header">
-              <h3>{editingPension ? 'Edit Pension Contribution' : 'Add New Pension Contribution'}</h3>
-              <button onClick={handleCloseModal} className="btn-close">&times;</button>
+      {/* Total Strategy Summary */}
+      <div className="card" style={{ backgroundColor: '#e8f5e8' }}>
+        <h3>Total Pension Strategy Summary</h3>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '15px' }}>
+          <div style={{ padding: '15px', backgroundColor: '#f8f9fa', borderRadius: '6px' }}>
+            <div style={{ fontSize: '14px', color: '#666', marginBottom: '5px' }}>Total Company Contributions</div>
+            <div style={{ fontSize: '18px', fontWeight: 'bold', color: '#2e7d32' }}>
+              {formatCurrency(strategy.totalCompanyContribution)}
             </div>
-            <form onSubmit={handleSubmit} className="modal-body">
-              <div className="form-group">
-                <label>Person *</label>
-                <select
-                  value={formData.person_id}
-                  onChange={(e) => setFormData({...formData, person_id: e.target.value})}
-                  required
-                >
-                  <option value="">Select a person</option>
-                  {people.map(person => (
-                    <option key={person.id} value={person.id}>
-                      {person.name}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              <div className="form-group">
-                <label>Pension Type *</label>
-                <select
-                  value={formData.pension_type}
-                  onChange={(e) => setFormData({...formData, pension_type: e.target.value})}
-                  required
-                >
-                  <option value="personal">Personal (PRSA/PRB)</option>
-                  <option value="occupational">Occupational</option>
-                  <option value="company">Company Director</option>
-                </select>
-              </div>
-
-              <div className="form-group">
-                <label>Contribution Amount *</label>
-                <input
-                  type="number"
-                  value={formData.contribution_amount}
-                  onChange={(e) => setFormData({...formData, contribution_amount: e.target.value})}
-                  placeholder="Enter amount"
-                  required
-                  min="0"
-                  step="0.01"
-                />
-              </div>
-
-              <div className="form-group">
-                <label>Contribution Frequency *</label>
-                <select
-                  value={formData.contribution_frequency}
-                  onChange={(e) => setFormData({...formData, contribution_frequency: e.target.value})}
-                  required
-                >
-                  <option value="annual">Annual</option>
-                  <option value="monthly">Monthly</option>
-                  <option value="quarterly">Quarterly</option>
-                </select>
-              </div>
-
-              <div className="form-group">
-                <label>Tax Year *</label>
-                <input
-                  type="number"
-                  value={formData.tax_year}
-                  onChange={(e) => setFormData({...formData, tax_year: e.target.value})}
-                  min="2020"
-                  max="2030"
-                  required
-                />
-              </div>
-
-              <div className="form-group">
-                <label>
-                  <input
-                    type="checkbox"
-                    checked={formData.is_company_contribution}
-                    onChange={(e) => setFormData({...formData, is_company_contribution: e.target.checked})}
-                  />
-                  Company Contribution
-                </label>
-              </div>
-
-              {formData.is_company_contribution && (
-                <div className="form-group">
-                  <label>Company Name</label>
-                  <input
-                    type="text"
-                    value={formData.company_name}
-                    onChange={(e) => setFormData({...formData, company_name: e.target.value})}
-                    placeholder="Enter company name"
-                  />
-                </div>
-              )}
-
-              <div className="form-group">
-                <label>Pension Provider</label>
-                <input
-                  type="text"
-                  value={formData.pension_provider}
-                  onChange={(e) => setFormData({...formData, pension_provider: e.target.value})}
-                  placeholder="e.g., Irish Life, Aviva, etc."
-                />
-              </div>
-
-              <div className="form-group">
-                <label>Notes</label>
-                <textarea
-                  value={formData.notes}
-                  onChange={(e) => setFormData({...formData, notes: e.target.value})}
-                  placeholder="Additional notes"
-                  rows="3"
-                />
-              </div>
-
-              <div className="form-actions">
-                <button type="button" onClick={handleCloseModal} className="btn btn-secondary">
-                  Cancel
-                </button>
-                <button type="submit" className="btn btn-primary">
-                  {editingPension ? 'Update' : 'Add'} Pension Contribution
-                </button>
-              </div>
-            </form>
+          </div>
+          <div style={{ padding: '15px', backgroundColor: '#f8f9fa', borderRadius: '6px' }}>
+            <div style={{ fontSize: '14px', color: '#666', marginBottom: '5px' }}>Total Corporation Tax Relief</div>
+            <div style={{ fontSize: '18px', fontWeight: 'bold', color: '#4caf50' }}>
+              {formatCurrency(strategy.totalCorporationTaxRelief)}
+            </div>
+          </div>
+          <div style={{ padding: '15px', backgroundColor: '#f8f9fa', borderRadius: '6px' }}>
+            <div style={{ fontSize: '14px', color: '#666', marginBottom: '5px' }}>Net Cost to Company</div>
+            <div style={{ fontSize: '18px', fontWeight: 'bold', color: '#1976d2' }}>
+              {formatCurrency(strategy.totalNetCost)}
+            </div>
+          </div>
+          <div style={{ padding: '15px', backgroundColor: '#f8f9fa', borderRadius: '6px' }}>
+            <div style={{ fontSize: '14px', color: '#666', marginBottom: '5px' }}>Available RRltd Funds</div>
+            <div style={{ fontSize: '18px', fontWeight: 'bold', color: '#4caf50' }}>
+              {formatCurrency(strategy.availableFunds)}
+            </div>
+          </div>
+          <div style={{ padding: '15px', backgroundColor: '#f8f9fa', borderRadius: '6px' }}>
+            <div style={{ fontSize: '14px', color: '#666', marginBottom: '5px' }}>Funds Utilization</div>
+            <div style={{ fontSize: '18px', fontWeight: 'bold', color: strategy.totalNetCost <= strategy.availableFunds ? '#4caf50' : '#d32f2f' }}>
+              {((strategy.totalNetCost / strategy.availableFunds) * 100).toFixed(1)}%
+            </div>
           </div>
         </div>
-      )}
+        
+        <div style={{ marginTop: '20px', padding: '15px', backgroundColor: '#f5f5f5', borderRadius: '8px' }}>
+          <h4>Strategy Recommendation:</h4>
+          <p>
+            <strong>RRltd should pay pension contributions totaling {formatCurrency(strategy.totalCompanyContribution)} to all employees.</strong>
+          </p>
+          <p>
+            This will provide {formatCurrency(strategy.totalCorporationTaxRelief)} in corporation tax relief, 
+            reducing the net cost to {formatCurrency(strategy.totalNetCost)}.
+          </p>
+          <p>
+            <strong>Note:</strong> PRSI and USC cannot be eliminated as they are calculated on gross income and cannot be reduced by pension contributions.
+          </p>
+        </div>
+      </div>
     </div>
   );
 };

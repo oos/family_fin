@@ -9,6 +9,7 @@ import Income from './components/Income';
 import LoanCalculator from './components/LoanCalculator';
 import Loans from './components/Loans';
 import Taxation from './components/Taxation';
+import CompanyTaxation from './components/CompanyTaxation';
 import Pension from './components/Pension';
 import CompanyPensionCalculator from './components/CompanyPensionCalculator';
 import Transactions from './components/Transactions';
@@ -19,7 +20,7 @@ import Login from './components/Login';
 import './sidebar.css';
 
 // Set up axios defaults
-axios.defaults.baseURL = 'http://localhost:5001/api';
+axios.defaults.baseURL = 'http://localhost:5002/api';
 
 // Add request interceptor to include JWT token
 axios.interceptors.request.use(
@@ -73,10 +74,11 @@ function Sidebar({ userRole, sidebarOpen, setSidebarOpen }) {
     { path: '/people', icon: 'fas fa-users', label: 'People' },
     { path: '/properties', icon: 'fas fa-home', label: 'Properties' },
     { path: '/business-accounts', icon: 'fas fa-university', label: 'Business Accounts' },
-    { path: '/income', icon: 'fas fa-euro-sign', label: 'Income' },
+    { path: '/income', icon: 'fas fa-euro-sign', label: 'Family Incomes' },
     { path: '/loans', icon: 'fas fa-credit-card', label: 'Loans' },
     { path: '/loan-calculator', icon: 'fas fa-calculator', label: 'Loan Calculator' },
-    { path: '/taxation', icon: 'fas fa-file-invoice-dollar', label: 'Taxation' },
+    { path: '/taxation', icon: 'fas fa-file-invoice-dollar', label: 'Family Taxation' },
+    { path: '/company-taxation', icon: 'fas fa-building', label: 'Company Taxation' },
     { path: '/pension', icon: 'fas fa-piggy-bank', label: 'Pension' },
     { path: '/company-pension', icon: 'fas fa-building', label: 'Company Pension' },
     { path: '/transactions', icon: 'fas fa-exchange-alt', label: 'Transactions' },
@@ -276,6 +278,11 @@ function App() {
               <Route path="/taxation" element={
                 <ProtectedRoute userRole={userRole} requiredRole="admin" fallbackPath="/user-dashboard">
                   <Taxation />
+                </ProtectedRoute>
+              } />
+              <Route path="/company-taxation" element={
+                <ProtectedRoute userRole={userRole} requiredRole="admin" fallbackPath="/user-dashboard">
+                  <CompanyTaxation />
                 </ProtectedRoute>
               } />
               <Route path="/pension" element={

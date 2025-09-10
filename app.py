@@ -29,7 +29,7 @@ from models import db, User, Person, Property, Income, Loan, Family, BusinessAcc
 db.init_app(app)
 jwt = JWTManager(app)
 migrate = Migrate(app, db)
-CORS(app)
+CORS(app, origins=['http://localhost:3001'])
 
 @app.route('/api/health', methods=['GET'])
 def health_check():
@@ -284,9 +284,7 @@ def create_loan():
         regular_overpayment=data.get('regular_overpayment', 0),
         overpayment_start_month=data.get('overpayment_start_month', 1),
         overpayment_end_month=data.get('overpayment_end_month'),
-        max_extra_payment=data.get('max_extra_payment', 0),
-        erc_rate=data.get('erc_rate', 0),
-        erc_end_date=datetime.strptime(data['erc_end_date'], '%Y-%m-%d').date() if data.get('erc_end_date') else None
+        max_extra_payment=data.get('max_extra_payment', 0)
     )
     db.session.add(loan)
     db.session.commit()
@@ -312,13 +310,9 @@ def update_loan(loan_id):
     loan.overpayment_start_month = data.get('overpayment_start_month', loan.overpayment_start_month)
     loan.overpayment_end_month = data.get('overpayment_end_month', loan.overpayment_end_month)
     loan.max_extra_payment = data.get('max_extra_payment', loan.max_extra_payment)
-    loan.erc_rate = data.get('erc_rate', loan.erc_rate)
     
     if 'start_date' in data:
         loan.start_date = datetime.strptime(data['start_date'], '%Y-%m-%d').date()
-    
-    if 'erc_end_date' in data:
-        loan.erc_end_date = datetime.strptime(data['erc_end_date'], '%Y-%m-%d').date() if data['erc_end_date'] else None
     
     # Recalculate monthly payment if rate or term changed
     if 'interest_rate' in data or 'term_years' in data or 'principal_amount' in data:
@@ -420,7 +414,7 @@ def get_person_networth(person_id):
             'property_details': {
                 'total_property_value': property_value,
                 'total_mortgages': property_mortgages,
-                'net_property_equity': property_equity
+                'net_equity': property_equity
             },
             'income': {
                 'total_annual_income': total_income,
@@ -2423,4 +2417,4 @@ def delete_airbnb_booking(booking_id):
 if __name__ == '__main__':
     with app.app_context():
         db.create_all()
-    app.run(debug=True, port=5001)
+    app.run(debug=True, port=int(os.environ.get('PORT', 5002)))

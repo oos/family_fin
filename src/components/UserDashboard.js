@@ -6,19 +6,13 @@ const UserDashboard = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [showBalanceForm, setShowBalanceForm] = useState(false);
-  const [editingBalance, setEditingBalance] = useState(null);
-
+  const [selectedItem, setSelectedItem] = useState(null);
+  const [itemType, setItemType] = useState(null); // 'account' or 'loan'
   const [balanceForm, setBalanceForm] = useState({
-    account_id: '',
-    loan_id: '',
     balance: '',
-    currency: 'EUR',
-    notes: '',
-    date_entered: new Date().toISOString().split('T')[0]
+    date_entered: new Date().toISOString().split('T')[0],
+    notes: ''
   });
-
-  const [selectedLoan, setSelectedLoan] = useState(null);
-  const [selectedAccount, setSelectedAccount] = useState(null);
 
   useEffect(() => {
     fetchDashboardData();
@@ -41,123 +35,73 @@ const UserDashboard = () => {
     }
   };
 
-  const handleBalanceSubmit = async (e) => {
-    e.preventDefault();
-    try {
-      const url = editingBalance ? `/account-balances/${editingBalance.id}` : '/account-balances';
-      const method = editingBalance ? 'PUT' : 'POST';
-      
-      const response = await axios({
-        method,
-        url,
-        data: balanceForm
-      });
-
-      if (response.data.success) {
-        setShowBalanceForm(false);
-        setEditingBalance(null);
-        setSelectedLoan(null);
-        setSelectedAccount(null);
-        setBalanceForm({
-          account_id: '',
-          loan_id: '',
-          balance: '',
-          currency: 'EUR',
-          notes: '',
-          date_entered: new Date().toISOString().split('T')[0]
-        });
-        fetchDashboardData(); // Refresh data
-      } else {
-        setError(response.data.message);
-      }
-    } catch (err) {
-      setError('Failed to save account balance');
-      console.error('Error saving account balance:', err);
-    }
-  };
-
-  const handleEditBalance = (balance) => {
-    setEditingBalance(balance);
-    setBalanceForm({
-      account_id: balance.account_id || '',
-      loan_id: balance.loan_id || '',
-      balance: balance.balance,
-      currency: balance.currency,
-      notes: balance.notes || '',
-      date_entered: balance.date_entered
-    });
-    setShowBalanceForm(true);
-  };
-
-  const handleDeleteBalance = async (balanceId) => {
-    if (window.confirm('Are you sure you want to delete this balance entry?')) {
-      try {
-        const response = await axios.delete(`/account-balances/${balanceId}`);
-        if (response.data.success) {
-          fetchDashboardData(); // Refresh data
-        } else {
-          setError(response.data.message);
-        }
-      } catch (err) {
-        setError('Failed to delete account balance');
-        console.error('Error deleting account balance:', err);
-      }
-    }
-  };
 
   const formatCurrency = (amount, currency = 'EUR') => {
+    // Handle null, undefined, or non-numeric values
+    if (amount === null || amount === undefined || amount === '' || isNaN(Number(amount))) {
+      return '€0.00';
+    }
+    
+    const numericAmount = Number(amount);
     return new Intl.NumberFormat('en-IE', {
       style: 'currency',
       currency: currency
-    }).format(amount);
+    }).format(numericAmount);
   };
 
   const formatDate = (dateString) => {
     return new Date(dateString).toLocaleDateString('en-GB');
   };
 
-  const getLatestLoanBalance = (loanId) => {
-    if (!data.account_balances) return null;
-    const loanBalances = data.account_balances
-      .filter(balance => balance.loan_id === loanId)
-      .sort((a, b) => new Date(b.date_entered) - new Date(a.date_entered));
-    return loanBalances[0] || null;
-  };
-
-  const getLatestAccountBalance = (accountId) => {
-    if (!data.account_balances) return null;
-    const accountBalances = data.account_balances
-      .filter(balance => balance.account_id === accountId)
-      .sort((a, b) => new Date(b.date_entered) - new Date(a.date_entered));
-    return accountBalances[0] || null;
+  const handleAddAccountBalance = (account) => {
+    setSelectedItem(account);
+    setItemType('account');
+    setBalanceForm({
+      balance: '',
+      date_entered: new Date().toISOString().split('T')[0],
+      notes: ''
+    });
+    setShowBalanceForm(true);
   };
 
   const handleAddLoanBalance = (loan) => {
-    setSelectedLoan(loan);
-    setSelectedAccount(null);
+    setSelectedItem(loan);
+    setItemType('loan');
     setBalanceForm({
-      account_id: '',
-      loan_id: loan.id,
       balance: '',
-      currency: 'EUR',
-      notes: '',
-      date_entered: new Date().toISOString().split('T')[0]
+      date_entered: new Date().toISOString().split('T')[0],
+      notes: ''
     });
     setShowBalanceForm(true);
   };
 
-  const handleAddAccountBalance = (account) => {
-    setSelectedAccount(account);
-    setSelectedLoan(null);
-    setBalanceForm({
-      account_id: account.id,
-      loan_id: '',
-      balance: '',
-      currency: 'EUR',
-      notes: '',
-      date_entered: new Date().toISOString().split('T')[0]
-    });
-    setShowBalanceForm(true);
+  const handleBalanceSubmit = async (e) => {
+    e.preventDefault();
+    try {
+      const formData = {
+        ...balanceForm,
+        [itemType === 'account' ? 'account_id' : 'loan_id']: selectedItem.id
+      };
+
+      const response = await axios.post('/account-balances', formData);
+      
+      if (response.data.success) {
+        fetchDashboardData(); // Refresh data
+        setShowBalanceForm(false);
+        setSelectedItem(null);
+        setItemType(null);
+        setBalanceForm({
+          balance: '',
+          date_entered: new Date().toISOString().split('T')[0],
+          notes: ''
+        });
+      } else {
+        setError(response.data.message);
+      }
+    } catch (err) {
+      setError('Failed to save account balance');
+      console.error('Error saving balance:', err);
+    }
   };
 
   if (loading) {
@@ -212,38 +156,31 @@ const UserDashboard = () => {
                     <thead>
                       <tr>
                         <th>Bank</th>
-                        <th>Date of Latest Entry</th>
-                        <th>Balance of Latest Entry</th>
-                        <th>Comment</th>
+                        <th>Amount</th>
+                        <th>Interest Rate</th>
+                        <th>Term</th>
                         <th>Actions</th>
                       </tr>
                     </thead>
                     <tbody>
-                      {data.loans.map(loan => {
-                        const latestBalance = getLatestLoanBalance(loan.id);
-                        return (
-                          <tr key={loan.id}>
-                            <td>{loan.lender}</td>
-                            <td>
-                              {latestBalance ? formatDate(latestBalance.date_entered) : 'No entries'}
-                            </td>
-                            <td>
-                              {latestBalance ? formatCurrency(latestBalance.balance, latestBalance.currency) : 'N/A'}
-                            </td>
-                            <td>
-                              {latestBalance ? (latestBalance.notes || 'No comment') : 'N/A'}
-                            </td>
-                            <td>
-                              <button 
-                                className="btn btn-sm btn-primary"
-                                onClick={() => handleAddLoanBalance(loan)}
-                              >
-                                Add Balance
-                              </button>
-                            </td>
-                          </tr>
-                        );
-                      })}
+                      {data.loans
+                        .filter(loan => !['Pepper', 'AIB', 'B&G'].includes(loan.lender))
+                        .map(loan => (
+                        <tr key={loan.id}>
+                          <td>{loan.lender}</td>
+                          <td>{formatCurrency(loan.principal_amount)}</td>
+                          <td>{loan.interest_rate}%</td>
+                          <td>{loan.term_years} years</td>
+                          <td>
+                            <button 
+                              className="btn btn-sm btn-primary"
+                              onClick={() => handleAddLoanBalance(loan)}
+                            >
+                              Add Balance
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
                     </tbody>
                   </table>
                 </div>
@@ -265,92 +202,27 @@ const UserDashboard = () => {
                     <thead>
                       <tr>
                         <th>Bank</th>
+                        <th>Account Name</th>
                         <th>Account Number</th>
-                        <th>Date of Latest Entry</th>
-                        <th>Balance of Latest Entry</th>
-                        <th>Comment</th>
+                        <th>Currency</th>
+                        <th>Type</th>
                         <th>Actions</th>
                       </tr>
                     </thead>
                     <tbody>
-                      {data.bank_accounts.map(account => {
-                        const latestBalance = getLatestAccountBalance(account.id);
-                        return (
-                          <tr key={account.id}>
-                            <td>{account.bank_name}</td>
-                            <td>{account.account_number}</td>
-                            <td>
-                              {latestBalance ? formatDate(latestBalance.date_entered) : 'No entries'}
-                            </td>
-                            <td>
-                              {latestBalance ? formatCurrency(latestBalance.balance, latestBalance.currency) : 'N/A'}
-                            </td>
-                            <td>
-                              {latestBalance ? (latestBalance.notes || 'No comment') : 'N/A'}
-                            </td>
-                            <td>
-                              <button 
-                                className="btn btn-sm btn-primary"
-                                onClick={() => handleAddAccountBalance(account)}
-                              >
-                                Add Balance
-                              </button>
-                            </td>
-                          </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* Account Balances Section */}
-        {visible_sections.account_balances && (
-          <div className="col-md-6 mb-4">
-            <div className="card">
-              <div className="card-header d-flex justify-content-between align-items-center">
-                <h5>Account Balances</h5>
-                <button 
-                  className="btn btn-sm btn-primary"
-                  onClick={() => setShowBalanceForm(true)}
-                >
-                  Add Balance
-                </button>
-              </div>
-              <div className="card-body">
-                <div className="table-responsive">
-                  <table className="table table-sm">
-                    <thead>
-                      <tr>
-                        <th>Account/Loan</th>
-                        <th>Balance</th>
-                        <th>Date</th>
-                        <th>Actions</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {data.account_balances && data.account_balances.map(balance => (
-                        <tr key={balance.id}>
-                          <td>
-                            {balance.account_name || balance.loan_name || 'Unknown'}
-                          </td>
-                          <td>{formatCurrency(balance.balance, balance.currency)}</td>
-                          <td>{formatDate(balance.date_entered)}</td>
+                      {data.bank_accounts.map(account => (
+                        <tr key={account.id}>
+                          <td>{account.bank_name}</td>
+                          <td>{account.account_name}</td>
+                          <td>{account.account_number}</td>
+                          <td>{account.currency}</td>
+                          <td>{account.account_type}</td>
                           <td>
                             <button 
-                              className="btn btn-sm btn-outline-primary me-1"
-                              onClick={() => handleEditBalance(balance)}
+                              className="btn btn-sm btn-primary"
+                              onClick={() => handleAddAccountBalance(account)}
                             >
-                              Edit
-                            </button>
-                            <button 
-                              className="btn btn-sm btn-outline-danger"
-                              onClick={() => handleDeleteBalance(balance.id)}
-                            >
-                              Delete
+                              Add Balance
                             </button>
                           </td>
                         </tr>
@@ -362,134 +234,143 @@ const UserDashboard = () => {
             </div>
           </div>
         )}
+
       </div>
 
       {/* Balance Form Modal */}
       {showBalanceForm && (
         <div className="modal show d-block" style={{ backgroundColor: 'rgba(0,0,0,0.5)' }}>
-          <div className="modal-dialog">
-            <div className="modal-content">
-              <div className="modal-header">
-                <h5 className="modal-title">
-                  {editingBalance ? 'Edit Account Balance' : 
-                   selectedLoan ? `Add Balance for ${selectedLoan.bank} - ${selectedLoan.property_name}` :
-                   selectedAccount ? `Add Balance for ${selectedAccount.bank_name} - ${selectedAccount.name}` :
-                   'Add Account Balance'}
-                </h5>
+          <div className="modal-dialog modal-dialog-centered">
+            <div className="modal-content shadow-lg" style={{ borderRadius: '12px', border: 'none' }}>
+              <div className="modal-header bg-primary text-white" style={{ borderRadius: '12px 12px 0 0' }}>
+                <div className="d-flex align-items-center">
+                  <i className="fas fa-plus-circle me-2"></i>
+                  <h5 className="modal-title mb-0">
+                    Add Balance for {selectedItem ? 
+                      (itemType === 'account' ? 
+                        `${selectedItem.bank_name} - ${selectedItem.account_name}` : 
+                        `${selectedItem.lender} - ${selectedItem.property_name}`) : 
+                      'Unknown Item'}
+                  </h5>
+                </div>
                 <button 
                   type="button" 
-                  className="btn-close"
+                  className="btn-close btn-close-white"
                   onClick={() => {
                     setShowBalanceForm(false);
-                    setEditingBalance(null);
-                    setSelectedLoan(null);
-                    setSelectedAccount(null);
+                    setSelectedItem(null);
+                    setItemType(null);
                     setBalanceForm({
-                      account_id: '',
-                      loan_id: '',
                       balance: '',
-                      currency: 'EUR',
-                      notes: '',
-                      date_entered: new Date().toISOString().split('T')[0]
+                      date_entered: new Date().toISOString().split('T')[0],
+                      notes: ''
                     });
                   }}
                 ></button>
               </div>
               <form onSubmit={handleBalanceSubmit}>
-                <div className="modal-body">
-                  <div className="mb-3">
-                    <label className="form-label">Account</label>
-                    <select 
-                      className="form-select"
-                      value={balanceForm.account_id}
-                      onChange={(e) => setBalanceForm({...balanceForm, account_id: e.target.value, loan_id: ''})}
-                    >
-                      <option value="">Select Account</option>
-                      {data.bank_accounts && data.bank_accounts.map(account => (
-                        <option key={account.id} value={account.id}>
-                          {account.account_name} ({account.account_number}) - {account.bank_name}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                  
-                  <div className="mb-3">
-                    <label className="form-label">Loan</label>
-                    <select 
-                      className="form-select"
-                      value={balanceForm.loan_id}
-                      onChange={(e) => setBalanceForm({...balanceForm, loan_id: e.target.value, account_id: ''})}
-                    >
-                      <option value="">Select Loan</option>
-                      {data.loans && data.loans.map(loan => (
-                        <option key={loan.id} value={loan.id}>
-                          {loan.lender} - {loan.property_name}
-                        </option>
-                      ))}
-                    </select>
+                <div className="modal-body p-4">
+                  <div className="row">
+                    <div className="col-md-6 mb-4">
+                      <label className="form-label fw-semibold text-dark">
+                        <i className="fas fa-euro-sign me-2 text-success"></i>
+                        Balance Amount
+                      </label>
+                      <div className="input-group">
+                        <span className="input-group-text bg-light">
+                          <i className="fas fa-euro-sign text-muted"></i>
+                        </span>
+                        <input 
+                          type="number" 
+                          step="0.01"
+                          className="form-control form-control-lg"
+                          placeholder="0.00"
+                          value={balanceForm.balance}
+                          onChange={(e) => setBalanceForm({...balanceForm, balance: e.target.value})}
+                          required
+                          style={{ borderLeft: 'none' }}
+                        />
+                      </div>
+                    </div>
+
+                    <div className="col-md-6 mb-4">
+                      <label className="form-label fw-semibold text-dark">
+                        <i className="fas fa-calendar-alt me-2 text-info"></i>
+                        Date
+                      </label>
+                      <div className="input-group">
+                        <span className="input-group-text bg-light">
+                          <i className="fas fa-calendar text-muted"></i>
+                        </span>
+                        <input 
+                          type="date" 
+                          className="form-control form-control-lg"
+                          value={balanceForm.date_entered}
+                          onChange={(e) => setBalanceForm({...balanceForm, date_entered: e.target.value})}
+                          required
+                          style={{ borderLeft: 'none' }}
+                        />
+                      </div>
+                    </div>
                   </div>
 
-                  <div className="mb-3">
-                    <label className="form-label">Balance</label>
-                    <input 
-                      type="number" 
-                      step="0.01"
-                      className="form-control"
-                      value={balanceForm.balance}
-                      onChange={(e) => setBalanceForm({...balanceForm, balance: e.target.value})}
-                      required
-                    />
-                  </div>
-
-                  <div className="mb-3">
-                    <label className="form-label">Currency</label>
-                    <select 
-                      className="form-select"
-                      value={balanceForm.currency}
-                      onChange={(e) => setBalanceForm({...balanceForm, currency: e.target.value})}
-                    >
-                      <option value="EUR">EUR</option>
-                      <option value="GBP">GBP</option>
-                      <option value="USD">USD</option>
-                    </select>
-                  </div>
-
-                  <div className="mb-3">
-                    <label className="form-label">Date</label>
-                    <input 
-                      type="date" 
-                      className="form-control"
-                      value={balanceForm.date_entered}
-                      onChange={(e) => setBalanceForm({...balanceForm, date_entered: e.target.value})}
-                      required
-                    />
-                  </div>
-
-                  <div className="mb-3">
-                    <label className="form-label">Notes</label>
+                  <div className="mb-4">
+                    <label className="form-label fw-semibold text-dark">
+                      <i className="fas fa-comment-alt me-2 text-warning"></i>
+                      Comments
+                    </label>
                     <textarea 
                       className="form-control"
-                      rows="3"
+                      rows="4"
+                      placeholder="Add any additional notes or comments about this balance entry..."
                       value={balanceForm.notes}
                       onChange={(e) => setBalanceForm({...balanceForm, notes: e.target.value})}
+                      style={{ resize: 'vertical', minHeight: '100px' }}
                     />
                   </div>
+
+                  {/* Summary Card */}
+                  <div className="card bg-light border-0 mb-3">
+                    <div className="card-body py-3">
+                      <div className="row text-center">
+                        <div className="col-4">
+                          <div className="text-muted small">Item Type</div>
+                          <div className="fw-semibold text-capitalize">
+                            {itemType === 'account' ? 'Bank Account' : 'Loan'}
+                          </div>
+                        </div>
+                        <div className="col-4">
+                          <div className="text-muted small">Institution</div>
+                          <div className="fw-semibold">
+                            {selectedItem ? (itemType === 'account' ? selectedItem.bank_name : selectedItem.lender) : 'N/A'}
+                          </div>
+                        </div>
+                        <div className="col-4">
+                          <div className="text-muted small">Reference</div>
+                          <div className="fw-semibold">
+                            {selectedItem ? (itemType === 'account' ? selectedItem.account_name : selectedItem.property_name) : 'N/A'}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
                 </div>
-                <div className="modal-footer">
+                <div className="modal-footer bg-light border-0 p-4" style={{ borderRadius: '0 0 12px 12px' }}>
                   <button 
                     type="button" 
-                    className="btn btn-secondary"
+                    className="btn btn-outline-secondary btn-lg px-4"
                     onClick={() => {
                       setShowBalanceForm(false);
-                      setEditingBalance(null);
-                      setSelectedLoan(null);
-                      setSelectedAccount(null);
+                      setSelectedItem(null);
+                      setItemType(null);
                     }}
                   >
+                    <i className="fas fa-times me-2"></i>
                     Cancel
                   </button>
-                  <button type="submit" className="btn btn-primary">
-                    {editingBalance ? 'Update' : 'Add'} Balance
+                  <button type="submit" className="btn btn-primary btn-lg px-4">
+                    <i className="fas fa-save me-2"></i>
+                    Add Balance
                   </button>
                 </div>
               </form>
@@ -497,6 +378,7 @@ const UserDashboard = () => {
           </div>
         </div>
       )}
+
     </div>
   );
 };

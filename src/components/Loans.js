@@ -51,6 +51,23 @@ function Loans() {
     fetchData();
   }, []);
 
+  // Update selectedLoan when loans array changes (e.g., after update)
+  useEffect(() => {
+    if (selectedLoan && loans.length > 0) {
+      const updatedLoan = loans.find(loan => loan.id === selectedLoan.id);
+      if (updatedLoan) {
+        setSelectedLoan(updatedLoan);
+      }
+    }
+  }, [loans, selectedLoan]);
+
+  // Cleanup modal class when component unmounts
+  useEffect(() => {
+    return () => {
+      document.body.classList.remove('modal-open');
+    };
+  }, []);
+
   const fetchData = async () => {
     try {
       setLoading(true);
@@ -98,6 +115,7 @@ function Loans() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    
     try {
       // Validate required fields
       if (!formData.loan_name || !formData.lender || !formData.principal_amount || !formData.interest_rate || !formData.term_years || !formData.start_date) {
@@ -112,25 +130,27 @@ function Loans() {
         interest_rate: parseFloat(formData.interest_rate) || 0,
         term_years: parseInt(formData.term_years) || 0,
         start_date: formData.start_date,
-        current_balance: parseFloat(formData.current_balance) || parseFloat(formData.principal_amount) || 0
+        current_balance: parseFloat(formData.current_balance) || parseFloat(formData.principal_amount) || 0,
+        regular_overpayment: parseFloat(formData.regular_overpayment) || 0,
+        overpayment_start_month: parseInt(formData.overpayment_start_month) || 1,
+        overpayment_end_month: formData.overpayment_end_month ? parseInt(formData.overpayment_end_month) : null,
+        max_extra_payment: parseFloat(formData.max_extra_payment) || 0
       };
 
-      console.log('Submitting loan data:', data);
-
       if (editingLoan) {
-        const response = await axios.put(`/loans/${editingLoan.id}`, data);
-        console.log('Loan updated:', response.data);
+        await axios.put(`/loans/${editingLoan.id}`, data);
       } else {
-        const response = await axios.post('/loans', data);
-        console.log('Loan created:', response.data);
+        await axios.post('/loans', data);
       }
       
       setShowModal(false);
       setEditingLoan(null);
       resetForm();
       setError('');
+      document.body.classList.remove('modal-open');
+      console.log('Update successful, refreshing data...');
       await fetchData();
-      console.log('Data refreshed after loan creation');
+      console.log('Data refreshed after update');
     } catch (err) {
       console.error('Error saving loan:', err);
       setError(`Failed to save loan: ${err.response?.data?.message || err.message}`);
@@ -159,6 +179,7 @@ function Loans() {
       erc_end_date: loan.erc_end_date || ''
     });
     setShowModal(true);
+    document.body.classList.add('modal-open');
   };
 
   const handleDelete = async (id) => {
@@ -182,6 +203,7 @@ function Loans() {
     resetForm();
     setError('');
     setShowModal(true);
+    document.body.classList.add('modal-open');
   };
 
   const resetForm = () => {
@@ -209,6 +231,7 @@ function Loans() {
     setShowModal(false);
     setEditingLoan(null);
     resetForm();
+    document.body.classList.remove('modal-open');
   };
 
   // ERC Management Functions
@@ -745,15 +768,24 @@ function Loans() {
 
       {/* Add/Edit Loan Modal */}
       {showModal && (
-        <div className="modal">
-          <div className="modal-content" style={{ maxWidth: '600px' }}>
+        <div className="modal-overlay" onClick={(e) => {
+          if (e.target === e.currentTarget) {
+            handleCloseModal();
+          }
+        }}>
+          <div className="modal-content large-modal" onClick={e => e.stopPropagation()}>
             <div className="modal-header">
               <h2>{editingLoan ? 'Edit Loan' : 'Add New Loan'}</h2>
               <button className="close" onClick={handleCloseModal}>&times;</button>
             </div>
-            <form onSubmit={handleSubmit}>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '15px' }}>
-                <div className="form-group">
+            <div className="modal-body" style={{ maxHeight: 'calc(90vh - 120px)', overflowY: 'auto' }}>
+              <form onSubmit={handleSubmit} style={{ position: 'relative', zIndex: 1000 }}>
+                <div style={{ 
+                  display: 'grid', 
+                  gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', 
+                  gap: '15px' 
+                }}>
+                  <div className="form-group">
                   <label htmlFor="loan_name">Loan Name</label>
                   <input
                     type="text"
@@ -914,20 +946,24 @@ function Loans() {
                     />
                     <small className="form-text">Maximum extra payment allowed before ERC charges apply</small>
                   </div>
+                  </div>
+                  
+                  {/* ERC Fields - Now handled separately in loan details */}
                 </div>
                 
-                {/* ERC Fields - Now handled separately in loan details */}
-              </div>
-              
-              <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end', marginTop: '20px' }}>
-                <button type="button" className="btn btn-secondary" onClick={handleCloseModal}>
-                  Cancel
-                </button>
-                <button type="submit" className="btn btn-primary">
-                  {editingLoan ? 'Update' : 'Create'}
-                </button>
-              </div>
-            </form>
+                <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end', marginTop: '20px' }}>
+                  <button type="button" className="btn btn-secondary" onClick={handleCloseModal}>
+                    Cancel
+                  </button>
+                  <button 
+                    type="submit" 
+                    className="btn btn-primary"
+                  >
+                    {editingLoan ? 'Update' : 'Create'}
+                  </button>
+                </div>
+              </form>
+            </div>
           </div>
         </div>
       )}
