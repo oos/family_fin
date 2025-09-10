@@ -174,6 +174,7 @@ function App() {
       };
       fetchUserData();
     } else {
+      setIsAuthenticated(false);
       setRoleLoading(false);
     }
     setLoading(false);
@@ -205,15 +206,19 @@ function App() {
     setUserRole(null);
     setCurrentUser(null);
     setSidebarOpen(false);
-    setRoleLoading(true);
+    setRoleLoading(false);
   };
 
-  if (loading || roleLoading) {
+  if (loading) {
     return <div className="loading">Loading...</div>;
   }
 
   if (!isAuthenticated) {
     return <Login onLogin={handleLogin} />;
+  }
+
+  if (roleLoading) {
+    return <div className="loading">Loading user data...</div>;
   }
 
   return (
