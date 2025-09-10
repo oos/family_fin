@@ -248,14 +248,9 @@ function Navbar({ onLogout, userRole, currentUser, sidebarOpen, setSidebarOpen }
                 type="button" 
                 data-bs-toggle="dropdown"
                 aria-expanded="false"
+                title={`${currentUser.email} (${userRole?.toUpperCase()})`}
               >
-                <i className="fas fa-user-circle me-2"></i>
-                <div className="text-start">
-                  <div className="fw-bold">{currentUser.email}</div>
-                  <small className={`badge ${userRole === 'admin' ? 'bg-danger' : 'bg-primary'}`}>
-                    {userRole?.toUpperCase()}
-                  </small>
-                </div>
+                <i className="fas fa-user-circle fs-4"></i>
               </button>
               <ul className="dropdown-menu dropdown-menu-end">
                 <li><h6 className="dropdown-header">Account</h6></li>

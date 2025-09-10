@@ -131,6 +131,35 @@
   font-size: 0.875rem;
 }
 
+/* Profile icon button styling */
+.navbar .dropdown-toggle {
+  border: none;
+  background: none;
+  color: white;
+  padding: 0.5rem;
+  border-radius: 50%;
+  transition: all 0.2s ease;
+}
+
+.navbar .dropdown-toggle:hover {
+  background-color: rgba(255, 255, 255, 0.1);
+  color: white;
+}
+
+.navbar .dropdown-toggle:focus {
+  box-shadow: 0 0 0 0.2rem rgba(255, 255, 255, 0.25);
+  background-color: rgba(255, 255, 255, 0.1);
+}
+
+.navbar .dropdown-toggle i {
+  font-size: 1.5rem;
+}
+
+/* Remove the dropdown arrow for cleaner look */
+.navbar .dropdown-toggle::after {
+  display: none;
+}
+
 /* Loading state */
 .loading {
   display: flex;
