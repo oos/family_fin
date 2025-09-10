@@ -3,12 +3,12 @@ import axios from 'axios';
 
 const Bookings = () => {
   const [bookings, setBookings] = useState([]);
+  const [filteredBookings, setFilteredBookings] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [syncLoading, setSyncLoading] = useState(false);
   const [syncMessage, setSyncMessage] = useState('');
   const [showAddForm, setShowAddForm] = useState(false);
-  const [selectedProperty, setSelectedProperty] = useState('2SA');
   const [showDetailsModal, setShowDetailsModal] = useState(false);
   const [selectedBooking, setSelectedBooking] = useState(null);
   const [autoSyncing, setAutoSyncing] = useState(false);
@@ -18,6 +18,16 @@ const Bookings = () => {
     estimated_income: '',
     phone_last_4: '',
     status: 'reserved'
+  });
+
+  // Filter states
+  const [filters, setFilters] = useState({
+    property: 'all',
+    platform: 'all',
+    status: 'all',
+    dateFrom: '',
+    dateTo: '',
+    search: ''
   });
 
   // Property configurations with platform support
@@ -77,16 +87,168 @@ const Bookings = () => {
   };
 
   useEffect(() => {
-    // Auto-sync data when page loads or property changes
+    // Auto-sync data when page loads
     const autoSync = async () => {
       try {
         setAutoSyncing(true);
         setLoading(true);
-        const property = properties[selectedProperty];
         
-        // Sync all available platforms for the selected property
+        // Sync all available platforms for all properties
         const syncPromises = [];
         
+        Object.entries(properties).forEach(([propertyKey, property]) => {
+          // Sync Airbnb if available
+          if (property.platforms.airbnb.ical_url) {
+            syncPromises.push(
+              axios.post('/bookings/sync', {
+                ical_url: property.platforms.airbnb.ical_url,
+                listing_id: property.platforms.airbnb.listing_id,
+                platform: 'airbnb',
+                property_id: 1
+              })
+            );
+          }
+          
+          // Sync VRBO if available
+          if (property.platforms.vrbo.ical_url) {
+            syncPromises.push(
+              axios.post('/bookings/sync', {
+                ical_url: property.platforms.vrbo.ical_url,
+                listing_id: property.platforms.vrbo.listing_id,
+                platform: 'vrbo',
+                property_id: 1
+              })
+            );
+          }
+        });
+        
+        // Wait for all sync operations to complete
+        if (syncPromises.length > 0) {
+          await Promise.allSettled(syncPromises);
+        }
+        
+        // After sync, fetch the updated bookings
+        await fetchBookings();
+      } catch (err) {
+        console.error('Auto-sync failed:', err);
+        // If auto-sync fails, still try to fetch existing data
+        await fetchBookings();
+      } finally {
+        setAutoSyncing(false);
+      }
+    };
+    
+    autoSync();
+  }, []);
+
+  // Filter bookings when filters or bookings change
+  useEffect(() => {
+    applyFilters();
+  }, [filters, bookings]);
+
+  const fetchBookings = async () => {
+    try {
+      setLoading(true);
+      const response = await axios.get('/bookings');
+      if (response.data.success) {
+        setBookings(response.data.bookings);
+      } else {
+        setError(response.data.message);
+      }
+    } catch (err) {
+      setError('Failed to fetch bookings');
+      console.error('Error fetching bookings:', err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Apply filters to bookings
+  const applyFilters = () => {
+    let filtered = [...bookings];
+
+    // Filter by property
+    if (filters.property !== 'all') {
+      const property = properties[filters.property];
+      const propertyListingIds = [
+        property.platforms.airbnb.listing_id,
+        property.platforms.vrbo.listing_id
+      ].filter(id => id);
+      filtered = filtered.filter(booking => 
+        propertyListingIds.includes(booking.listing_id)
+      );
+    }
+
+    // Filter by platform
+    if (filters.platform !== 'all') {
+      filtered = filtered.filter(booking => 
+        booking.platform?.toLowerCase() === filters.platform.toLowerCase()
+      );
+    }
+
+    // Filter by status
+    if (filters.status !== 'all') {
+      filtered = filtered.filter(booking => 
+        booking.status?.toLowerCase() === filters.status.toLowerCase()
+      );
+    }
+
+    // Filter by date range
+    if (filters.dateFrom) {
+      filtered = filtered.filter(booking => 
+        new Date(booking.check_in_date) >= new Date(filters.dateFrom)
+      );
+    }
+    if (filters.dateTo) {
+      filtered = filtered.filter(booking => 
+        new Date(booking.check_in_date) <= new Date(filters.dateTo)
+      );
+    }
+
+    // Filter by search term
+    if (filters.search) {
+      const searchTerm = filters.search.toLowerCase();
+      filtered = filtered.filter(booking => 
+        booking.property_name?.toLowerCase().includes(searchTerm) ||
+        booking.phone_last_4?.includes(searchTerm) ||
+        booking.booking_uid?.toLowerCase().includes(searchTerm) ||
+        booking.confirmation_code?.toLowerCase().includes(searchTerm)
+      );
+    }
+
+    setFilteredBookings(filtered);
+  };
+
+  // Handle filter changes
+  const handleFilterChange = (filterName, value) => {
+    setFilters(prev => ({
+      ...prev,
+      [filterName]: value
+    }));
+  };
+
+  // Clear all filters
+  const clearFilters = () => {
+    setFilters({
+      property: 'all',
+      platform: 'all',
+      status: 'all',
+      dateFrom: '',
+      dateTo: '',
+      search: ''
+    });
+  };
+
+  const syncBookings = async () => {
+    try {
+      setSyncLoading(true);
+      setSyncMessage('');
+      
+      const syncPromises = [];
+      const results = [];
+      
+      // Sync all properties and platforms
+      Object.entries(properties).forEach(([propertyKey, property]) => {
         // Sync Airbnb if available
         if (property.platforms.airbnb.ical_url) {
           syncPromises.push(
@@ -110,85 +272,7 @@ const Bookings = () => {
             })
           );
         }
-        
-        // Wait for all sync operations to complete
-        if (syncPromises.length > 0) {
-          await Promise.allSettled(syncPromises);
-        }
-        
-        // After sync, fetch the updated bookings
-        await fetchBookings();
-      } catch (err) {
-        console.error('Auto-sync failed:', err);
-        // If auto-sync fails, still try to fetch existing data
-        await fetchBookings();
-      } finally {
-        setAutoSyncing(false);
-      }
-    };
-    
-    autoSync();
-  }, [selectedProperty]);
-
-  const fetchBookings = async () => {
-    try {
-      setLoading(true);
-      const response = await axios.get('/bookings');
-      if (response.data.success) {
-        // Filter bookings by selected property
-        const property = properties[selectedProperty];
-        const propertyListingIds = [
-          property.platforms.airbnb.listing_id,
-          property.platforms.vrbo.listing_id
-        ].filter(id => id); // Remove empty IDs
-        
-        const filteredBookings = response.data.bookings.filter(booking => 
-          propertyListingIds.includes(booking.listing_id)
-        );
-        setBookings(filteredBookings);
-      } else {
-        setError(response.data.message);
-      }
-    } catch (err) {
-      setError('Failed to fetch bookings');
-      console.error('Error fetching bookings:', err);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const syncBookings = async () => {
-    try {
-      setSyncLoading(true);
-      setSyncMessage('');
-      
-      const property = properties[selectedProperty];
-      const syncPromises = [];
-      const results = [];
-      
-      // Sync Airbnb if available
-      if (property.platforms.airbnb.ical_url) {
-        syncPromises.push(
-          axios.post('/bookings/sync', {
-            ical_url: property.platforms.airbnb.ical_url,
-            listing_id: property.platforms.airbnb.listing_id,
-            platform: 'airbnb',
-            property_id: 1
-          })
-        );
-      }
-      
-      // Sync VRBO if available
-      if (property.platforms.vrbo.ical_url) {
-        syncPromises.push(
-          axios.post('/bookings/sync', {
-            ical_url: property.platforms.vrbo.ical_url,
-            listing_id: property.platforms.vrbo.listing_id,
-            platform: 'vrbo',
-            property_id: 1
-          })
-        );
-      }
+      });
       
       if (syncPromises.length > 0) {
         const responses = await Promise.allSettled(syncPromises);
@@ -196,15 +280,14 @@ const Bookings = () => {
           if (response.status === 'fulfilled' && response.value.data.success) {
             results.push(`✅ ${response.value.data.message}`);
           } else {
-            const platform = index === 0 ? 'Airbnb' : 'VRBO';
-            results.push(`❌ ${platform} sync failed`);
+            results.push(`❌ Sync ${index + 1} failed`);
           }
         });
         
         setSyncMessage(results.join('\n'));
         fetchBookings(); // Refresh the list
       } else {
-        setSyncMessage('❌ No platforms configured for this property');
+        setSyncMessage('❌ No platforms configured');
       }
     } catch (err) {
       setSyncMessage(`❌ Failed to sync bookings: ${err.response?.data?.message || err.message}`);
@@ -255,18 +338,19 @@ const Bookings = () => {
     <div className="container">
       <h1>Bookings</h1>
       
-      {/* Property Selection */}
+      {/* Filters */}
       <div className="card mb-4">
         <div className="card-body">
-          <h3>Select Property</h3>
+          <h3>Filter Bookings</h3>
           <div className="row">
-            <div className="col-md-6">
-              <label className="form-label">Choose Property to View Bookings</label>
+            <div className="col-md-2">
+              <label className="form-label">Property</label>
               <select 
                 className="form-select"
-                value={selectedProperty}
-                onChange={(e) => setSelectedProperty(e.target.value)}
+                value={filters.property}
+                onChange={(e) => handleFilterChange('property', e.target.value)}
               >
+                <option value="all">All Properties</option>
                 {Object.entries(properties).map(([key, property]) => (
                   <option key={key} value={key}>
                     {property.name}
@@ -274,13 +358,71 @@ const Bookings = () => {
                 ))}
               </select>
             </div>
-            <div className="col-md-6">
-              <label className="form-label">Current Property</label>
-              <div className="form-control-plaintext">
-                <strong>{properties[selectedProperty].name}</strong>
-                <br />
-                <small className="text-muted">Listing ID: {properties[selectedProperty].listing_id}</small>
-              </div>
+            <div className="col-md-2">
+              <label className="form-label">Platform</label>
+              <select 
+                className="form-select"
+                value={filters.platform}
+                onChange={(e) => handleFilterChange('platform', e.target.value)}
+              >
+                <option value="all">All Platforms</option>
+                <option value="airbnb">Airbnb</option>
+                <option value="vrbo">VRBO</option>
+              </select>
+            </div>
+            <div className="col-md-2">
+              <label className="form-label">Status</label>
+              <select 
+                className="form-select"
+                value={filters.status}
+                onChange={(e) => handleFilterChange('status', e.target.value)}
+              >
+                <option value="all">All Status</option>
+                <option value="reserved">Reserved</option>
+                <option value="confirmed">Confirmed</option>
+                <option value="cancelled">Cancelled</option>
+              </select>
+            </div>
+            <div className="col-md-2">
+              <label className="form-label">From Date</label>
+              <input
+                type="date"
+                className="form-control"
+                value={filters.dateFrom}
+                onChange={(e) => handleFilterChange('dateFrom', e.target.value)}
+              />
+            </div>
+            <div className="col-md-2">
+              <label className="form-label">To Date</label>
+              <input
+                type="date"
+                className="form-control"
+                value={filters.dateTo}
+                onChange={(e) => handleFilterChange('dateTo', e.target.value)}
+              />
+            </div>
+            <div className="col-md-2">
+              <label className="form-label">Search</label>
+              <input
+                type="text"
+                className="form-control"
+                placeholder="Search..."
+                value={filters.search}
+                onChange={(e) => handleFilterChange('search', e.target.value)}
+              />
+            </div>
+          </div>
+          <div className="row mt-3">
+            <div className="col-12">
+              <button 
+                className="btn btn-outline-secondary btn-sm"
+                onClick={clearFilters}
+              >
+                Clear All Filters
+              </button>
+              <span className="ms-3 text-muted">
+                Showing {filteredBookings.length} of {bookings.length} bookings
+              </span>
             </div>
           </div>
         </div>
@@ -291,7 +433,7 @@ const Bookings = () => {
         <div className="card-body">
           <h3>Sync Bookings</h3>
           <p className="text-muted">
-            Sync the latest bookings from <strong>{properties[selectedProperty].name}</strong> iCal feed. 
+            Sync the latest bookings from all property iCal feeds. 
             <strong>Note:</strong> iCal feeds typically only show future bookings and recent past bookings (last 30-90 days).
           </p>
           <div className="d-flex gap-2">
@@ -306,7 +448,7 @@ const Bookings = () => {
                   Syncing...
                 </>
               ) : (
-                `🔄 Sync ${properties[selectedProperty].name} Bookings`
+                '🔄 Sync All Bookings'
               )}
             </button>
             <button 
@@ -443,7 +585,7 @@ const Bookings = () => {
       <div className="card">
         <div className="card-header">
           <div className="d-flex justify-content-between align-items-center">
-            <h3>{properties[selectedProperty].name} - Current Bookings ({bookings.length})</h3>
+            <h3>All Bookings ({filteredBookings.length} of {bookings.length})</h3>
             {autoSyncing && (
               <div className="d-flex align-items-center text-muted">
                 <span className="spinner-border spinner-border-sm me-2" role="status"></span>
@@ -460,9 +602,14 @@ const Bookings = () => {
         <div className="card-body">
           {error ? (
             <div className="alert alert-danger">{error}</div>
-          ) : bookings.length === 0 ? (
+          ) : filteredBookings.length === 0 ? (
             <div className="text-center text-muted">
-              <p>No bookings found. Click "Sync Bookings" to load your Airbnb reservations.</p>
+              <p>
+                {bookings.length === 0 
+                  ? 'No bookings found. Click "Sync Bookings" to load your reservations.'
+                  : 'No bookings match the current filters. Try adjusting your filter criteria.'
+                }
+              </p>
             </div>
           ) : (
             <div className="table-responsive">
@@ -482,7 +629,7 @@ const Bookings = () => {
                   </tr>
                 </thead>
                 <tbody>
-                  {bookings.map(booking => (
+                  {filteredBookings.map(booking => (
                     <tr key={booking.id}>
                       <td>
                         <span className="badge bg-secondary">
