@@ -1,0 +1,145 @@
+/* Sidebar Styles */
+.sidebar {
+  position: fixed;
+  top: 0;
+  left: -300px;
+  width: 300px;
+  height: 100vh;
+  background-color: #343a40;
+  color: white;
+  z-index: 1050;
+  transition: left 0.3s ease;
+  overflow-y: auto;
+  box-shadow: 2px 0 5px rgba(0,0,0,0.1);
+}
+
+.sidebar.sidebar-open {
+  left: 0;
+}
+
+.sidebar-header {
+  padding: 1rem;
+  border-bottom: 1px solid #495057;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background-color: #212529;
+}
+
+.sidebar-header h5 {
+  color: white;
+  margin: 0;
+}
+
+.sidebar-nav {
+  padding: 1rem 0;
+}
+
+.sidebar-nav .nav-link {
+  color: #adb5bd;
+  padding: 0.75rem 1.5rem;
+  border: none;
+  background: none;
+  text-decoration: none;
+  display: flex;
+  align-items: center;
+  transition: all 0.2s ease;
+}
+
+.sidebar-nav .nav-link:hover {
+  color: white;
+  background-color: #495057;
+  text-decoration: none;
+}
+
+.sidebar-nav .nav-link.active {
+  color: white;
+  background-color: #007bff;
+}
+
+.sidebar-nav .nav-link i {
+  width: 20px;
+  text-align: center;
+}
+
+/* Main content adjustment */
+.main-content {
+  margin-left: 0;
+  transition: margin-left 0.3s ease;
+  min-height: calc(100vh - 56px);
+}
+
+.main-content.sidebar-open {
+  margin-left: 0; /* Keep content full width on mobile */
+}
+
+/* Responsive design */
+@media (min-width: 768px) {
+  .main-content.sidebar-open {
+    margin-left: 300px;
+  }
+  
+  .sidebar {
+    left: -300px;
+  }
+  
+  .sidebar.sidebar-open {
+    left: 0;
+  }
+}
+
+/* Sidebar overlay for mobile */
+.sidebar-overlay {
+  display: none;
+}
+
+@media (max-width: 767px) {
+  .sidebar-overlay {
+    display: block;
+  }
+}
+
+/* Navbar adjustments */
+.navbar-brand {
+  font-size: 1.25rem;
+  font-weight: 600;
+}
+
+/* User dropdown improvements */
+.dropdown-toggle::after {
+  margin-left: 0.5rem;
+}
+
+.dropdown-menu {
+  min-width: 250px;
+}
+
+.dropdown-item-text {
+  color: #6c757d;
+  font-size: 0.875rem;
+}
+
+/* Loading state */
+.loading {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  height: 100vh;
+  font-size: 1.2rem;
+  color: #6c757d;
+}
+
+/* Smooth transitions */
+* {
+  transition: all 0.2s ease;
+}
+
+/* Focus states for accessibility */
+.sidebar-nav .nav-link:focus {
+  outline: 2px solid #007bff;
+  outline-offset: -2px;
+}
+
+.btn:focus {
+  box-shadow: 0 0 0 0.2rem rgba(0, 123, 255, 0.25);
+}

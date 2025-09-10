@@ -16,6 +16,7 @@ import Bookings from './components/Bookings';
 import AdminPanel from './components/AdminPanel';
 import UserDashboard from './components/UserDashboard';
 import Login from './components/Login';
+import './sidebar.css';
 
 // Set up axios defaults
 axios.defaults.baseURL = 'http://localhost:5001/api';
@@ -46,11 +47,87 @@ axios.interceptors.response.use(
   }
 );
 
+function Sidebar({ userRole, sidebarOpen, setSidebarOpen }) {
+  const adminMenuItems = [
+    { path: '/', icon: 'fas fa-tachometer-alt', label: 'Dashboard' },
+    { path: '/people', icon: 'fas fa-users', label: 'People' },
+    { path: '/properties', icon: 'fas fa-home', label: 'Properties' },
+    { path: '/business-accounts', icon: 'fas fa-university', label: 'Business Accounts' },
+    { path: '/income', icon: 'fas fa-euro-sign', label: 'Income' },
+    { path: '/loans', icon: 'fas fa-credit-card', label: 'Loans' },
+    { path: '/loan-calculator', icon: 'fas fa-calculator', label: 'Loan Calculator' },
+    { path: '/taxation', icon: 'fas fa-file-invoice-dollar', label: 'Taxation' },
+    { path: '/pension', icon: 'fas fa-piggy-bank', label: 'Pension' },
+    { path: '/company-pension', icon: 'fas fa-building', label: 'Company Pension' },
+    { path: '/transactions', icon: 'fas fa-exchange-alt', label: 'Transactions' },
+    { path: '/bookings', icon: 'fas fa-calendar-check', label: 'Bookings' },
+    { path: '/admin', icon: 'fas fa-cog', label: 'Admin Panel' }
+  ];
+
+  const userMenuItems = [
+    { path: '/user-dashboard', icon: 'fas fa-tachometer-alt', label: 'My Dashboard' }
+  ];
+
+  const menuItems = userRole === 'admin' ? adminMenuItems : userMenuItems;
+
+  return (
+    <>
+      {/* Sidebar Overlay */}
+      {sidebarOpen && (
+        <div 
+          className="sidebar-overlay" 
+          onClick={() => setSidebarOpen(false)}
+          style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            width: '100%',
+            height: '100%',
+            backgroundColor: 'rgba(0,0,0,0.5)',
+            zIndex: 1040
+          }}
+        />
+      )}
+      
+      {/* Sidebar */}
+      <div className={`sidebar ${sidebarOpen ? 'sidebar-open' : ''}`}>
+        <div className="sidebar-header">
+          <h5 className="mb-0">Navigation</h5>
+          <button 
+            className="btn btn-sm btn-outline-light" 
+            onClick={() => setSidebarOpen(false)}
+          >
+            <i className="fas fa-times"></i>
+          </button>
+        </div>
+        
+        <nav className="sidebar-nav">
+          <ul className="nav flex-column">
+            {menuItems.map((item, index) => (
+              <li key={index} className="nav-item">
+                <Link 
+                  to={item.path} 
+                  className="nav-link"
+                  onClick={() => setSidebarOpen(false)}
+                >
+                  <i className={`${item.icon} me-2`}></i>
+                  {item.label}
+                </Link>
+              </li>
+            ))}
+          </ul>
+        </nav>
+      </div>
+    </>
+  );
+}
+
 function App() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [loading, setLoading] = useState(true);
   const [userRole, setUserRole] = useState(null);
   const [currentUser, setCurrentUser] = useState(null);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
 
   useEffect(() => {
     const token = localStorage.getItem('token');
@@ -98,6 +175,7 @@ function App() {
     setIsAuthenticated(false);
     setUserRole(null);
     setCurrentUser(null);
+    setSidebarOpen(false);
   };
 
   if (loading) {
@@ -111,70 +189,94 @@ function App() {
   return (
     <Router>
       <div className="App">
-        <Navbar onLogout={handleLogout} userRole={userRole} currentUser={currentUser} />
-        <div className="container">
-          <Routes>
-            <Route path="/" element={<Dashboard />} />
-            <Route path="/people" element={<People />} />
-            <Route path="/properties" element={<Properties />} />
-            <Route path="/business-accounts" element={<BusinessAccounts />} />
-            <Route path="/income" element={<Income />} />
-            <Route path="/loans" element={<Loans />} />
-            <Route path="/loan-calculator" element={<LoanCalculator />} />
-            <Route path="/taxation" element={<Taxation />} />
-            <Route path="/pension" element={<Pension />} />
-            <Route path="/company-pension" element={<CompanyPensionCalculator />} />
-            <Route path="/transactions" element={<Transactions />} />
-            <Route path="/bookings" element={<Bookings />} />
-            <Route path="/admin" element={<AdminPanel />} />
-            <Route path="/user-dashboard" element={<UserDashboard />} />
-          </Routes>
+        <Navbar 
+          onLogout={handleLogout} 
+          userRole={userRole} 
+          currentUser={currentUser}
+          sidebarOpen={sidebarOpen}
+          setSidebarOpen={setSidebarOpen}
+        />
+        <Sidebar 
+          userRole={userRole}
+          sidebarOpen={sidebarOpen}
+          setSidebarOpen={setSidebarOpen}
+        />
+        <div className={`main-content ${sidebarOpen ? 'sidebar-open' : ''}`}>
+          <div className="container-fluid mt-4">
+            <Routes>
+              <Route path="/" element={<Dashboard />} />
+              <Route path="/people" element={<People />} />
+              <Route path="/properties" element={<Properties />} />
+              <Route path="/business-accounts" element={<BusinessAccounts />} />
+              <Route path="/income" element={<Income />} />
+              <Route path="/loans" element={<Loans />} />
+              <Route path="/loan-calculator" element={<LoanCalculator />} />
+              <Route path="/taxation" element={<Taxation />} />
+              <Route path="/pension" element={<Pension />} />
+              <Route path="/company-pension" element={<CompanyPensionCalculator />} />
+              <Route path="/transactions" element={<Transactions />} />
+              <Route path="/bookings" element={<Bookings />} />
+              <Route path="/admin" element={<AdminPanel />} />
+              <Route path="/user-dashboard" element={<UserDashboard />} />
+            </Routes>
+          </div>
         </div>
       </div>
     </Router>
   );
 }
 
-function Navbar({ onLogout, userRole, currentUser }) {
+function Navbar({ onLogout, userRole, currentUser, sidebarOpen, setSidebarOpen }) {
   return (
-    <nav className="navbar">
-      <div className="container">
-        <h1>Family Finance Management</h1>
-        <div className="d-flex align-items-center">
-          <ul className="navbar-nav me-auto">
-            {userRole === 'admin' ? (
-              <>
-                <li><Link to="/">Dashboard</Link></li>
-                <li><Link to="/people">People</Link></li>
-                <li><Link to="/properties">Properties</Link></li>
-                <li><Link to="/business-accounts">Business Accounts</Link></li>
-                <li><Link to="/income">Income</Link></li>
-                <li><Link to="/loans">Loans</Link></li>
-                <li><Link to="/loan-calculator">Loan Calculator</Link></li>
-                <li><Link to="/taxation">Taxation</Link></li>
-                <li><Link to="/pension">Pension</Link></li>
-                <li><Link to="/company-pension">Company Pension</Link></li>
-                <li><Link to="/transactions">Transactions</Link></li>
-                <li><Link to="/bookings">Bookings</Link></li>
-                <li><Link to="/admin">Admin Panel</Link></li>
-              </>
-            ) : (
-              <>
-                <li><Link to="/user-dashboard">My Dashboard</Link></li>
-              </>
-            )}
-          </ul>
-          <div className="d-flex align-items-center">
-            {currentUser && (
-              <span className="me-3 text-muted">
-                Logged in as: <strong>{currentUser.email}</strong>
-                <span className={`badge ms-2 ${userRole === 'admin' ? 'bg-danger' : 'bg-primary'}`}>
-                  {userRole?.toUpperCase()}
-                </span>
-              </span>
-            )}
-            <button className="btn btn-secondary" onClick={onLogout}>Logout</button>
-          </div>
+    <nav className="navbar navbar-expand-lg navbar-dark bg-dark">
+      <div className="container-fluid">
+        <button 
+          className="btn btn-outline-light me-3" 
+          onClick={() => setSidebarOpen(!sidebarOpen)}
+          aria-label="Toggle sidebar"
+        >
+          <i className="fas fa-bars"></i>
+        </button>
+        
+        <h1 className="navbar-brand mb-0">Family Finance Management</h1>
+        
+        <div className="d-flex align-items-center ms-auto">
+          {currentUser && (
+            <div className="dropdown">
+              <button 
+                className="btn btn-outline-light dropdown-toggle d-flex align-items-center" 
+                type="button" 
+                data-bs-toggle="dropdown"
+                aria-expanded="false"
+              >
+                <i className="fas fa-user-circle me-2"></i>
+                <div className="text-start">
+                  <div className="fw-bold">{currentUser.email}</div>
+                  <small className={`badge ${userRole === 'admin' ? 'bg-danger' : 'bg-primary'}`}>
+                    {userRole?.toUpperCase()}
+                  </small>
+                </div>
+              </button>
+              <ul className="dropdown-menu dropdown-menu-end">
+                <li><h6 className="dropdown-header">Account</h6></li>
+                <li><span className="dropdown-item-text">
+                  <i className="fas fa-envelope me-2"></i>
+                  {currentUser.email}
+                </span></li>
+                <li><span className="dropdown-item-text">
+                  <i className="fas fa-shield-alt me-2"></i>
+                  Role: {userRole?.toUpperCase()}
+                </span></li>
+                <li><hr className="dropdown-divider" /></li>
+                <li>
+                  <button className="dropdown-item" onClick={onLogout}>
+                    <i className="fas fa-sign-out-alt me-2"></i>
+                    Logout
+                  </button>
+                </li>
+              </ul>
+            </div>
+          )}
         </div>
       </div>
     </nav>
