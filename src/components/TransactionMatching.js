@@ -21,7 +21,7 @@ const TransactionMatching = () => {
     setError(null);
     try {
       const token = localStorage.getItem('token');
-      const response = await axios.get('/api/tax-returns', {
+      const response = await axios.get('/tax-returns', {
         headers: { Authorization: `Bearer ${token}` }
       });
       setTaxReturns(response.data);
@@ -38,7 +38,7 @@ const TransactionMatching = () => {
     setError(null);
     try {
       const token = localStorage.getItem('token');
-      const response = await axios.get(`/api/tax-returns/${taxReturnId}/match-transactions`, {
+      const response = await axios.get(`/tax-returns/${taxReturnId}/match-transactions`, {
         headers: { Authorization: `Bearer ${token}` }
       });
       setPotentialMatches(response.data.potential_matches);
@@ -60,7 +60,7 @@ const TransactionMatching = () => {
   const fetchAutoMatches = async (taxReturnId) => {
     try {
       const token = localStorage.getItem('token');
-      const response = await axios.get(`/api/tax-returns/${taxReturnId}/auto-matches`, {
+      const response = await axios.get(`/tax-returns/${taxReturnId}/auto-matches`, {
         headers: { Authorization: `Bearer ${token}` }
       });
       setAutoMatches(response.data.auto_matches);
@@ -89,7 +89,7 @@ const TransactionMatching = () => {
     
     try {
       const token = localStorage.getItem('token');
-      const response = await axios.post('/api/transaction-matches', {
+      const response = await axios.post('/transaction-matches', {
         tax_return_transaction_id: taxTransactionId,
         bank_transaction_id: bankTransactionId,
         match_method: 'manual',
@@ -119,7 +119,7 @@ const TransactionMatching = () => {
     
     try {
       const token = localStorage.getItem('token');
-      const response = await axios.put(`/api/transaction-matches/${matchId}/category`, {
+      const response = await axios.put(`/transaction-matches/${matchId}/category`, {
         category: category
       }, {
         headers: { Authorization: `Bearer ${token}` }

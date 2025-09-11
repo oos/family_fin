@@ -39,7 +39,7 @@ const TaxReturns = () => {
         return;
       }
       
-      const response = await axios.get('/api/tax-returns', {
+      const response = await axios.get('/tax-returns', {
         headers: { Authorization: `Bearer ${token}` }
       });
       setTaxReturns(response.data);
@@ -85,7 +85,7 @@ const TaxReturns = () => {
       formData.append('year', selectedYear);
 
       const token = localStorage.getItem('token');
-      const response = await axios.post('/api/tax-returns/upload', formData, {
+      const response = await axios.post('/tax-returns/upload', formData, {
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'multipart/form-data'
@@ -114,7 +114,7 @@ const TaxReturns = () => {
 
     try {
       const token = localStorage.getItem('token');
-      await axios.delete(`/api/tax-returns/${id}`, {
+      await axios.delete(`/tax-returns/${id}`, {
         headers: { Authorization: `Bearer ${token}` }
       });
       
@@ -133,7 +133,7 @@ const TaxReturns = () => {
 
     try {
       const token = localStorage.getItem('token');
-      const response = await axios.get(`/api/tax-returns/${id}/data`, {
+      const response = await axios.get(`/tax-returns/${id}/data`, {
         headers: { Authorization: `Bearer ${token}` }
       });
       
@@ -153,7 +153,7 @@ const TaxReturns = () => {
 
     try {
       const token = localStorage.getItem('token');
-      const response = await axios.get(`/api/tax-returns/${id}/transactions`, {
+      const response = await axios.get(`/tax-returns/${id}/transactions`, {
         headers: { Authorization: `Bearer ${token}` }
       });
       
