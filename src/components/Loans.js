@@ -399,12 +399,99 @@ function Loans() {
 
       {error && <div className="error">{error}</div>}
 
-      {/* Loan Selector */}
+      {/* All Loans Table */}
+      <div className="card" style={{ marginBottom: '20px' }}>
+        <h3>All Loans</h3>
+        <table className="table">
+          <thead>
+            <tr>
+              <th>Loan Name</th>
+              <th>Lender</th>
+              <th>Property</th>
+              <th>Type</th>
+              <th>Principal</th>
+              <th>Current Balance</th>
+              <th>Interest Rate</th>
+              <th>Monthly Payment</th>
+              <th>Term</th>
+              <th>Status</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            {loans.map(loan => {
+              const property = properties.find(p => p.id === loan.property_id);
+              return (
+                <tr key={loan.id} style={{ cursor: 'pointer' }} onClick={() => handleLoanSelect(loan.id)}>
+                  <td style={{ fontWeight: '600' }} className="db-data">{loan.loan_name}</td>
+                  <td className="db-data">{loan.lender}</td>
+                  <td className="db-data">{property ? property.nickname : 'N/A'}</td>
+                  <td>
+                    <span style={{
+                      backgroundColor: loan.loan_type === 'mortgage' ? '#e3f2fd' : '#f3e5f5',
+                      color: loan.loan_type === 'mortgage' ? '#1976d2' : '#7b1fa2',
+                      padding: '4px 8px',
+                      borderRadius: '12px',
+                      fontSize: '12px',
+                      fontWeight: '500'
+                    }}>
+                      {loan.loan_type}
+                    </span>
+                  </td>
+                  <td style={{ textAlign: 'right' }} className="db-data">{formatCurrency(loan.principal_amount)}</td>
+                  <td style={{ textAlign: 'right', fontWeight: '600' }} className="db-data">{formatCurrency(loan.current_balance)}</td>
+                  <td style={{ textAlign: 'right' }} className="db-data">{loan.interest_rate}%</td>
+                  <td style={{ textAlign: 'right', color: '#d32f2f', fontWeight: '600' }} className="calculated-data">{formatCurrency(loan.monthly_payment)}</td>
+                  <td style={{ textAlign: 'right' }} className="db-data">{loan.term_years} years</td>
+                  <td>
+                    <span style={{
+                      backgroundColor: loan.is_active ? '#e8f5e8' : '#ffebee',
+                      color: loan.is_active ? '#2e7d32' : '#c62828',
+                      padding: '4px 8px',
+                      borderRadius: '12px',
+                      fontSize: '12px',
+                      fontWeight: '500'
+                    }}>
+                      {loan.is_active ? 'Active' : 'Inactive'}
+                    </span>
+                  </td>
+                  <td>
+                    <div style={{ display: 'flex', gap: '5px' }}>
+                      <button 
+                        className="btn btn-sm btn-secondary" 
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleEdit(loan);
+                        }}
+                        style={{ padding: '4px 8px', fontSize: '11px' }}
+                      >
+                        Edit
+                      </button>
+                      <button 
+                        className="btn btn-sm btn-danger" 
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleDelete(loan.id);
+                        }}
+                        style={{ padding: '4px 8px', fontSize: '11px' }}
+                      >
+                        Delete
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+
+      {/* Loan Selector for Details View */}
       <div className="card" style={{ marginBottom: '20px' }}>
         <div style={{ display: 'flex', gap: '20px', alignItems: 'center', flexWrap: 'wrap' }}>
           <div style={{ minWidth: '300px' }}>
             <label htmlFor="loan-select" style={{ display: 'block', marginBottom: '8px', fontWeight: '600' }}>
-              Select Loan to View Details:
+              Select Loan to View Detailed Schedule:
             </label>
             <select
               id="loan-select"
@@ -420,7 +507,7 @@ function Loans() {
                 backgroundColor: 'white'
               }}
             >
-              <option value="">Choose a loan...</option>
+              <option value="">Choose a loan to view detailed schedule...</option>
               {loans.map(loan => (
                 <option key={loan.id} value={loan.id}>
                   {loan.loan_name} - {loan.lender} ({formatCurrency(loan.current_balance)} balance)
@@ -428,25 +515,6 @@ function Loans() {
               ))}
             </select>
           </div>
-          
-          {selectedLoan && (
-            <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
-              <button 
-                className="btn btn-secondary" 
-                onClick={() => handleEdit(selectedLoan)}
-                style={{ padding: '8px 16px' }}
-              >
-                Edit Loan
-              </button>
-              <button 
-                className="btn btn-danger" 
-                onClick={() => handleDelete(selectedLoan.id)}
-                style={{ padding: '8px 16px' }}
-              >
-                Delete Loan
-              </button>
-            </div>
-          )}
         </div>
       </div>
 

@@ -120,7 +120,7 @@ const Pension = () => {
     
     // Net cost to company
     const netCostToCompany = optimalCompanyContribution - corporationTaxRelief;
-    
+
     return {
       currentSalary,
       currentTax,
@@ -324,31 +324,31 @@ const Pension = () => {
             <div style={{ fontSize: '14px', color: '#666', marginBottom: '5px' }}>Total Company Contributions</div>
             <div style={{ fontSize: '18px', fontWeight: 'bold', color: '#2e7d32' }}>
               {formatCurrency(strategy.totalCompanyContribution)}
-            </div>
-          </div>
+        </div>
+      </div>
           <div style={{ padding: '15px', backgroundColor: '#f8f9fa', borderRadius: '6px' }}>
             <div style={{ fontSize: '14px', color: '#666', marginBottom: '5px' }}>Total Corporation Tax Relief</div>
             <div style={{ fontSize: '18px', fontWeight: 'bold', color: '#4caf50' }}>
               {formatCurrency(strategy.totalCorporationTaxRelief)}
             </div>
-          </div>
+              </div>
           <div style={{ padding: '15px', backgroundColor: '#f8f9fa', borderRadius: '6px' }}>
             <div style={{ fontSize: '14px', color: '#666', marginBottom: '5px' }}>Net Cost to Company</div>
             <div style={{ fontSize: '18px', fontWeight: 'bold', color: '#1976d2' }}>
               {formatCurrency(strategy.totalNetCost)}
-            </div>
-          </div>
+              </div>
+              </div>
           <div style={{ padding: '15px', backgroundColor: '#f8f9fa', borderRadius: '6px' }}>
             <div style={{ fontSize: '14px', color: '#666', marginBottom: '5px' }}>Available RRltd Funds</div>
             <div style={{ fontSize: '18px', fontWeight: 'bold', color: '#4caf50' }}>
               {formatCurrency(strategy.availableFunds)}
-            </div>
-          </div>
+              </div>
+              </div>
           <div style={{ padding: '15px', backgroundColor: '#f8f9fa', borderRadius: '6px' }}>
             <div style={{ fontSize: '14px', color: '#666', marginBottom: '5px' }}>Funds Utilization</div>
             <div style={{ fontSize: '18px', fontWeight: 'bold', color: strategy.totalNetCost <= strategy.availableFunds ? '#4caf50' : '#d32f2f' }}>
               {((strategy.totalNetCost / strategy.availableFunds) * 100).toFixed(1)}%
-            </div>
+              </div>
           </div>
         </div>
         

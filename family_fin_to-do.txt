@@ -1,0 +1,88 @@
+
+
+
+This "Explain" feature is a fantastic principle - please add it throughout the app
+
+
+>>>>>>>>>>
+
+
+- The income that RRltd currently gets is the income from short-term letting 2SA, 87HP and 28LC - see the income levels in http://localhost:3001/properties.
+- RRLtd pays long-term rent to the owners of these 3 properties according to the ownership split (see the ownership % in http://localhost:3001/properties) and this Long-term rental income is recognised by the individuals in their personal tax calculations because they own the propertiers in their personal names.
+- RRLtd pays salaries to Heidi, Dwayne and Sean - see those of type "RRltd" in http://localhost:3001/income
+- Omar and Heidi currently earn long-term rental income from letting 19Abb and 51LC - see the income levels in http://localhost:3001/properties - this gets paid to them directly into their personal bank accounts in a personal capacity currently because they own these properties in their personal name. 
+- I want to do an excercise where we compare and contrast the above scenario with another one, where RRLtd (owned by the directors Omar and Heidi 50:50) raises a loan to buy 28LC, 51LC and 19Abb and then pays a salary from this RRLtd notional child entity (called "OmHe Props") to Omar and Heidi and also makes pension contributions to Omar and HEidi as directors of the company to reduce their income tax to zero (excliuding PRSI and USC) and indeed to reduce the Corporation Tax on the profits from these properties (25% I believe)
+-8LC would remain earning short-tem rent and actually I would also swap 51LC to short-term rent inside RRLtd. However 19Abb would remain as Long-term rent. 
+- It is important to note that these 3 properties (19Abbb, 51LC and 28LC) all fall within the notional sub-entity of RRLtd "OmHe Props" because that is the vehicle that will shield Omar and Heidi from tax on these propreties and Sen, Dwayne and Lena will have absolutely nothing to do with them. Whereas Sean and Dwayne are part-owners of 2SA and 87HP so they are in a different notinal sub-entity of RRLtd we can call "Secodwom Props". Both sub-entities should be isolated from each other within RRLtd
+- SECODWOM UK LTD is an official wholly-owned subsidiary of RRld in the UK. This company owns 67RR. RRltd owns SECODWOM UK LTD. Omar and Heidi own RRltd 50:50. 67RR was purchased in August 2025 and SECODWOM UK LTD raised a loan in the UK from HTB to buy this property (see amount in the Loan page). 67RR will be short-term let in the UK. In the UK there is a £90k cut-off point for VAT so it is not VAT registered yet, whereas RRltd is and so everythinng it earns (except long-term rental income) is subject to VAT. 
+- I think we can send profits from UK to Ireland witout paying UK tax and then we can pay salaries and pensions with it in Ireland to reduce Corporation Tax on profits in Ireland.
+- in the proposed scenario, Dwayne, Sean and Omar would pay off the BOI loan with the money they would receive from the purchase of 28LC to reduce the heavy monthly repayment they have to pay each month for that loan. There wouldn't be any capital gains tax CGT to pay on the purchase of 28LC because it hasn't raised in value
+- OmHe Props will have an 850k loan to service so it is increasing the cash flow on the "Secodwom Props" side and placing a burden on the "OmHe Props" side but the net (after VAT) 28LC short-term rental income will help to service that new loan (lets say by ICS)
+
+
+
+In the Company Taxation page we need to figure out the figure that can be taxed so we need to look at the Bank Transactions to determine the legitimate expenses that can be offset
+
+
+The Company needs to pay 25% Corporation Tax (CT) on rental income I believe, so if RRltd was to raise another loan to buy 28LC, 51LC and 19Abb from the owners (i.e. Sean, Dwayne, Omar and Heidi in different proportions), it would
+
+
+>>>>
+
+Dad
+add a new user login for my dad Sean (seanosullivan@gmail.com) with the password "Secodwom01!" and don't give him access to everything that we have created instead give him a personalised dashboard with some selected data on it. Give me, Omar, the admin the ability to decide what data he can see on that dashboard via an admin panel. Also create a new DB table with a foreign key to the bank accounts and loans so that Sean can enter balances for each of these bank accounts and loans and vie them on his own dashboard.
+
+
+
+
+
+
+
+>>>>>>
+
+
+I want to create an authenticated, modular, object-orientated flask/react app to manage my wider family business and finances. We have a number of properties that are rented out (some long-term and some short-term via platfroms like AirBnB and VRBO), loans and people. There is an offical Irish busines (Reinvented Recruitment Ltd) and a wholly owned UK subsidary (SECODWOM UK LTD). My wife Heidi and I are the directors of both these businesses (50:50 ownership). I am looking to restructure the loans via refinancing them currently to increase cash flow in the short-term and so I want to do some calculations and cash flows to decide what is the best approach. Certain people have incomes outside the family business, others just earn money from the family business. Give me a UI with all of these details below shown and allow me to edit (CRUD) any of them via the UI
+
+People:
+Omar (me)
+Heidi (my wife)
+Dwayne (my brother)
+Lena (Dwayne's wife)
+Sean (my dad)
+Coral (my late mum - died in June 2023)
+
+
+Business Bank Accounts:
+Revolut Business Account for Reinvented Recruitemnt Ltd (account number ends in 488)
+Revolut Business Account for SECODWOM UK Ltd (account number ends in ???)
+AIB SeCo account (account number ends in 084) - this has very recently been closed down but was used for some transactions for years
+
+Properties - Ownership and Loans:
+Property	Nickname	Valuation (€)	Mortgage (€)	Rental Income (€/yr)	Lender	Omar Ownership	Heidi Ownership	Dwayne Ownership	Sean Ownership	Lena Ownership
+51 Liberty Corner, Dublin 1.	51LC	450,000	156,774	29,040	Pepper	50%	50%	0%	0%	0%
+19 Abberley, Killiney	19Abb	525,000	312,348	32,244	AIB	50%	50%	0%	0%	0%
+28 Liberty Corner, Dublin 1.	28LC	450,000	0	75,000	N/A	25%	0%	50%	25%	0%
+2 Sallymount Avenue	2SA	1,300,000	400,000	200,000	BOI	100%	0%	0%	0%	0%
+87 Highfield Park	87HP	1150000	0	125,000	N/A	47.5%	0%	50%	3%	0%
+3 Glendale, Delgany, Wicklow	3GD	1000000	350000	0	B&G	50%	50%	0%	0%	0%
+67 Raleigh Road, Bristol, UK	67RR	800000	550000	150000	HTB	50%	50%	0%	0%	0%
+										
+										
+										
+Gross income Outside the Family Business:										
+	Per annum	per month								
+Heidi	30000	2500								
+Sean	18000	1500								
+Lena	36000	3000								
+Omar	0	0								
+Dwayne	0	0								
+										
+										
+										
+Net income inside the family Business:										
+	Per annum	per month								
+Heidi	28800	2400								
+Dwayne	28800	2400								
+Sean	12000	1000								
+Omar	0	0								
+Lena	0	0								

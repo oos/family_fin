@@ -5,7 +5,6 @@ import axios from 'axios';
 function BusinessAccounts() {
   const [accounts, setAccounts] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState('');
   const [showModal, setShowModal] = useState(false);
   const [showApiModal, setShowApiModal] = useState(false);
@@ -25,10 +24,6 @@ function BusinessAccounts() {
     access_token: '',
     refresh_token: ''
   });
-  const [showCsvModal, setShowCsvModal] = useState(false);
-  const [csvFile, setCsvFile] = useState(null);
-  const [importingCsv, setImportingCsv] = useState(false);
-  const [importResult, setImportResult] = useState(null);
 
   useEffect(() => {
     fetchAccounts();
@@ -40,7 +35,7 @@ function BusinessAccounts() {
       const response = await axios.get('/business-accounts');
       setAccounts(response.data);
     } catch (err) {
-      setError('Failed to load business accounts');
+      setError('Failed to load bank accounts');
       console.error(err);
     } finally {
       setLoading(false);
@@ -66,7 +61,7 @@ function BusinessAccounts() {
       });
       fetchAccounts();
     } catch (err) {
-      setError('Failed to save business account');
+      setError('Failed to save bank account');
       console.error(err);
     }
   };
@@ -89,7 +84,7 @@ function BusinessAccounts() {
         await axios.delete(`/business-accounts/${id}`);
         fetchAccounts();
       } catch (err) {
-        setError('Failed to delete business account');
+        setError('Failed to delete bank account');
         console.error(err);
       }
     }
@@ -119,37 +114,6 @@ function BusinessAccounts() {
     });
   };
 
-  const refreshAccountTransactions = async (accountId) => {
-    try {
-      setRefreshing(true);
-      const response = await axios.post(`/business-accounts/${accountId}/refresh-transactions`);
-      if (response.data.success) {
-        // Refresh the accounts list to show updated data
-        await fetchAccounts();
-      }
-    } catch (err) {
-      setError('Failed to refresh account transactions');
-      console.error(err);
-    } finally {
-      setRefreshing(false);
-    }
-  };
-
-  const refreshAllAccounts = async () => {
-    try {
-      setRefreshing(true);
-      const response = await axios.post('/business-accounts/refresh-all');
-      if (response.data.success) {
-        // Refresh the accounts list to show updated data
-        await fetchAccounts();
-      }
-    } catch (err) {
-      setError('Failed to refresh all accounts');
-      console.error(err);
-    } finally {
-      setRefreshing(false);
-    }
-  };
 
   const handleConfigureApi = (account) => {
     setConfiguringAccount(account);
@@ -195,92 +159,16 @@ function BusinessAccounts() {
     });
   };
 
-  const handleCsvFileChange = (e) => {
-    const file = e.target.files[0];
-    if (file && file.type === 'text/csv') {
-      setCsvFile(file);
-    } else {
-      alert('Please select a valid CSV file');
-      setCsvFile(null);
-    }
-  };
-
-  const handleCsvImport = async (accountId) => {
-    if (!csvFile) {
-      alert('Please select a CSV file first');
-      return;
-    }
-
-    setImportingCsv(true);
-    setImportResult(null);
-
-    try {
-      const formData = new FormData();
-      formData.append('file', csvFile);
-
-      const response = await axios.post(`/api/business-accounts/${accountId}/import-csv`, formData, {
-        headers: {
-          'Content-Type': 'multipart/form-data',
-        },
-      });
-
-      if (response.data.success) {
-        setImportResult({
-          success: true,
-          message: response.data.message,
-          importedCount: response.data.imported_count,
-          errors: response.data.errors || [],
-          totalErrors: response.data.total_errors || 0
-        });
-        fetchAccounts(); // Refresh accounts to show updated balance
-      } else {
-        setImportResult({
-          success: false,
-          message: response.data.message
-        });
-      }
-    } catch (error) {
-      console.error('Error importing CSV:', error);
-      setImportResult({
-        success: false,
-        message: 'Error importing CSV: ' + (error.response?.data?.message || error.message)
-      });
-    } finally {
-      setImportingCsv(false);
-    }
-  };
-
-  const closeCsvModal = () => {
-    setShowCsvModal(false);
-    setCsvFile(null);
-    setImportResult(null);
-  };
 
   if (loading) {
-    return <div className="loading">Loading business accounts...</div>;
+    return <div className="loading">Loading bank accounts...</div>;
   }
 
   return (
     <div>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
-        <h1>Business Accounts</h1>
+        <h1>Bank Accounts</h1>
         <div style={{ display: 'flex', gap: '10px' }}>
-          <button 
-            className="btn btn-outline" 
-            onClick={refreshAllAccounts}
-            disabled={refreshing}
-            style={{ 
-              opacity: refreshing ? 0.6 : 1,
-              display: 'flex',
-              alignItems: 'center',
-              gap: '5px'
-            }}
-          >
-            {refreshing && (
-              <div className="spinner" style={{ width: '16px', height: '16px', border: '2px solid #f3f3f3', borderTop: '2px solid #007bff', borderRadius: '50%', animation: 'spin 1s linear infinite' }}></div>
-            )}
-            🔄 Refresh All Accounts
-          </button>
           <button className="btn btn-primary" onClick={handleAddNew}>
             Add New Account
           </button>
@@ -348,27 +236,6 @@ function BusinessAccounts() {
                       title="Configure bank API credentials"
                     >
                       ⚙️ API
-                    </button>
-                    <button 
-                      className="btn btn-outline" 
-                      onClick={() => refreshAccountTransactions(account.id)}
-                      disabled={refreshing || !account.api_configured}
-                      style={{ 
-                        opacity: (refreshing || !account.api_configured) ? 0.6 : 1
-                      }}
-                      title={account.api_configured ? "Refresh transactions from bank API" : "Configure API first"}
-                    >
-                      🔄 Refresh
-                    </button>
-                    <button 
-                      className="btn btn-info" 
-                      onClick={() => {
-                        setConfiguringAccount(account);
-                        setShowCsvModal(true);
-                      }}
-                      title="Import transactions from CSV file"
-                    >
-                      📄 Import CSV
                     </button>
                     <button 
                       className="btn btn-secondary" 
@@ -544,89 +411,6 @@ function BusinessAccounts() {
         </div>
       )}
 
-      {/* CSV Import Modal */}
-      {showCsvModal && (
-        <div className="modal-overlay">
-          <div className="modal-content">
-            <div className="modal-header">
-              <h2>Import CSV Transactions - {configuringAccount?.account_name}</h2>
-              <button className="close" onClick={closeCsvModal}>&times;</button>
-            </div>
-            <div className="modal-body">
-              <div style={{ marginBottom: '20px' }}>
-                <h4>CSV File Requirements:</h4>
-                <ul style={{ fontSize: '14px', color: '#666', margin: '10px 0' }}>
-                  <li>File must be in CSV format (.csv)</li>
-                  <li>Required columns: Date, Description, Amount</li>
-                  <li>Optional columns: Balance, Reference, Type</li>
-                  <li>Date formats supported: YYYY-MM-DD, DD/MM/YYYY, MM/DD/YYYY</li>
-                  <li>Amount: Positive for credits, negative for debits</li>
-                </ul>
-              </div>
-
-              <div className="form-group">
-                <label htmlFor="csv_file">Select CSV File</label>
-                <input
-                  type="file"
-                  id="csv_file"
-                  accept=".csv"
-                  onChange={handleCsvFileChange}
-                  style={{ padding: '8px', border: '1px solid #ddd', borderRadius: '4px' }}
-                />
-                {csvFile && (
-                  <div style={{ marginTop: '8px', color: '#28a745', fontSize: '14px' }}>
-                    ✓ Selected: {csvFile.name}
-                  </div>
-                )}
-              </div>
-
-              {importResult && (
-                <div style={{ 
-                  marginTop: '20px', 
-                  padding: '15px', 
-                  borderRadius: '4px',
-                  backgroundColor: importResult.success ? '#d4edda' : '#f8d7da',
-                  border: `1px solid ${importResult.success ? '#c3e6cb' : '#f5c6cb'}`,
-                  color: importResult.success ? '#155724' : '#721c24'
-                }}>
-                  <h4>{importResult.success ? '✅ Import Successful' : '❌ Import Failed'}</h4>
-                  <p>{importResult.message}</p>
-                  
-                  {importResult.success && importResult.importedCount > 0 && (
-                    <p><strong>Imported {importResult.importedCount} transactions</strong></p>
-                  )}
-                  
-                  {importResult.errors && importResult.errors.length > 0 && (
-                    <div>
-                      <p><strong>Errors ({importResult.totalErrors}):</strong></p>
-                      <ul style={{ fontSize: '12px', margin: '5px 0' }}>
-                        {importResult.errors.map((error, index) => (
-                          <li key={index}>{error}</li>
-                        ))}
-                      </ul>
-                    </div>
-                  )}
-                </div>
-              )}
-
-              <div style={{ display: 'flex', gap: '12px', justifyContent: 'flex-end', marginTop: '24px' }}>
-                <button type="button" className="btn btn-secondary" onClick={closeCsvModal}>
-                  Cancel
-                </button>
-                <button 
-                  type="button" 
-                  className="btn btn-primary"
-                  onClick={() => handleCsvImport(configuringAccount.id)}
-                  disabled={!csvFile || importingCsv}
-                  style={{ opacity: (!csvFile || importingCsv) ? 0.6 : 1 }}
-                >
-                  {importingCsv ? '⏳ Importing...' : '📄 Import CSV'}
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }

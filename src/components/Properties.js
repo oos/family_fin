@@ -13,7 +13,6 @@ function Properties() {
     address: '',
     nickname: '',
     valuation: '',
-    mortgage_balance: '',
     rental_income_yearly: '',
     lender: '',
     omar_ownership: '',
@@ -46,7 +45,6 @@ function Properties() {
       const data = {
         ...formData,
         valuation: parseFloat(formData.valuation) || 0,
-        mortgage_balance: parseFloat(formData.mortgage_balance) || 0,
         rental_income_yearly: parseFloat(formData.rental_income_yearly) || 0,
         omar_ownership: parseFloat(formData.omar_ownership) || 0,
         heidi_ownership: parseFloat(formData.heidi_ownership) || 0,
@@ -76,7 +74,6 @@ function Properties() {
       address: property.address,
       nickname: property.nickname,
       valuation: property.valuation.toString(),
-      mortgage_balance: property.mortgage_balance.toString(),
       rental_income_yearly: property.rental_income_yearly.toString(),
       lender: property.lender,
       omar_ownership: property.omar_ownership.toString(),
@@ -111,7 +108,6 @@ function Properties() {
       address: '',
       nickname: '',
       valuation: '',
-      mortgage_balance: '',
       rental_income_yearly: '',
       lender: '',
       omar_ownership: '',
@@ -232,25 +228,25 @@ function Properties() {
               <tr key={property.id}>
                 <td>
                   <div>
-                    <strong>{property.nickname}</strong>
+                    <strong className="db-data">{property.nickname}</strong>
                     <br />
-                    <small>{property.address}</small>
+                    <small className="db-data">{property.address}</small>
                   </div>
                 </td>
-                <td>{formatCurrency(property.valuation)}</td>
-                <td>{formatCurrency(property.mortgage_balance)}</td>
-                <td style={{ color: property.equity >= 0 ? '#28a745' : '#dc3545' }}>
+                <td className="db-data">{formatCurrency(property.valuation)}</td>
+                <td className="calculated-data">{formatCurrency(property.mortgage_balance)}</td>
+                <td style={{ color: property.equity >= 0 ? '#28a745' : '#dc3545' }} className="calculated-data">
                   {formatCurrency(property.equity)}
                 </td>
-                <td>{formatCurrency(property.rental_income_yearly)}</td>
-                <td>{property.lender}</td>
+                <td className="db-data">{formatCurrency(property.rental_income_yearly)}</td>
+                <td className="db-data">{property.lender}</td>
                 <td>
                   <div style={{ fontSize: '12px' }}>
-                    {property.omar_ownership > 0 && <div>Omar: {property.omar_ownership}%</div>}
-                    {property.heidi_ownership > 0 && <div>Heidi: {property.heidi_ownership}%</div>}
-                    {property.dwayne_ownership > 0 && <div>Dwayne: {property.dwayne_ownership}%</div>}
-                    {property.sean_ownership > 0 && <div>Sean: {property.sean_ownership}%</div>}
-                    {property.lena_ownership > 0 && <div>Lena: {property.lena_ownership}%</div>}
+                    {property.omar_ownership > 0 && <div>Omar: <span className="db-data">{property.omar_ownership}%</span></div>}
+                    {property.heidi_ownership > 0 && <div>Heidi: <span className="db-data">{property.heidi_ownership}%</span></div>}
+                    {property.dwayne_ownership > 0 && <div>Dwayne: <span className="db-data">{property.dwayne_ownership}%</span></div>}
+                    {property.sean_ownership > 0 && <div>Sean: <span className="db-data">{property.sean_ownership}%</span></div>}
+                    {property.lena_ownership > 0 && <div>Lena: <span className="db-data">{property.lena_ownership}%</span></div>}
                   </div>
                 </td>
                 <td>
@@ -311,15 +307,6 @@ function Properties() {
                     value={formData.valuation}
                     onChange={(e) => setFormData({ ...formData, valuation: e.target.value })}
                     required
-                  />
-                </div>
-                <div className="form-group">
-                  <label htmlFor="mortgage_balance">Mortgage Balance (€)</label>
-                  <input
-                    type="number"
-                    id="mortgage_balance"
-                    value={formData.mortgage_balance}
-                    onChange={(e) => setFormData({ ...formData, mortgage_balance: e.target.value })}
                   />
                 </div>
                 <div className="form-group">

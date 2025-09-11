@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, Link, Navigate } from 'react-router-dom';
 import axios from 'axios';
 import Dashboard from './components/Dashboard';
+import Entities from './components/Entities';
 import People from './components/People';
 import Properties from './components/Properties';
 import BusinessAccounts from './components/BusinessAccounts';
@@ -12,6 +13,7 @@ import Taxation from './components/Taxation';
 import CompanyTaxation from './components/CompanyTaxation';
 import Pension from './components/Pension';
 import CompanyPensionCalculator from './components/CompanyPensionCalculator';
+import NetWorth from './components/NetWorth';
 import Transactions from './components/Transactions';
 import Bookings from './components/Bookings';
 import AdminPanel from './components/AdminPanel';
@@ -71,11 +73,9 @@ function RoleBasedDashboard({ userRole }) {
 function Sidebar({ userRole, sidebarOpen, setSidebarOpen }) {
   const adminMenuItems = [
     { path: '/', icon: 'fas fa-tachometer-alt', label: 'Dashboard' },
-    { path: '/people', icon: 'fas fa-users', label: 'People' },
-    { path: '/properties', icon: 'fas fa-home', label: 'Properties' },
-    { path: '/business-accounts', icon: 'fas fa-university', label: 'Business Accounts' },
+    { path: '/entities', icon: 'fas fa-database', label: 'Entities' },
+    { path: '/networth', icon: 'fas fa-chart-line', label: 'Net Worth' },
     { path: '/income', icon: 'fas fa-euro-sign', label: 'Family Incomes' },
-    { path: '/loans', icon: 'fas fa-credit-card', label: 'Loans' },
     { path: '/loan-calculator', icon: 'fas fa-calculator', label: 'Loan Calculator' },
     { path: '/taxation', icon: 'fas fa-file-invoice-dollar', label: 'Family Taxation' },
     { path: '/company-taxation', icon: 'fas fa-building', label: 'Company Taxation' },
@@ -245,29 +245,19 @@ function App() {
               <Route path="/" element={<RoleBasedDashboard userRole={userRole} />} />
               
               {/* Admin-only routes */}
-              <Route path="/people" element={
+              <Route path="/entities" element={
                 <ProtectedRoute userRole={userRole} requiredRole="admin" fallbackPath="/user-dashboard">
-                  <People />
+                  <Entities />
                 </ProtectedRoute>
               } />
-              <Route path="/properties" element={
+              <Route path="/networth" element={
                 <ProtectedRoute userRole={userRole} requiredRole="admin" fallbackPath="/user-dashboard">
-                  <Properties />
-                </ProtectedRoute>
-              } />
-              <Route path="/business-accounts" element={
-                <ProtectedRoute userRole={userRole} requiredRole="admin" fallbackPath="/user-dashboard">
-                  <BusinessAccounts />
+                  <NetWorth />
                 </ProtectedRoute>
               } />
               <Route path="/income" element={
                 <ProtectedRoute userRole={userRole} requiredRole="admin" fallbackPath="/user-dashboard">
                   <Income />
-                </ProtectedRoute>
-              } />
-              <Route path="/loans" element={
-                <ProtectedRoute userRole={userRole} requiredRole="admin" fallbackPath="/user-dashboard">
-                  <Loans />
                 </ProtectedRoute>
               } />
               <Route path="/loan-calculator" element={

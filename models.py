@@ -83,7 +83,6 @@ class Property(db.Model):
     address = db.Column(db.String(500), nullable=False)
     nickname = db.Column(db.String(50), nullable=False)
     valuation = db.Column(db.Float, nullable=False)
-    mortgage_balance = db.Column(db.Float, default=0)
     rental_income_yearly = db.Column(db.Float, default=0)
     lender = db.Column(db.String(100), default='')
     omar_ownership = db.Column(db.Float, default=0)
@@ -94,14 +93,20 @@ class Property(db.Model):
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     
-    def to_dict(self):
-        equity = self.valuation - self.mortgage_balance
+    def to_dict(self, loans=None):
+        # Calculate mortgage balance from loans if provided
+        mortgage_balance = 0
+        if loans:
+            property_loans = [loan for loan in loans if loan.get('property_id') == self.id and loan.get('is_active', True)]
+            mortgage_balance = sum(loan.get('current_balance', 0) for loan in property_loans)
+        
+        equity = self.valuation - mortgage_balance
         return {
             'id': self.id,
             'address': self.address,
             'nickname': self.nickname,
             'valuation': self.valuation,
-            'mortgage_balance': self.mortgage_balance,
+            'mortgage_balance': mortgage_balance,
             'equity': equity,
             'rental_income_yearly': self.rental_income_yearly,
             'rental_income_monthly': self.rental_income_yearly / 12,
@@ -334,6 +339,43 @@ class Pension(db.Model):
             'is_company_contribution': self.is_company_contribution,
             'company_name': self.company_name,
             'pension_provider': self.pension_provider,
+            'notes': self.notes,
+            'created_at': self.created_at.isoformat() if self.created_at else None,
+            'updated_at': self.updated_at.isoformat() if self.updated_at else None
+        }
+
+
+class PensionAccount(db.Model):
+    __tablename__ = 'pension_account'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    person_id = db.Column(db.Integer, db.ForeignKey('person.id'), nullable=False)
+    account_name = db.Column(db.String(100), nullable=False)  # e.g., "Omar's PRSA"
+    account_type = db.Column(db.String(50), nullable=False)  # PRSA, AVC, Occupational, etc.
+    provider = db.Column(db.String(100), nullable=False)  # e.g., "Zurich Life", "Irish Life"
+    account_number = db.Column(db.String(50))
+    current_balance = db.Column(db.Numeric(12, 2), default=0)
+    is_active = db.Column(db.Boolean, default=True)
+    opened_date = db.Column(db.Date)
+    notes = db.Column(db.Text)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    
+    # Relationship
+    person = db.relationship('Person', backref='pension_accounts')
+    
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'person_id': self.person_id,
+            'person_name': self.person.name if self.person else None,
+            'account_name': self.account_name,
+            'account_type': self.account_type,
+            'provider': self.provider,
+            'account_number': self.account_number,
+            'current_balance': float(self.current_balance) if self.current_balance else 0,
+            'is_active': self.is_active,
+            'opened_date': self.opened_date.isoformat() if self.opened_date else None,
             'notes': self.notes,
             'created_at': self.created_at.isoformat() if self.created_at else None,
             'updated_at': self.updated_at.isoformat() if self.updated_at else None

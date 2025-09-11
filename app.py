@@ -23,13 +23,17 @@ app.config['JWT_SECRET_KEY'] = os.getenv('JWT_SECRET_KEY', 'jwt-secret-string')
 app.config['JWT_ACCESS_TOKEN_EXPIRES'] = timedelta(hours=24)
 
 # Import models and db
-from models import db, User, Person, Property, Income, Loan, Family, BusinessAccount, Pension, LoanERC, LoanPayment, BankTransaction, AirbnbBooking, DashboardSettings, AccountBalance
+from models import db, User, Person, Property, Income, Loan, Family, BusinessAccount, Pension, PensionAccount, LoanERC, LoanPayment, BankTransaction, AirbnbBooking, DashboardSettings, AccountBalance
 
 # Initialize extensions
 db.init_app(app)
 jwt = JWTManager(app)
 migrate = Migrate(app, db)
-CORS(app, origins=['http://localhost:3001'])
+CORS(app, 
+     origins=['http://localhost:3001'],
+     methods=['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+     allow_headers=['Content-Type', 'Authorization'],
+     supports_credentials=True)
 
 @app.route('/api/health', methods=['GET'])
 def health_check():
@@ -103,11 +107,75 @@ def delete_person(person_id):
     db.session.commit()
     return jsonify({'message': 'Person deleted successfully'})
 
+# Family API endpoints
+@app.route('/api/families', methods=['GET'])
+@jwt_required()
+def get_families():
+    families = Family.query.all()
+    return jsonify([family.to_dict() for family in families])
+
+@app.route('/api/families', methods=['POST'])
+@jwt_required()
+def create_family():
+    data = request.get_json()
+    
+    # Validate required fields
+    required_fields = ['name', 'code']
+    for field in required_fields:
+        if field not in data or not data[field]:
+            return jsonify({'error': f'{field} is required'}), 400
+    
+    try:
+        family = Family(
+            name=data['name'],
+            code=data['code'],
+            description=data.get('description', '')
+        )
+        
+        db.session.add(family)
+        db.session.commit()
+        return jsonify(family.to_dict()), 201
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/families/<int:family_id>', methods=['PUT'])
+@jwt_required()
+def update_family(family_id):
+    family = Family.query.get_or_404(family_id)
+    data = request.get_json()
+    
+    try:
+        family.name = data.get('name', family.name)
+        family.code = data.get('code', family.code)
+        family.description = data.get('description', family.description)
+        
+        db.session.commit()
+        return jsonify(family.to_dict())
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/families/<int:family_id>', methods=['DELETE'])
+@jwt_required()
+def delete_family(family_id):
+    family = Family.query.get_or_404(family_id)
+    
+    try:
+        db.session.delete(family)
+        db.session.commit()
+        return jsonify({'message': 'Family deleted successfully'})
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': str(e)}), 500
+
 @app.route('/api/properties', methods=['GET'])
 @jwt_required()
 def get_properties():
     properties = Property.query.all()
-    return jsonify([property.to_dict() for property in properties])
+    loans = Loan.query.all()
+    loans_data = [loan.to_dict() for loan in loans]
+    return jsonify([property.to_dict(loans_data) for property in properties])
 
 @app.route('/api/properties', methods=['POST'])
 @jwt_required()
@@ -117,7 +185,6 @@ def create_property():
         address=data['address'],
         nickname=data['nickname'],
         valuation=data['valuation'],
-        mortgage_balance=data.get('mortgage_balance', 0),
         rental_income_yearly=data.get('rental_income_yearly', 0),
         lender=data.get('lender', ''),
         omar_ownership=data.get('omar_ownership', 0),
@@ -128,7 +195,9 @@ def create_property():
     )
     db.session.add(property)
     db.session.commit()
-    return jsonify(property.to_dict()), 201
+    loans = Loan.query.all()
+    loans_data = [loan.to_dict() for loan in loans]
+    return jsonify(property.to_dict(loans_data)), 201
 
 @app.route('/api/properties/<int:property_id>', methods=['PUT'])
 @jwt_required()
@@ -139,7 +208,6 @@ def update_property(property_id):
     property.address = data.get('address', property.address)
     property.nickname = data.get('nickname', property.nickname)
     property.valuation = data.get('valuation', property.valuation)
-    property.mortgage_balance = data.get('mortgage_balance', property.mortgage_balance)
     property.rental_income_yearly = data.get('rental_income_yearly', property.rental_income_yearly)
     property.lender = data.get('lender', property.lender)
     property.omar_ownership = data.get('omar_ownership', property.omar_ownership)
@@ -149,7 +217,9 @@ def update_property(property_id):
     property.lena_ownership = data.get('lena_ownership', property.lena_ownership)
     
     db.session.commit()
-    return jsonify(property.to_dict())
+    loans = Loan.query.all()
+    loans_data = [loan.to_dict() for loan in loans]
+    return jsonify(property.to_dict(loans_data))
 
 @app.route('/api/properties/<int:property_id>', methods=['DELETE'])
 @jwt_required()
@@ -346,11 +416,15 @@ def get_loan_schedule(loan_id):
 def get_person_networth(person_id):
     person = Person.query.get_or_404(person_id)
     
-    # Calculate property ownership value
+    # Calculate property ownership value with detailed breakdown
     properties = Property.query.all()
+    loans = Loan.query.all()
+    loans_data = [loan.to_dict() for loan in loans]
+    
     property_value = 0
     property_equity = 0
     property_mortgages = 0
+    property_breakdown = []
     
     for prop in properties:
         # Calculate ownership percentage for this person
@@ -367,31 +441,63 @@ def get_person_networth(person_id):
             ownership_percentage = prop.sean_ownership / 100
         
         if ownership_percentage > 0:
-            property_value += prop.valuation * ownership_percentage
-            # Calculate equity as valuation minus mortgage balance
-            equity = prop.valuation - prop.mortgage_balance
-            property_equity += equity * ownership_percentage
-            property_mortgages += prop.mortgage_balance * ownership_percentage
+            person_property_value = prop.valuation * ownership_percentage
+            
+            # Calculate mortgage balance from loans
+            property_loans = [loan for loan in loans_data if loan.get('property_id') == prop.id and loan.get('is_active', True)]
+            property_mortgage_balance = sum(loan.get('current_balance', 0) for loan in property_loans)
+            person_mortgage = property_mortgage_balance * ownership_percentage
+            person_equity = person_property_value - person_mortgage
+            
+            property_value += person_property_value
+            property_equity += person_equity
+            property_mortgages += person_mortgage
+            
+            property_breakdown.append({
+                'property_name': prop.nickname,
+                'ownership_percentage': ownership_percentage * 100,
+                'property_value': person_property_value,
+                'mortgage_balance': person_mortgage,
+                'equity': person_equity
+            })
     
-    # Calculate income
+    # Calculate income with detailed breakdown
     income_records = Income.query.filter_by(person_id=person_id).all()
     total_income = sum(inc.amount_yearly for inc in income_records)
+    income_breakdown = []
+    for inc in income_records:
+        income_breakdown.append({
+            'source': inc.income_type,
+            'category': inc.income_category,
+            'amount_yearly': inc.amount_yearly,
+            'amount_monthly': inc.amount_monthly
+        })
     
     # Calculate business account ownership (assuming equal split for directors)
-    # Note: Business accounts don't have balance field in current model
-    # This would need to be added or calculated differently
     business_value = 0
+    business_breakdown = []
     if person.is_director:
         # For now, we'll set a placeholder value or calculate based on other factors
         # In a real implementation, you'd need to add balance field to BusinessAccount model
         business_value = 0
+        business_breakdown.append({
+            'account_name': 'RRltd Business Account',
+            'value': 0,
+            'note': 'Requires additional data fields in business account model'
+        })
     
-    # Calculate loan liabilities (assuming personal responsibility)
+    # Calculate loan liabilities with detailed breakdown
     loans = Loan.query.filter_by(property_id=None).all()  # Non-property loans
     loan_liabilities = 0
+    loan_breakdown = []
     for loan in loans:
-        # This is a simplified calculation - in reality, loan responsibility would be more complex
         loan_liabilities += loan.current_balance
+        loan_breakdown.append({
+            'loan_name': loan.loan_name,
+            'current_balance': loan.current_balance,
+            'interest_rate': loan.interest_rate,
+            'monthly_payment': loan.monthly_payment
+        })
     
     # Calculate net worth
     total_assets = property_equity + business_value
@@ -405,11 +511,16 @@ def get_person_networth(person_id):
             'assets': {
                 'property_equity': property_equity,
                 'business_value': business_value,
-                'total_assets': total_assets
+                'total_assets': total_assets,
+                'breakdown': {
+                    'properties': property_breakdown,
+                    'business_accounts': business_breakdown
+                }
             },
             'liabilities': {
                 'loan_liabilities': loan_liabilities,
-                'total_liabilities': total_liabilities
+                'total_liabilities': total_liabilities,
+                'breakdown': loan_breakdown
             },
             'property_details': {
                 'total_property_value': property_value,
@@ -418,7 +529,8 @@ def get_person_networth(person_id):
             },
             'income': {
                 'total_annual_income': total_income,
-                'monthly_income': total_income / 12
+                'monthly_income': total_income / 12,
+                'breakdown': income_breakdown
             }
         }
     })
@@ -517,6 +629,79 @@ def delete_pension(pension_id):
         db.session.delete(pension)
         db.session.commit()
         return jsonify({'message': 'Pension record deleted successfully'})
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': str(e)}), 500
+
+# Pension Account API endpoints
+@app.route('/api/pension-accounts', methods=['GET'])
+@jwt_required()
+def get_pension_accounts():
+    accounts = PensionAccount.query.all()
+    return jsonify([account.to_dict() for account in accounts])
+
+@app.route('/api/pension-accounts', methods=['POST'])
+@jwt_required()
+def create_pension_account():
+    data = request.get_json()
+    
+    # Validate required fields
+    required_fields = ['person_id', 'account_name', 'account_type', 'provider']
+    for field in required_fields:
+        if field not in data or not data[field]:
+            return jsonify({'error': f'{field} is required'}), 400
+    
+    try:
+        account = PensionAccount(
+            person_id=data['person_id'],
+            account_name=data['account_name'],
+            account_type=data['account_type'],
+            provider=data['provider'],
+            account_number=data.get('account_number'),
+            current_balance=data.get('current_balance', 0),
+            is_active=data.get('is_active', True),
+            opened_date=datetime.strptime(data['opened_date'], '%Y-%m-%d').date() if data.get('opened_date') else None,
+            notes=data.get('notes')
+        )
+        
+        db.session.add(account)
+        db.session.commit()
+        return jsonify(account.to_dict()), 201
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/pension-accounts/<int:account_id>', methods=['PUT'])
+@jwt_required()
+def update_pension_account(account_id):
+    account = PensionAccount.query.get_or_404(account_id)
+    data = request.get_json()
+    
+    try:
+        account.account_name = data.get('account_name', account.account_name)
+        account.account_type = data.get('account_type', account.account_type)
+        account.provider = data.get('provider', account.provider)
+        account.account_number = data.get('account_number', account.account_number)
+        account.current_balance = data.get('current_balance', account.current_balance)
+        account.is_active = data.get('is_active', account.is_active)
+        account.opened_date = datetime.strptime(data['opened_date'], '%Y-%m-%d').date() if data.get('opened_date') else account.opened_date
+        account.notes = data.get('notes', account.notes)
+        
+        db.session.commit()
+        return jsonify(account.to_dict())
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/pension-accounts/<int:account_id>', methods=['DELETE'])
+@jwt_required()
+def delete_pension_account(account_id):
+    account = PensionAccount.query.get_or_404(account_id)
+    
+    try:
+        db.session.delete(account)
+        db.session.commit()
+        return jsonify({'message': 'Pension account deleted successfully'})
     except Exception as e:
         db.session.rollback()
         return jsonify({'error': str(e)}), 500
@@ -1556,14 +1741,29 @@ def import_csv_transactions(account_id):
         }
         
         # Find column mappings
-        headers = csv_reader.fieldnames
+        original_headers = csv_reader.fieldnames
+        # Trim whitespace from headers
+        headers = [header.strip() for header in original_headers]
+        # Create mapping from trimmed to original headers
+        header_mapping = {trimmed: original for trimmed, original in zip(headers, original_headers)}
         column_mapping = {}
         
         for field, possible_names in expected_columns.items():
             for header in headers:
                 if header.lower() in [name.lower() for name in possible_names]:
-                    column_mapping[field] = header
+                    column_mapping[field] = header  # Use trimmed header
                     break
+        
+        # Special handling for AIB multiple description columns
+        if 'Description1' in headers and 'description' not in column_mapping:
+            # Check if we have Description1, Description2, Description3
+            desc_columns = []
+            for i in range(1, 4):  # Check Description1, Description2, Description3
+                if f'Description{i}' in headers:
+                    desc_columns.append(f'Description{i}')
+            
+            if desc_columns:
+                column_mapping['description'] = desc_columns  # Store as list for special handling
         
         # Also map Revolut specific columns
         revolut_mapping = {}
@@ -1594,7 +1794,8 @@ def import_csv_transactions(account_id):
         for row_num, row in enumerate(csv_reader, start=2):  # Start at 2 because row 1 is header
             try:
                 # Parse transaction date
-                date_str = row[column_mapping['date']].strip()
+                original_date_header = header_mapping[column_mapping['date']]
+                date_str = row[original_date_header].strip()
                 try:
                     # Try different date formats - Enhanced for Revolut and international formats
                     date_formats = [
@@ -1628,7 +1829,8 @@ def import_csv_transactions(account_id):
                 amount = 0.0
                 if 'amount' in column_mapping:
                     # Standard amount column
-                    amount_str = row[column_mapping['amount']].strip().replace(',', '')
+                    original_amount_header = header_mapping[column_mapping['amount']]
+                    amount_str = row[original_amount_header].strip().replace(',', '')
                     try:
                         amount = float(amount_str) if amount_str else 0.0
                     except ValueError:
@@ -1676,15 +1878,26 @@ def import_csv_transactions(account_id):
                 # Get other fields
                 if 'Description1' in headers and 'Description2' in headers and 'Description3' in headers:
                     # AIB format: combine multiple description columns
-                    desc1 = row.get('Description1', '').strip()
-                    desc2 = row.get('Description2', '').strip()
-                    desc3 = row.get('Description3', '').strip()
+                    desc1 = row.get(' Description1', '').strip()  # Use original header with space
+                    desc2 = row.get(' Description2', '').strip()  # Use original header with space
+                    desc3 = row.get(' Description3', '').strip()  # Use original header with space
                     description = ' '.join([d for d in [desc1, desc2, desc3] if d])
+                elif isinstance(column_mapping.get('description'), list):
+                    # Handle case where description is mapped to multiple columns
+                    desc_parts = []
+                    for desc_col in column_mapping['description']:
+                        original_desc_col = header_mapping[desc_col]
+                        desc_part = row.get(original_desc_col, '').strip()
+                        if desc_part:
+                            desc_parts.append(desc_part)
+                    description = ' '.join(desc_parts)
                 else:
-                    description = row[column_mapping['description']].strip()
+                    original_desc_header = header_mapping[column_mapping['description']]
+                    description = row[original_desc_header].strip()
                 balance = None
                 if 'balance' in column_mapping:
-                    balance_str = row[column_mapping['balance']].strip().replace(',', '')
+                    original_balance_header = header_mapping[column_mapping['balance']]
+                    balance_str = row[original_balance_header].strip().replace(',', '')
                     try:
                         balance = float(balance_str) if balance_str else None
                     except ValueError:
@@ -1692,11 +1905,13 @@ def import_csv_transactions(account_id):
                 
                 reference = None
                 if 'reference' in column_mapping:
-                    reference = row[column_mapping['reference']].strip() or None
+                    original_ref_header = header_mapping[column_mapping['reference']]
+                    reference = row[original_ref_header].strip() or None
                 
                 transaction_type = None
                 if 'type' in column_mapping:
-                    transaction_type = row[column_mapping['type']].strip() or None
+                    original_type_header = header_mapping[column_mapping['type']]
+                    transaction_type = row[original_type_header].strip() or None
                 elif 'Transaction Type' in headers:
                     transaction_type = row['Transaction Type'].strip() or None
                 
