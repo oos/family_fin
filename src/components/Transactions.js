@@ -14,6 +14,10 @@ const Transactions = () => {
   const [sortField, setSortField] = useState('transaction_date');
   const [sortDirection, setSortDirection] = useState('desc');
   
+  // Pagination states
+  const [currentPage, setCurrentPage] = useState(1);
+  const [rowsPerPage, setRowsPerPage] = useState(50);
+  
   // Filter states
   const [filters, setFilters] = useState({
     search: '',
@@ -204,6 +208,13 @@ const Transactions = () => {
       return 0;
     });
 
+  // Pagination calculations
+  const totalFilteredTransactions = filteredTransactions.length;
+  const totalPages = Math.ceil(totalFilteredTransactions / rowsPerPage);
+  const startIndex = (currentPage - 1) * rowsPerPage;
+  const endIndex = startIndex + rowsPerPage;
+  const paginatedTransactions = filteredTransactions.slice(startIndex, endIndex);
+
   const formatCurrency = (amount) => {
     return new Intl.NumberFormat('en-IE', {
       style: 'currency',
@@ -381,11 +392,32 @@ const Transactions = () => {
           {/* Transaction Count Display */}
           {!loading && !error && (
             <div className="d-flex justify-content-between align-items-center mb-2">
-              <div className="text-muted small">
-                Showing {filteredTransactions.length} of {Array.isArray(transactions) ? transactions.length : 0} transactions
+              <div className="d-flex align-items-center gap-3">
+                <div className="text-muted small">
+                  Rows per page:
+                </div>
+                <select 
+                  value={rowsPerPage} 
+                  onChange={(e) => {
+                    setRowsPerPage(parseInt(e.target.value));
+                    setCurrentPage(1);
+                  }}
+                  className="form-select form-select-sm"
+                  style={{ width: '80px' }}
+                >
+                  <option value={25}>25</option>
+                  <option value={50}>50</option>
+                  <option value={100}>100</option>
+                  <option value={200}>200</option>
+                </select>
               </div>
-              <div className="text-muted small">
-                Page 1 of 1
+              <div className="d-flex align-items-center gap-3">
+                <div className="text-muted small">
+                  Showing {startIndex + 1}-{Math.min(endIndex, totalFilteredTransactions)} of {totalFilteredTransactions} transactions
+                </div>
+                <div className="text-muted small">
+                  Page {currentPage} of {totalPages}
+                </div>
               </div>
             </div>
           )}
@@ -459,14 +491,14 @@ const Transactions = () => {
                   </tr>
                 </thead>
                 <tbody>
-                  {filteredTransactions.length === 0 ? (
+                  {paginatedTransactions.length === 0 ? (
                     <tr>
                       <td colSpan="9" className="text-center">
                         {(Array.isArray(transactions) ? transactions.length : 0) === 0 ? 'No transactions found' : 'No transactions match the current filters'}
                       </td>
                     </tr>
                   ) : (
-                    filteredTransactions.map(transaction => (
+                    paginatedTransactions.map(transaction => (
                       <tr key={transaction.id}>
                         <td>{formatDate(transaction.transaction_date)}</td>
                         <td>{transaction.description}</td>
