@@ -11,7 +11,7 @@ import re
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.model_selection import train_test_split
-from sklearn.metrics import classification_report, accuracy_score
+from sklearn.metrics import classification_report, accuracy_score, precision_recall_fscore_support
 import numpy as np
 import os
 import csv
@@ -31,7 +31,7 @@ app.config['JWT_SECRET_KEY'] = os.getenv('JWT_SECRET_KEY', 'jwt-secret-string')
 app.config['JWT_ACCESS_TOKEN_EXPIRES'] = timedelta(hours=24)
 
 # Import models and db
-from models import db, User, Person, Property, Income, Loan, Family, BusinessAccount, Pension, PensionAccount, LoanERC, LoanPayment, BankTransaction, AirbnbBooking, DashboardSettings, AccountBalance, TaxReturn, TaxReturnTransaction, TransactionMatch, TransactionLearningPattern, TransactionCategoryPrediction
+from models import db, User, Person, Property, Income, Loan, Family, BusinessAccount, Pension, PensionAccount, LoanERC, LoanPayment, BankTransaction, AirbnbBooking, DashboardSettings, AccountBalance, TaxReturn, TaxReturnTransaction, TransactionMatch, TransactionLearningPattern, TransactionCategoryPrediction, ModelTrainingHistory
 
 # Initialize extensions
 db.init_app(app)
@@ -3366,6 +3366,7 @@ class TransactionCategoryPredictor:
         self.vectorizer = None
         self.model_version = "1.0"
         self.is_trained = False
+        self.training_history = []
     
     def extract_features(self, transaction):
         """Extract features from a bank transaction for ML prediction"""
@@ -3390,7 +3391,11 @@ class TransactionCategoryPredictor:
             features['day_of_week'] = transaction.transaction_date.weekday()
             features['day_of_month'] = transaction.transaction_date.day
             features['month'] = transaction.transaction_date.month
+            features['year'] = transaction.transaction_date.year
             features['is_weekend'] = transaction.transaction_date.weekday() >= 5
+            features['is_month_end'] = transaction.transaction_date.day >= 28
+            features['is_quarter_end'] = transaction.transaction_date.month in [3, 6, 9, 12] and transaction.transaction_date.day >= 28
+            features['is_year_end'] = transaction.transaction_date.month == 12 and transaction.transaction_date.day >= 28
         
         # Reference features
         reference = str(transaction.reference or '')
@@ -3420,13 +3425,20 @@ class TransactionCategoryPredictor:
         
         return X, y
     
-    def train_model(self, user_id):
+    def train_model(self, user_id, incremental=False):
         """Train the ML model on matched transaction data"""
+        import time
+        start_time = time.time()
+        
         try:
+            # Get training data
             X, y = self.prepare_training_data(user_id)
             
             if X is None or len(X) < 10:
                 return False, "Not enough training data. Need at least 10 matched transactions with categories."
+            
+            # Get tax return years for tracking
+            tax_return_years = self.get_tax_return_years(user_id)
             
             # Convert features to DataFrame
             df_features = pd.DataFrame(X)
@@ -3441,9 +3453,10 @@ class TransactionCategoryPredictor:
             
             # Create TF-IDF features
             self.vectorizer = TfidfVectorizer(
-                max_features=100,
+                max_features=150,  # Increased for better text analysis
                 stop_words='english',
-                ngram_range=(1, 2)
+                ngram_range=(1, 3),  # Include trigrams for better pattern recognition
+                min_df=2  # Ignore terms that appear in less than 2 documents
             )
             tfidf_features = self.vectorizer.fit_transform(descriptions).toarray()
             
@@ -3454,12 +3467,15 @@ class TransactionCategoryPredictor:
             # Fill NaN values
             combined_features = combined_features.fillna(0)
             
-            # Train the model
+            # Train the model with enhanced parameters
             self.model = RandomForestClassifier(
-                n_estimators=100,
-                max_depth=10,
+                n_estimators=200,  # Increased for better performance
+                max_depth=15,      # Increased for more complex patterns
+                min_samples_split=5,
+                min_samples_leaf=2,
                 random_state=42,
-                class_weight='balanced'
+                class_weight='balanced',
+                n_jobs=-1  # Use all available cores
             )
             
             # Split data for validation
@@ -3469,16 +3485,81 @@ class TransactionCategoryPredictor:
             
             self.model.fit(X_train, y_train)
             
-            # Evaluate model
+            # Evaluate model with comprehensive metrics
             y_pred = self.model.predict(X_test)
             accuracy = accuracy_score(y_test, y_pred)
+            precision, recall, f1, _ = precision_recall_fscore_support(y_test, y_pred, average='weighted')
+            
+            # Update model version
+            if incremental:
+                version_parts = self.model_version.split('.')
+                self.model_version = f"{version_parts[0]}.{int(version_parts[1]) + 1}"
+            else:
+                self.model_version = "1.0"
             
             self.is_trained = True
+            training_duration = time.time() - start_time
             
-            return True, f"Model trained successfully! Accuracy: {accuracy:.2%}"
+            # Save training history to database
+            self.save_training_history(
+                user_id=user_id,
+                training_samples=len(X),
+                tax_return_years=tax_return_years,
+                matched_transactions_count=len(X),
+                accuracy=accuracy,
+                precision=precision,
+                recall=recall,
+                f1_score=f1,
+                features_count=combined_features.shape[1],
+                training_duration_seconds=training_duration
+            )
+            
+            return True, f"Model v{self.model_version} trained successfully!\nAccuracy: {accuracy:.2%}\nPrecision: {precision:.2%}\nRecall: {recall:.2%}\nF1-Score: {f1:.2%}\nTraining time: {training_duration:.1f}s"
             
         except Exception as e:
+            # Save failed training attempt
+            self.save_training_history(
+                user_id=user_id,
+                training_samples=0,
+                tax_return_years="",
+                matched_transactions_count=0,
+                status='failed',
+                error_message=str(e)
+            )
             return False, f"Training failed: {str(e)}"
+    
+    def get_tax_return_years(self, user_id):
+        """Get years of tax returns used for training"""
+        tax_returns = TaxReturn.query.filter_by(user_id=user_id).all()
+        years = [str(tr.year) for tr in tax_returns if tr.year]
+        return ','.join(sorted(years))
+    
+    def save_training_history(self, user_id, training_samples, tax_return_years, matched_transactions_count, 
+                            accuracy=None, precision=None, recall=None, f1_score=None, 
+                            features_count=None, training_duration_seconds=None, 
+                            status='completed', error_message=None):
+        """Save training history to database"""
+        try:
+            history = ModelTrainingHistory(
+                user_id=user_id,
+                model_version=self.model_version,
+                training_samples=training_samples,
+                tax_return_years=tax_return_years,
+                matched_transactions_count=matched_transactions_count,
+                accuracy=accuracy,
+                precision=precision,
+                recall=recall,
+                f1_score=f1_score,
+                features_count=features_count,
+                training_duration_seconds=training_duration_seconds,
+                status=status,
+                error_message=error_message
+            )
+            db.session.add(history)
+            db.session.commit()
+        except Exception as e:
+            print(f"Error saving training history: {e}")
+            db.session.rollback()
     
     def predict_category(self, transaction):
         """Predict category for a single transaction"""
@@ -3518,18 +3599,96 @@ def train_category_model():
     """Train the ML model on matched transaction data"""
     try:
         current_user_id = get_jwt_identity()
+        data = request.get_json() or {}
+        incremental = data.get('incremental', False)
         
-        success, message = predictor.train_model(current_user_id)
+        success, message = predictor.train_model(current_user_id, incremental=incremental)
         
         if success:
             return jsonify({
                 'message': message,
                 'model_version': predictor.model_version,
-                'is_trained': predictor.is_trained
+                'is_trained': predictor.is_trained,
+                'incremental': incremental
             })
         else:
             return jsonify({'error': message}), 400
             
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/training-history', methods=['GET'])
+@jwt_required()
+def get_training_history():
+    """Get training history for the user"""
+    try:
+        current_user_id = get_jwt_identity()
+        
+        history = ModelTrainingHistory.query.filter_by(
+            user_id=current_user_id
+        ).order_by(ModelTrainingHistory.training_date.desc()).all()
+        
+        return jsonify({
+            'training_history': [h.to_dict() for h in history]
+        })
+        
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/model-performance', methods=['GET'])
+@jwt_required()
+def get_model_performance():
+    """Get current model performance metrics"""
+    try:
+        current_user_id = get_jwt_identity()
+        
+        # Get latest successful training
+        latest_training = ModelTrainingHistory.query.filter_by(
+            user_id=current_user_id,
+            status='completed'
+        ).order_by(ModelTrainingHistory.training_date.desc()).first()
+        
+        if not latest_training:
+            return jsonify({'error': 'No trained model found'}), 404
+        
+        # Get prediction statistics
+        total_predictions = TransactionCategoryPrediction.query.filter_by(
+            user_id=current_user_id
+        ).count()
+        
+        validated_predictions = TransactionCategoryPrediction.query.filter_by(
+            user_id=current_user_id,
+            validation_status='validated'
+        ).count()
+        
+        pending_predictions = TransactionCategoryPrediction.query.filter_by(
+            user_id=current_user_id,
+            validation_status='pending'
+        ).count()
+        
+        return jsonify({
+            'model_version': latest_training.model_version,
+            'training_date': latest_training.training_date.isoformat(),
+            'performance': {
+                'accuracy': latest_training.accuracy,
+                'precision': latest_training.precision,
+                'recall': latest_training.recall,
+                'f1_score': latest_training.f1_score
+            },
+            'training_data': {
+                'samples': latest_training.training_samples,
+                'tax_return_years': latest_training.tax_return_years,
+                'features_count': latest_training.features_count,
+                'training_duration': latest_training.training_duration_seconds
+            },
+            'predictions': {
+                'total': total_predictions,
+                'validated': validated_predictions,
+                'pending': pending_predictions,
+                'validation_rate': validated_predictions / total_predictions if total_predictions > 0 else 0
+            }
+        })
+        
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 

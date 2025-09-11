@@ -12,9 +12,14 @@ const TransactionPredictions = () => {
   const [pagination, setPagination] = useState({});
   const [selectedStatus, setSelectedStatus] = useState('all');
   const [currentPage, setCurrentPage] = useState(1);
+  const [trainingHistory, setTrainingHistory] = useState([]);
+  const [modelPerformance, setModelPerformance] = useState(null);
+  const [showTrainingHistory, setShowTrainingHistory] = useState(false);
 
   useEffect(() => {
     fetchPredictions();
+    fetchTrainingHistory();
+    fetchModelPerformance();
   }, [currentPage, selectedStatus]);
 
   const fetchPredictions = async () => {
@@ -35,12 +40,41 @@ const TransactionPredictions = () => {
     }
   };
 
-  const trainModel = async () => {
+  const fetchTrainingHistory = async () => {
+    try {
+      const token = localStorage.getItem('token');
+      const response = await axios.get('/training-history', {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      setTrainingHistory(response.data.training_history);
+    } catch (err) {
+      console.error('Error fetching training history:', err);
+    }
+  };
+
+  const fetchModelPerformance = async () => {
+    try {
+      const token = localStorage.getItem('token');
+      const response = await axios.get('/model-performance', {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      setModelPerformance(response.data);
+      setModelStatus({
+        is_trained: true,
+        version: response.data.model_version
+      });
+    } catch (err) {
+      console.error('Error fetching model performance:', err);
+      setModelStatus({ is_trained: false, version: null });
+    }
+  };
+
+  const trainModel = async (incremental = false) => {
     setTraining(true);
     setError(null);
     try {
       const token = localStorage.getItem('token');
-      const response = await axios.post('/train-category-model', {}, {
+      const response = await axios.post('/train-category-model', { incremental }, {
         headers: { Authorization: `Bearer ${token}` }
       });
       
@@ -49,6 +83,10 @@ const TransactionPredictions = () => {
         is_trained: response.data.is_trained,
         version: response.data.model_version
       });
+      
+      // Refresh data
+      fetchTrainingHistory();
+      fetchModelPerformance();
     } catch (err) {
       console.error('Error training model:', err);
       setError(`Training failed: ${err.response?.data?.message || err.message}`);
@@ -149,21 +187,70 @@ const TransactionPredictions = () => {
         </div>
         <div className="card-body">
           <div className="row">
-            <div className="col-md-6">
+            <div className="col-md-4">
               <h6>Model Status</h6>
               <p>
                 <strong>Status:</strong> {modelStatus.is_trained ? '✅ Trained' : '❌ Not Trained'}<br/>
                 <strong>Version:</strong> {modelStatus.version || 'N/A'}
               </p>
+              {modelPerformance && (
+                <div className="mt-2">
+                  <small className="text-muted">
+                    <strong>Tax Return Years:</strong> {modelPerformance.training_data?.tax_return_years || 'N/A'}<br/>
+                    <strong>Training Samples:</strong> {modelPerformance.training_data?.samples || 0}<br/>
+                    <strong>Features:</strong> {modelPerformance.training_data?.features_count || 0}
+                  </small>
+                </div>
+              )}
             </div>
-            <div className="col-md-6">
-              <div className="d-flex gap-2">
+            <div className="col-md-4">
+              {modelPerformance && (
+                <div>
+                  <h6>Performance Metrics</h6>
+                  <div className="row text-center">
+                    <div className="col-3">
+                      <div className="text-success">
+                        <strong>{(modelPerformance.performance?.accuracy * 100 || 0).toFixed(1)}%</strong><br/>
+                        <small>Accuracy</small>
+                      </div>
+                    </div>
+                    <div className="col-3">
+                      <div className="text-info">
+                        <strong>{(modelPerformance.performance?.precision * 100 || 0).toFixed(1)}%</strong><br/>
+                        <small>Precision</small>
+                      </div>
+                    </div>
+                    <div className="col-3">
+                      <div className="text-warning">
+                        <strong>{(modelPerformance.performance?.recall * 100 || 0).toFixed(1)}%</strong><br/>
+                        <small>Recall</small>
+                      </div>
+                    </div>
+                    <div className="col-3">
+                      <div className="text-primary">
+                        <strong>{(modelPerformance.performance?.f1_score * 100 || 0).toFixed(1)}%</strong><br/>
+                        <small>F1-Score</small>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+            <div className="col-md-4">
+              <div className="d-flex flex-column gap-2">
                 <button
-                  onClick={trainModel}
+                  onClick={() => trainModel(false)}
                   className="btn btn-primary"
                   disabled={training}
                 >
-                  {training ? '⏳ Training...' : '🎓 Train Model'}
+                  {training ? '⏳ Training...' : '🎓 Train New Model'}
+                </button>
+                <button
+                  onClick={() => trainModel(true)}
+                  className="btn btn-outline-primary"
+                  disabled={training || !modelStatus.is_trained}
+                >
+                  {training ? '⏳ Training...' : '🔄 Incremental Training'}
                 </button>
                 <button
                   onClick={predictAllTransactions}
@@ -172,11 +259,64 @@ const TransactionPredictions = () => {
                 >
                   {predicting ? '⏳ Predicting...' : '🎯 Predict All Transactions'}
                 </button>
+                <button
+                  onClick={() => setShowTrainingHistory(!showTrainingHistory)}
+                  className="btn btn-outline-info btn-sm"
+                >
+                  📊 {showTrainingHistory ? 'Hide' : 'Show'} Training History
+                </button>
               </div>
             </div>
           </div>
         </div>
       </div>
+
+      {/* Training History */}
+      {showTrainingHistory && (
+        <div className="card mb-4">
+          <div className="card-header">
+            <h5>📊 Training History</h5>
+          </div>
+          <div className="card-body">
+            {trainingHistory.length === 0 ? (
+              <p className="text-muted">No training history found.</p>
+            ) : (
+              <div className="table-responsive">
+                <table className="table table-sm">
+                  <thead>
+                    <tr>
+                      <th>Date</th>
+                      <th>Version</th>
+                      <th>Status</th>
+                      <th>Samples</th>
+                      <th>Years</th>
+                      <th>Accuracy</th>
+                      <th>Duration</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {trainingHistory.map((history) => (
+                      <tr key={history.id}>
+                        <td>{new Date(history.training_date).toLocaleDateString()}</td>
+                        <td><span className="badge bg-info">{history.model_version}</span></td>
+                        <td>
+                          <span className={`badge ${history.status === 'completed' ? 'bg-success' : history.status === 'failed' ? 'bg-danger' : 'bg-warning'}`}>
+                            {history.status}
+                          </span>
+                        </td>
+                        <td>{history.training_samples}</td>
+                        <td>{history.tax_return_years || 'N/A'}</td>
+                        <td>{history.accuracy ? `${(history.accuracy * 100).toFixed(1)}%` : 'N/A'}</td>
+                        <td>{history.training_duration_seconds ? `${history.training_duration_seconds.toFixed(1)}s` : 'N/A'}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* Filters */}
       <div className="card mb-4">

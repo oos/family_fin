@@ -880,3 +880,53 @@ class TransactionCategoryPrediction(db.Model):
             'created_at': self.created_at.isoformat() if self.created_at else None,
             'updated_at': self.updated_at.isoformat() if self.updated_at else None
         }
+
+class ModelTrainingHistory(db.Model):
+    """Model for tracking ML model training history and performance"""
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+    model_version = db.Column(db.String(50), nullable=False)
+    training_date = db.Column(db.DateTime, default=datetime.utcnow)
+    
+    # Training data info
+    training_samples = db.Column(db.Integer, nullable=False)
+    tax_return_years = db.Column(db.String(200), nullable=True)  # Comma-separated years
+    matched_transactions_count = db.Column(db.Integer, nullable=False)
+    
+    # Model performance metrics
+    accuracy = db.Column(db.Float, nullable=True)
+    precision = db.Column(db.Float, nullable=True)
+    recall = db.Column(db.Float, nullable=True)
+    f1_score = db.Column(db.Float, nullable=True)
+    
+    # Training parameters
+    algorithm = db.Column(db.String(50), default='RandomForest')
+    features_count = db.Column(db.Integer, nullable=True)
+    training_duration_seconds = db.Column(db.Float, nullable=True)
+    
+    # Status
+    status = db.Column(db.String(20), default='completed')  # training, completed, failed
+    error_message = db.Column(db.Text, nullable=True)
+    
+    # Relationships
+    user = db.relationship('User', backref='model_training_history')
+    
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'user_id': self.user_id,
+            'model_version': self.model_version,
+            'training_date': self.training_date.isoformat() if self.training_date else None,
+            'training_samples': self.training_samples,
+            'tax_return_years': self.tax_return_years,
+            'matched_transactions_count': self.matched_transactions_count,
+            'accuracy': self.accuracy,
+            'precision': self.precision,
+            'recall': self.recall,
+            'f1_score': self.f1_score,
+            'algorithm': self.algorithm,
+            'features_count': self.features_count,
+            'training_duration_seconds': self.training_duration_seconds,
+            'status': self.status,
+            'error_message': self.error_message
+        }
