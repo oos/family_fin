@@ -33,6 +33,36 @@ const Transactions = () => {
     fetchBusinessAccounts();
   }, []);
 
+  // Auto-select account 488 when accounts are loaded
+  useEffect(() => {
+    if (businessAccounts.length > 0) {
+      console.log('Available accounts:', businessAccounts.map(acc => ({ id: acc.id, name: acc.account_name })));
+      
+      // Check if there's a stored account from previous session
+      const storedAccount = localStorage.getItem('selectedAccount');
+      if (storedAccount) {
+        const account = businessAccounts.find(acc => acc.id.toString() === storedAccount);
+        if (account) {
+          console.log('Restoring stored account:', account.id);
+          setSelectedAccount(storedAccount);
+          return;
+        }
+      }
+      
+      // Fallback to account 488 or first account
+      const account488 = businessAccounts.find(acc => acc.id === 488);
+      console.log('Looking for account 488, found:', account488);
+      if (account488) {
+        console.log('Auto-selecting account 488');
+        setSelectedAccount('488');
+      } else {
+        // If 488 doesn't exist, select the first account
+        console.log('Account 488 not found, selecting first account:', businessAccounts[0].id);
+        setSelectedAccount(businessAccounts[0].id.toString());
+      }
+    }
+  }, [businessAccounts]);
+
   useEffect(() => {
     if (selectedAccount) {
       fetchTransactions();
@@ -93,7 +123,14 @@ const Transactions = () => {
   };
 
   const handleAccountChange = (e) => {
-    setSelectedAccount(e.target.value);
+    const accountId = e.target.value;
+    setSelectedAccount(accountId);
+    // Store the selected account in localStorage
+    if (accountId) {
+      localStorage.setItem('selectedAccount', accountId);
+    } else {
+      localStorage.removeItem('selectedAccount');
+    }
   };
 
   const handleFilterChange = (e) => {
