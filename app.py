@@ -1,4 +1,4 @@
-from flask import Flask, request, jsonify
+from flask import Flask, request, jsonify, Response
 from flask_jwt_extended import JWTManager, create_access_token, jwt_required, get_jwt_identity
 from flask_cors import CORS
 from flask_migrate import Migrate
@@ -24,7 +24,7 @@ app.config['JWT_SECRET_KEY'] = os.getenv('JWT_SECRET_KEY', 'jwt-secret-string')
 app.config['JWT_ACCESS_TOKEN_EXPIRES'] = timedelta(hours=24)
 
 # Import models and db
-from models import db, User, Person, Property, Income, Loan, Family, BusinessAccount, Pension, PensionAccount, LoanERC, LoanPayment, BankTransaction, AirbnbBooking, DashboardSettings, AccountBalance, TaxReturn
+from models import db, User, Person, Property, Income, Loan, Family, BusinessAccount, Pension, PensionAccount, LoanERC, LoanPayment, BankTransaction, AirbnbBooking, DashboardSettings, AccountBalance, TaxReturn, TaxReturnTransaction, TransactionMatch, TransactionLearningPattern
 
 # Initialize extensions
 db.init_app(app)
@@ -2678,7 +2678,7 @@ def upload_tax_return():
         # Read and validate CSV
         try:
             df = pd.read_csv(file)
-            required_columns = ['Transaction Date', 'Description', 'Amount', 'Tax Category']
+            required_columns = ['Name', 'Date', 'Number', 'Reference', 'Source', 'Annotation', 'Debit', 'Credit', 'Balance']
             
             # Check if required columns exist (case insensitive)
             df_columns_lower = [col.lower() for col in df.columns]
@@ -2691,6 +2691,34 @@ def upload_tax_return():
                 return jsonify({
                     'error': f'Missing required columns: {", ".join(missing_columns)}'
                 }), 400
+            
+            # Clean up the data - remove empty rows and handle missing values
+            df = df.dropna(how='all')  # Remove completely empty rows
+            df = df.fillna('')  # Fill NaN values with empty strings
+            
+            # Skip first 5 rows as requested by user
+            df = df.iloc[5:].reset_index(drop=True)
+            
+            # Convert date column to proper format if needed
+            if 'Date' in df.columns:
+                try:
+                    # Handle DD/MM/YYYY format
+                    df['Date'] = pd.to_datetime(df['Date'], format='%d/%m/%Y', errors='coerce')
+                except:
+                    # Fallback to default parsing
+                    df['Date'] = pd.to_datetime(df['Date'], errors='coerce')
+            
+            # Convert numeric columns
+            numeric_columns = ['Debit', 'Credit', 'Balance']
+            for col in numeric_columns:
+                if col in df.columns:
+                    df[col] = pd.to_numeric(df[col], errors='coerce').fillna(0)
+            
+            # Filter out rows where Name is empty (these are usually summary rows)
+            df = df[df['Name'].str.strip() != '']
+            
+            # Count actual transaction rows (excluding summary rows)
+            transaction_count = len(df[df['Name'].str.strip() != ''])
                 
         except Exception as e:
             return jsonify({'error': f'Invalid CSV file: {str(e)}'}), 400
@@ -2706,16 +2734,39 @@ def upload_tax_return():
             filename=file.filename,
             file_content=file_content,
             file_size=len(file_content),
-            transaction_count=len(df)
+            transaction_count=transaction_count
         )
         
         db.session.add(tax_return)
+        db.session.flush()  # Get the tax_return.id before committing
+        
+        # Save individual transactions to database
+        saved_transactions = 0
+        for _, row in df.iterrows():
+            if pd.notna(row['Name']) and str(row['Name']).strip() != '':
+                transaction = TaxReturnTransaction(
+                    tax_return_id=tax_return.id,
+                    user_id=current_user_id,
+                    name=str(row['Name']).strip(),
+                    date=row['Date'] if pd.notna(row['Date']) else None,
+                    number=str(row['Number']).strip() if pd.notna(row['Number']) else None,
+                    reference=str(row['Reference']).strip() if pd.notna(row['Reference']) else None,
+                    source=str(row['Source']).strip() if pd.notna(row['Source']) else None,
+                    annotation=str(row['Annotation']).strip() if pd.notna(row['Annotation']) else None,
+                    debit=float(row['Debit']) if pd.notna(row['Debit']) else 0.0,
+                    credit=float(row['Credit']) if pd.notna(row['Credit']) else 0.0,
+                    balance=float(row['Balance']) if pd.notna(row['Balance']) else 0.0
+                )
+                db.session.add(transaction)
+                saved_transactions += 1
+        
         db.session.commit()
         
         return jsonify({
             'message': 'Tax return uploaded successfully',
             'id': tax_return.id,
-            'transaction_count': tax_return.transaction_count
+            'transaction_count': tax_return.transaction_count,
+            'saved_transactions': saved_transactions
         })
         
     except Exception as e:
@@ -2771,6 +2822,526 @@ def delete_tax_return(tax_return_id):
     except Exception as e:
         db.session.rollback()
         return jsonify({'error': str(e)}), 500
+
+@app.route('/api/tax-returns/<int:tax_return_id>/data', methods=['GET'])
+@jwt_required()
+def get_tax_return_data(tax_return_id):
+    """Get parsed CSV data from a tax return"""
+    try:
+        current_user_id = get_jwt_identity()
+        
+        tax_return = TaxReturn.query.filter_by(
+            id=tax_return_id, 
+            user_id=current_user_id
+        ).first()
+        
+        if not tax_return:
+            return jsonify({'error': 'Tax return not found'}), 404
+        
+        # Parse the CSV data
+        import io
+        csv_data = io.StringIO(tax_return.file_content.decode('utf-8'))
+        df = pd.read_csv(csv_data)
+        
+        # Clean up the data
+        df = df.dropna(how='all')
+        df = df.fillna('')
+        
+        # Convert date column
+        if 'Date' in df.columns:
+            try:
+                df['Date'] = pd.to_datetime(df['Date'], format='%d/%m/%Y', errors='coerce')
+            except:
+                df['Date'] = pd.to_datetime(df['Date'], errors='coerce')
+        
+        # Convert numeric columns
+        numeric_columns = ['Debit', 'Credit', 'Balance']
+        for col in numeric_columns:
+            if col in df.columns:
+                df[col] = pd.to_numeric(df[col], errors='coerce').fillna(0)
+        
+        # Filter out empty rows
+        df = df[df['Name'].str.strip() != '']
+        
+        # Convert to JSON
+        data = df.to_dict('records')
+        
+        return jsonify({
+            'data': data,
+            'total_rows': len(data),
+            'columns': list(df.columns)
+        })
+        
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/tax-returns/<int:tax_return_id>/transactions', methods=['GET'])
+@jwt_required()
+def get_tax_return_transactions(tax_return_id):
+    """Get saved transaction data from database for a tax return"""
+    try:
+        current_user_id = get_jwt_identity()
+        
+        # Verify tax return belongs to user
+        tax_return = TaxReturn.query.filter_by(
+            id=tax_return_id, 
+            user_id=current_user_id
+        ).first()
+        
+        if not tax_return:
+            return jsonify({'error': 'Tax return not found'}), 404
+        
+        # Get transactions from database
+        transactions = TaxReturnTransaction.query.filter_by(
+            tax_return_id=tax_return_id,
+            user_id=current_user_id
+        ).order_by(TaxReturnTransaction.date.asc(), TaxReturnTransaction.id.asc()).all()
+        
+        return jsonify({
+            'transactions': [transaction.to_dict() for transaction in transactions],
+            'total_count': len(transactions),
+            'tax_return': {
+                'id': tax_return.id,
+                'year': tax_return.year,
+                'filename': tax_return.filename,
+                'uploaded_at': tax_return.uploaded_at.isoformat()
+            }
+        })
+        
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+def calculate_amount_similarity(tax_amount, bank_amount):
+    """Calculate similarity between tax and bank transaction amounts"""
+    if tax_amount == 0 and bank_amount == 0:
+        return 1.0
+    if tax_amount == 0 or bank_amount == 0:
+        return 0.0
+    
+    # Exact match
+    if abs(tax_amount - bank_amount) < 0.01:
+        return 1.0
+    
+    # Percentage difference (within 5% is good)
+    diff_percent = abs(tax_amount - bank_amount) / max(abs(tax_amount), abs(bank_amount))
+    if diff_percent <= 0.05:
+        return 1.0 - diff_percent
+    elif diff_percent <= 0.1:
+        return 0.5 - (diff_percent - 0.05) * 5  # Linear decay
+    else:
+        return 0.0
+
+def calculate_date_similarity(tax_date, bank_date):
+    """Calculate similarity between tax and bank transaction dates"""
+    if not tax_date or not bank_date:
+        return 0.0
+    
+    days_diff = abs((tax_date - bank_date).days)
+    
+    if days_diff == 0:
+        return 1.0
+    elif days_diff <= 1:
+        return 0.9
+    elif days_diff <= 3:
+        return 0.8
+    elif days_diff <= 7:
+        return 0.6
+    elif days_diff <= 14:
+        return 0.3
+    else:
+        return 0.0
+
+def calculate_description_similarity(tax_desc, bank_desc):
+    """Calculate similarity between tax and bank transaction descriptions"""
+    if not tax_desc or not bank_desc:
+        return 0.0
+    
+    # Convert to lowercase and split into words
+    tax_words = set(tax_desc.lower().split())
+    bank_words = set(bank_desc.lower().split())
+    
+    # Remove common words that don't add meaning
+    stop_words = {'the', 'a', 'an', 'and', 'or', 'but', 'in', 'on', 'at', 'to', 'for', 'of', 'with', 'by', 'from', 'up', 'about', 'into', 'through', 'during', 'before', 'after', 'above', 'below', 'between', 'among', 'is', 'are', 'was', 'were', 'be', 'been', 'being', 'have', 'has', 'had', 'do', 'does', 'did', 'will', 'would', 'could', 'should', 'may', 'might', 'must', 'can', 'shall'}
+    
+    tax_words = tax_words - stop_words
+    bank_words = bank_words - stop_words
+    
+    if not tax_words or not bank_words:
+        return 0.0
+    
+    # Calculate Jaccard similarity
+    intersection = tax_words.intersection(bank_words)
+    union = tax_words.union(bank_words)
+    
+    jaccard = len(intersection) / len(union) if union else 0.0
+    
+    # Boost score if there are exact word matches
+    exact_matches = len(intersection)
+    if exact_matches >= 2:
+        jaccard = min(1.0, jaccard + 0.2)
+    
+    return jaccard
+
+def calculate_reference_similarity(tax_ref, bank_ref):
+    """Calculate similarity between tax and bank transaction references"""
+    if not tax_ref or not bank_ref:
+        return 0.0
+    
+    # Exact match
+    if tax_ref.strip().lower() == bank_ref.strip().lower():
+        return 1.0
+    
+    # Partial match (one contains the other)
+    tax_ref_lower = tax_ref.strip().lower()
+    bank_ref_lower = bank_ref.strip().lower()
+    
+    if tax_ref_lower in bank_ref_lower or bank_ref_lower in tax_ref_lower:
+        return 0.7
+    
+    # Character similarity
+    from difflib import SequenceMatcher
+    similarity = SequenceMatcher(None, tax_ref_lower, bank_ref_lower).ratio()
+    
+    return similarity if similarity > 0.6 else 0.0
+
+@app.route('/api/tax-returns/<int:tax_return_id>/match-transactions', methods=['GET'])
+@jwt_required()
+def get_potential_matches(tax_return_id):
+    """Get potential bank transaction matches for tax return transactions"""
+    try:
+        current_user_id = get_jwt_identity()
+        
+        # Verify tax return belongs to user
+        tax_return = TaxReturn.query.filter_by(
+            id=tax_return_id, 
+            user_id=current_user_id
+        ).first()
+        
+        if not tax_return:
+            return jsonify({'error': 'Tax return not found'}), 404
+        
+        # Get all tax return transactions that don't have matches yet
+        unmatched_tax_transactions = TaxReturnTransaction.query.filter_by(
+            tax_return_id=tax_return_id,
+            user_id=current_user_id
+        ).filter(
+            ~TaxReturnTransaction.id.in_(
+                db.session.query(TransactionMatch.tax_return_transaction_id)
+                .filter_by(user_id=current_user_id)
+            )
+        ).all()
+        
+        # Get all bank transactions for the user
+        bank_transactions = BankTransaction.query.join(BusinessAccount).filter(
+            BusinessAccount.user_id == current_user_id
+        ).all()
+        
+        # Create potential matches with improved algorithm
+        potential_matches = []
+        auto_matched_count = 0
+        
+        for tax_transaction in unmatched_tax_transactions:
+            tax_amount = tax_transaction.debit if tax_transaction.debit > 0 else -tax_transaction.credit
+            tax_date = tax_transaction.date
+            
+            matches = []
+            
+            for bank_transaction in bank_transactions:
+                # Skip if bank transaction already matched
+                if TransactionMatch.query.filter_by(
+                    bank_transaction_id=bank_transaction.id,
+                    user_id=current_user_id
+                ).first():
+                    continue
+                
+                # Calculate similarity scores
+                amount_similarity = calculate_amount_similarity(tax_amount, bank_transaction.amount)
+                date_similarity = calculate_date_similarity(tax_date, bank_transaction.transaction_date)
+                description_similarity = calculate_description_similarity(tax_transaction.name, bank_transaction.description)
+                reference_similarity = calculate_reference_similarity(tax_transaction.reference, bank_transaction.reference)
+                
+                # Weighted confidence score
+                confidence = (
+                    amount_similarity * 0.4 +      # Amount is most important
+                    date_similarity * 0.25 +       # Date proximity
+                    description_similarity * 0.25 + # Description keywords
+                    reference_similarity * 0.1     # Reference matching
+                )
+                
+                if confidence > 0.1:  # Only include potential matches with some similarity
+                    matches.append({
+                        'bank_transaction': bank_transaction.to_dict(),
+                        'confidence': confidence,
+                        'amount_similarity': amount_similarity,
+                        'date_similarity': date_similarity,
+                        'description_similarity': description_similarity,
+                        'reference_similarity': reference_similarity
+                    })
+            
+            # Sort by confidence and take top 5
+            matches.sort(key=lambda x: x['confidence'], reverse=True)
+            
+            # Check if we should auto-match the top result
+            auto_matched = False
+            if matches and matches[0]['confidence'] >= 0.85:  # High confidence threshold
+                best_match = matches[0]
+                try:
+                    # Auto-create match
+                    match = TransactionMatch(
+                        tax_return_transaction_id=tax_transaction.id,
+                        bank_transaction_id=best_match['bank_transaction']['id'],
+                        user_id=current_user_id,
+                        confidence_score=best_match['confidence'],
+                        match_method='auto_high_confidence',
+                        accountant_category=None  # Will be filled later
+                    )
+                    db.session.add(match)
+                    auto_matched = True
+                    auto_matched_count += 1
+                except Exception as e:
+                    print(f"Error auto-matching: {e}")
+            
+            if not auto_matched:
+                potential_matches.append({
+                    'tax_transaction': tax_transaction.to_dict(),
+                    'potential_matches': matches[:5]
+                })
+        
+        # Commit auto-matches
+        if auto_matched_count > 0:
+            db.session.commit()
+        
+        return jsonify({
+            'potential_matches': potential_matches,
+            'total_unmatched': len(unmatched_tax_transactions),
+            'auto_matched_count': auto_matched_count,
+            'message': f'Automatically matched {auto_matched_count} high-confidence transactions' if auto_matched_count > 0 else None
+        })
+        
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/tax-returns/<int:tax_return_id>/auto-matches', methods=['GET'])
+@jwt_required()
+def get_auto_matches(tax_return_id):
+    """Get automatically matched transactions that need category assignment"""
+    try:
+        current_user_id = get_jwt_identity()
+        
+        # Verify tax return belongs to user
+        tax_return = TaxReturn.query.filter_by(
+            id=tax_return_id, 
+            user_id=current_user_id
+        ).first()
+        
+        if not tax_return:
+            return jsonify({'error': 'Tax return not found'}), 404
+        
+        # Get auto-matched transactions
+        auto_matches = TransactionMatch.query.join(TaxReturnTransaction).filter(
+            TaxReturnTransaction.tax_return_id == tax_return_id,
+            TransactionMatch.user_id == current_user_id,
+            TransactionMatch.match_method == 'auto_high_confidence',
+            TransactionMatch.accountant_category.is_(None)  # No category assigned yet
+        ).all()
+        
+        matches_data = []
+        for match in auto_matches:
+            tax_transaction = match.tax_return_transaction
+            bank_transaction = match.bank_transaction
+            
+            matches_data.append({
+                'match_id': match.id,
+                'tax_transaction': tax_transaction.to_dict(),
+                'bank_transaction': bank_transaction.to_dict(),
+                'confidence_score': match.confidence_score,
+                'match_method': match.match_method
+            })
+        
+        return jsonify({
+            'auto_matches': matches_data,
+            'total_auto_matched': len(matches_data)
+        })
+        
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/transaction-matches', methods=['POST'])
+@jwt_required()
+def create_transaction_match():
+    """Create a match between a tax return transaction and a bank transaction"""
+    try:
+        current_user_id = get_jwt_identity()
+        data = request.get_json()
+        
+        tax_return_transaction_id = data.get('tax_return_transaction_id')
+        bank_transaction_id = data.get('bank_transaction_id')
+        match_method = data.get('match_method', 'manual')
+        confidence_score = data.get('confidence_score', 1.0)
+        accountant_category = data.get('accountant_category')
+        
+        # Verify both transactions belong to the user
+        tax_transaction = TaxReturnTransaction.query.filter_by(
+            id=tax_return_transaction_id,
+            user_id=current_user_id
+        ).first()
+        
+        bank_transaction = BankTransaction.query.join(BusinessAccount).filter(
+            BankTransaction.id == bank_transaction_id,
+            BusinessAccount.user_id == current_user_id
+        ).first()
+        
+        if not tax_transaction or not bank_transaction:
+            return jsonify({'error': 'Transaction not found or access denied'}), 404
+        
+        # Check if match already exists
+        existing_match = TransactionMatch.query.filter_by(
+            tax_return_transaction_id=tax_return_transaction_id,
+            bank_transaction_id=bank_transaction_id,
+            user_id=current_user_id
+        ).first()
+        
+        if existing_match:
+            return jsonify({'error': 'Match already exists'}), 400
+        
+        # Create the match
+        match = TransactionMatch(
+            tax_return_transaction_id=tax_return_transaction_id,
+            bank_transaction_id=bank_transaction_id,
+            user_id=current_user_id,
+            confidence_score=confidence_score,
+            match_method=match_method,
+            accountant_category=accountant_category
+        )
+        
+        db.session.add(match)
+        
+        # Update bank transaction category if provided
+        if accountant_category:
+            bank_transaction.category = accountant_category
+        
+        db.session.commit()
+        
+        # Learn patterns from this match
+        learn_from_match(tax_transaction, bank_transaction, accountant_category, current_user_id)
+        
+        return jsonify({
+            'message': 'Match created successfully',
+            'match': match.to_dict()
+        })
+        
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/transaction-matches/<int:match_id>/category', methods=['PUT'])
+@jwt_required()
+def update_match_category(match_id):
+    """Update the category for an auto-matched transaction"""
+    try:
+        current_user_id = get_jwt_identity()
+        data = request.get_json()
+        
+        category = data.get('category')
+        if not category:
+            return jsonify({'error': 'Category is required'}), 400
+        
+        # Get the match
+        match = TransactionMatch.query.filter_by(
+            id=match_id,
+            user_id=current_user_id
+        ).first()
+        
+        if not match:
+            return jsonify({'error': 'Match not found'}), 404
+        
+        # Update the category
+        match.accountant_category = category
+        
+        # Update the bank transaction category
+        bank_transaction = match.bank_transaction
+        bank_transaction.category = category
+        
+        db.session.commit()
+        
+        # Learn from this match
+        learn_from_match(match.tax_return_transaction, bank_transaction, category, current_user_id)
+        
+        return jsonify({
+            'message': 'Category updated successfully',
+            'match': match.to_dict()
+        })
+        
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': str(e)}), 500
+
+def learn_from_match(tax_transaction, bank_transaction, category, user_id):
+    """Learn patterns from a successful match"""
+    try:
+        # Learn description patterns
+        if tax_transaction.name and bank_transaction.description and category:
+            # Extract key words from both descriptions
+            tax_words = set(tax_transaction.name.lower().split())
+            bank_words = set(bank_transaction.description.lower().split())
+            common_words = tax_words.intersection(bank_words)
+            
+            for word in common_words:
+                if len(word) > 3:  # Only learn meaningful words
+                    pattern = TransactionLearningPattern.query.filter_by(
+                        user_id=user_id,
+                        pattern_type='description',
+                        pattern_value=word,
+                        category=category
+                    ).first()
+                    
+                    if pattern:
+                        pattern.times_used += 1
+                        pattern.success_rate = (pattern.success_rate * (pattern.times_used - 1) + 1.0) / pattern.times_used
+                    else:
+                        pattern = TransactionLearningPattern(
+                            user_id=user_id,
+                            pattern_type='description',
+                            pattern_value=word,
+                            category=category,
+                            confidence=0.8,
+                            times_used=1,
+                            success_rate=1.0
+                        )
+                        db.session.add(pattern)
+        
+        # Learn amount patterns
+        if category:
+            amount = abs(bank_transaction.amount)
+            amount_range = f"{amount * 0.95:.2f}-{amount * 1.05:.2f}"
+            
+            pattern = TransactionLearningPattern.query.filter_by(
+                user_id=user_id,
+                pattern_type='amount',
+                pattern_value=amount_range,
+                category=category
+            ).first()
+            
+            if pattern:
+                pattern.times_used += 1
+                pattern.success_rate = (pattern.success_rate * (pattern.times_used - 1) + 1.0) / pattern.times_used
+            else:
+                pattern = TransactionLearningPattern(
+                    user_id=user_id,
+                    pattern_type='amount',
+                    pattern_value=amount_range,
+                    category=category,
+                    confidence=0.6,
+                    times_used=1,
+                    success_rate=1.0
+                )
+                db.session.add(pattern)
+        
+        db.session.commit()
+        
+    except Exception as e:
+        print(f"Error learning from match: {e}")
+        # Don't fail the main operation if learning fails
 
 if __name__ == '__main__':
     with app.app_context():
