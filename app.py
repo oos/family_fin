@@ -2672,12 +2672,15 @@ def upload_tax_return():
         if file.filename == '':
             return jsonify({'error': 'No file selected'}), 400
             
-        if not file.filename.lower().endswith('.csv'):
-            return jsonify({'error': 'File must be a CSV'}), 400
+        if not (file.filename.lower().endswith('.csv') or file.filename.lower().endswith('.xlsx')):
+            return jsonify({'error': 'File must be a CSV or Excel (.xlsx) file'}), 400
         
-        # Read and validate CSV
+        # Read and validate file (CSV or Excel)
         try:
-            df = pd.read_csv(file)
+            if file.filename.lower().endswith('.xlsx'):
+                df = pd.read_excel(file)
+            else:
+                df = pd.read_csv(file)
             required_columns = ['Name', 'Date', 'Number', 'Reference', 'Source', 'Annotation', 'Debit', 'Credit', 'Balance']
             
             # Check if required columns exist (case insensitive)
@@ -2721,7 +2724,7 @@ def upload_tax_return():
             transaction_count = len(df[df['Name'].str.strip() != ''])
                 
         except Exception as e:
-            return jsonify({'error': f'Invalid CSV file: {str(e)}'}), 400
+            return jsonify({'error': f'Invalid file: {str(e)}'}), 400
         
         # Reset file pointer
         file.seek(0)
@@ -2838,10 +2841,15 @@ def get_tax_return_data(tax_return_id):
         if not tax_return:
             return jsonify({'error': 'Tax return not found'}), 404
         
-        # Parse the CSV data
+        # Parse the file data (CSV or Excel)
         import io
-        csv_data = io.StringIO(tax_return.file_content.decode('utf-8'))
-        df = pd.read_csv(csv_data)
+        if tax_return.filename.lower().endswith('.xlsx'):
+            # For Excel files, we need to read from bytes
+            df = pd.read_excel(io.BytesIO(tax_return.file_content))
+        else:
+            # For CSV files
+            csv_data = io.StringIO(tax_return.file_content.decode('utf-8'))
+            df = pd.read_csv(csv_data)
         
         # Clean up the data
         df = df.dropna(how='all')

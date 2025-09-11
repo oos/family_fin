@@ -63,10 +63,10 @@ const TaxReturns = () => {
 
   const handleFileSelect = (e) => {
     const file = e.target.files[0];
-    if (file && file.type === 'text/csv') {
+    if (file && (file.type === 'text/csv' || file.type === 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' || file.name.toLowerCase().endsWith('.xlsx'))) {
       setSelectedFile(file);
     } else {
-      setError('Please select a valid CSV file');
+      setError('Please select a valid CSV or Excel (.xlsx) file');
     }
   };
 
@@ -252,10 +252,10 @@ const TaxReturns = () => {
             onClick={() => setShowUploadModal(true)}
             className="btn btn-primary btn-lg"
           >
-            📁 Upload Tax Return CSV
+            📁 Upload Tax Return (CSV/Excel)
           </button>
           <p className="text-muted mt-2">
-            Upload your accountant's tax return CSV file to categorize transactions
+            Upload your accountant's tax return file (CSV or Excel) to categorize transactions
           </p>
         </div>
       </div>
@@ -371,10 +371,10 @@ const TaxReturns = () => {
               </div>
               
               <div className="mb-3">
-                <label className="form-label">CSV File:</label>
+                <label className="form-label">File (CSV or Excel):</label>
                 <input
                   type="file"
-                  accept=".csv"
+                  accept=".csv,.xlsx"
                   onChange={handleFileSelect}
                   className="form-control"
                 />
@@ -415,7 +415,7 @@ const TaxReturns = () => {
                 className="btn btn-primary"
                 disabled={!selectedFile || uploading}
               >
-                {uploading ? '⏳ Uploading...' : '📁 Upload File'}
+                {uploading ? '⏳ Uploading...' : '📁 Upload File (CSV/Excel)'}
               </button>
             </div>
           </div>
