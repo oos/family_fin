@@ -374,10 +374,7 @@ const Transactions = () => {
         <div className="card">
           <div className="d-flex justify-content-between align-items-center mb-3">
             <h4>
-              Transaction List
-              {filteredTransactions.length !== (Array.isArray(transactions) ? transactions.length : 0) && 
-                ` (${filteredTransactions.length} of ${Array.isArray(transactions) ? transactions.length : 0})`
-              }
+              Transactions{selectedAccountData && ` - ${selectedAccountData.account_name} (${selectedAccountData.account_number})`}
             </h4>
           </div>
           
