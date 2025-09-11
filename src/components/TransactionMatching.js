@@ -6,9 +6,12 @@ const TransactionMatching = () => {
   const [taxReturns, setTaxReturns] = useState([]);
   const [selectedTaxReturn, setSelectedTaxReturn] = useState(null);
   const [potentialMatches, setPotentialMatches] = useState([]);
+  const [autoMatches, setAutoMatches] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [matching, setMatching] = useState(false);
+  const [updatingCategory, setUpdatingCategory] = useState(false);
+  const [showAutoMatches, setShowAutoMatches] = useState(false);
 
   useEffect(() => {
     fetchTaxReturns();
@@ -40,6 +43,13 @@ const TransactionMatching = () => {
         headers: { Authorization: `Bearer ${token}` }
       });
       setPotentialMatches(response.data.potential_matches);
+      
+      // Show message if auto-matches were created
+      if (response.data.auto_matched_count > 0) {
+        alert(`🎉 Automatically matched ${response.data.auto_matched_count} high-confidence transactions!`);
+        // Fetch auto-matches for category assignment
+        fetchAutoMatches(taxReturnId);
+      }
     } catch (err) {
       console.error('Error fetching potential matches:', err);
       setError(`Failed to load potential matches: ${err.response?.data?.message || err.message}`);
@@ -48,9 +58,30 @@ const TransactionMatching = () => {
     }
   };
 
+  const fetchAutoMatches = async (taxReturnId) => {
+    try {
+      const token = localStorage.getItem('token');
+      const response = await axios.get(`/api/tax-returns/${taxReturnId}/auto-matches`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      setAutoMatches(response.data.auto_matches);
+      setShowAutoMatches(true);
+    } catch (err) {
+      console.error('Error fetching auto matches:', err);
+    }
+  };
+
   const handleTaxReturnSelect = (taxReturn) => {
     setSelectedTaxReturn(taxReturn);
     fetchPotentialMatches(taxReturn.id);
+    fetchAutoMatches(taxReturn.id);
+  };
+
+  const handleRefreshMatching = () => {
+    if (selectedTaxReturn) {
+      fetchPotentialMatches(selectedTaxReturn.id);
+      fetchAutoMatches(selectedTaxReturn.id);
+    }
   };
 
   const handleCreateMatch = async (taxTransactionId, bankTransactionId, confidence, category) => {
@@ -80,6 +111,35 @@ const TransactionMatching = () => {
       setError(`Failed to create match: ${err.response?.data?.message || err.message}`);
     } finally {
       setMatching(false);
+    }
+  };
+
+  const handleUpdateCategory = async (matchId, category) => {
+    setUpdatingCategory(true);
+    setError(null);
+    
+    try {
+      const token = localStorage.getItem('token');
+      const response = await axios.put(`/api/transaction-matches/${matchId}/category`, {
+        category: category
+      }, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      
+      alert('Category updated successfully!');
+      
+      // Remove from auto-matches list
+      setAutoMatches(prev => prev.filter(match => match.match_id !== matchId));
+      
+      // Refresh auto-matches if there are more
+      if (selectedTaxReturn && autoMatches.length > 1) {
+        fetchAutoMatches(selectedTaxReturn.id);
+      }
+    } catch (err) {
+      console.error('Error updating category:', err);
+      setError(`Failed to update category: ${err.response?.data?.message || err.message}`);
+    } finally {
+      setUpdatingCategory(false);
     }
   };
 
@@ -145,14 +205,99 @@ const TransactionMatching = () => {
         </div>
       </div>
 
+      {/* Auto-Matched Transactions */}
+      {selectedTaxReturn && showAutoMatches && autoMatches.length > 0 && (
+        <div className="card mb-4">
+          <div className="card-header bg-success text-white">
+            <h5>🤖 Auto-Matched Transactions (Need Category Assignment)</h5>
+            <small>
+              {autoMatches.length} transactions were automatically matched with high confidence
+            </small>
+          </div>
+          <div className="card-body">
+            <div className="row">
+              {autoMatches.map((match, index) => (
+                <div key={match.match_id} className="col-md-6 mb-3">
+                  <div className="card border-success">
+                    <div className="card-header d-flex justify-content-between align-items-center">
+                      <h6 className="mb-0">Auto-Match #{index + 1}</h6>
+                      <span className="badge bg-success">
+                        {Math.round(match.confidence_score * 100)}% confidence
+                      </span>
+                    </div>
+                    <div className="card-body">
+                      <div className="row">
+                        <div className="col-6">
+                          <h6 className="text-primary">Tax Transaction</h6>
+                          <p className="mb-1">
+                            <strong>Name:</strong> {match.tax_transaction.name}<br/>
+                            <strong>Amount:</strong> {formatCurrency(match.tax_transaction.debit || -match.tax_transaction.credit)}<br/>
+                            <strong>Date:</strong> {match.tax_transaction.date ? formatDate(match.tax_transaction.date) : 'N/A'}
+                          </p>
+                        </div>
+                        <div className="col-6">
+                          <h6 className="text-info">Bank Transaction</h6>
+                          <p className="mb-1">
+                            <strong>Description:</strong> {match.bank_transaction.description}<br/>
+                            <strong>Amount:</strong> {formatCurrency(match.bank_transaction.amount)}<br/>
+                            <strong>Date:</strong> {formatDate(match.bank_transaction.transaction_date)}
+                          </p>
+                        </div>
+                      </div>
+                      
+                      <div className="mt-3">
+                        <label htmlFor={`autoCategory${index}`} className="form-label">
+                          <strong>Assign Accountant Category:</strong>
+                        </label>
+                        <div className="input-group">
+                          <input
+                            type="text"
+                            className="form-control"
+                            id={`autoCategory${index}`}
+                            placeholder="e.g., Business Expense, Rental Income, Office Supplies"
+                          />
+                          <button
+                            className="btn btn-success"
+                            onClick={() => {
+                              const category = document.getElementById(`autoCategory${index}`).value;
+                              if (!category.trim()) {
+                                alert('Please enter a category');
+                                return;
+                              }
+                              handleUpdateCategory(match.match_id, category.trim());
+                            }}
+                            disabled={updatingCategory}
+                          >
+                            {updatingCategory ? '⏳ Updating...' : '✅ Assign Category'}
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Potential Matches */}
       {selectedTaxReturn && (
         <div className="card">
-          <div className="card-header">
-            <h5>Potential Matches for {selectedTaxReturn.filename}</h5>
-            <small className="text-muted">
-              {potentialMatches.length} unmatched transactions found
-            </small>
+          <div className="card-header d-flex justify-content-between align-items-center">
+            <div>
+              <h5>Potential Matches for {selectedTaxReturn.filename}</h5>
+              <small className="text-muted">
+                {potentialMatches.length} unmatched transactions found
+              </small>
+            </div>
+            <button
+              onClick={handleRefreshMatching}
+              className="btn btn-outline-primary btn-sm"
+              disabled={loading}
+            >
+              {loading ? '⏳ Refreshing...' : '🔄 Refresh Matching'}
+            </button>
           </div>
           <div className="card-body">
             {loading ? (

@@ -2911,6 +2911,99 @@ def get_tax_return_transactions(tax_return_id):
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
+def calculate_amount_similarity(tax_amount, bank_amount):
+    """Calculate similarity between tax and bank transaction amounts"""
+    if tax_amount == 0 and bank_amount == 0:
+        return 1.0
+    if tax_amount == 0 or bank_amount == 0:
+        return 0.0
+    
+    # Exact match
+    if abs(tax_amount - bank_amount) < 0.01:
+        return 1.0
+    
+    # Percentage difference (within 5% is good)
+    diff_percent = abs(tax_amount - bank_amount) / max(abs(tax_amount), abs(bank_amount))
+    if diff_percent <= 0.05:
+        return 1.0 - diff_percent
+    elif diff_percent <= 0.1:
+        return 0.5 - (diff_percent - 0.05) * 5  # Linear decay
+    else:
+        return 0.0
+
+def calculate_date_similarity(tax_date, bank_date):
+    """Calculate similarity between tax and bank transaction dates"""
+    if not tax_date or not bank_date:
+        return 0.0
+    
+    days_diff = abs((tax_date - bank_date).days)
+    
+    if days_diff == 0:
+        return 1.0
+    elif days_diff <= 1:
+        return 0.9
+    elif days_diff <= 3:
+        return 0.8
+    elif days_diff <= 7:
+        return 0.6
+    elif days_diff <= 14:
+        return 0.3
+    else:
+        return 0.0
+
+def calculate_description_similarity(tax_desc, bank_desc):
+    """Calculate similarity between tax and bank transaction descriptions"""
+    if not tax_desc or not bank_desc:
+        return 0.0
+    
+    # Convert to lowercase and split into words
+    tax_words = set(tax_desc.lower().split())
+    bank_words = set(bank_desc.lower().split())
+    
+    # Remove common words that don't add meaning
+    stop_words = {'the', 'a', 'an', 'and', 'or', 'but', 'in', 'on', 'at', 'to', 'for', 'of', 'with', 'by', 'from', 'up', 'about', 'into', 'through', 'during', 'before', 'after', 'above', 'below', 'between', 'among', 'is', 'are', 'was', 'were', 'be', 'been', 'being', 'have', 'has', 'had', 'do', 'does', 'did', 'will', 'would', 'could', 'should', 'may', 'might', 'must', 'can', 'shall'}
+    
+    tax_words = tax_words - stop_words
+    bank_words = bank_words - stop_words
+    
+    if not tax_words or not bank_words:
+        return 0.0
+    
+    # Calculate Jaccard similarity
+    intersection = tax_words.intersection(bank_words)
+    union = tax_words.union(bank_words)
+    
+    jaccard = len(intersection) / len(union) if union else 0.0
+    
+    # Boost score if there are exact word matches
+    exact_matches = len(intersection)
+    if exact_matches >= 2:
+        jaccard = min(1.0, jaccard + 0.2)
+    
+    return jaccard
+
+def calculate_reference_similarity(tax_ref, bank_ref):
+    """Calculate similarity between tax and bank transaction references"""
+    if not tax_ref or not bank_ref:
+        return 0.0
+    
+    # Exact match
+    if tax_ref.strip().lower() == bank_ref.strip().lower():
+        return 1.0
+    
+    # Partial match (one contains the other)
+    tax_ref_lower = tax_ref.strip().lower()
+    bank_ref_lower = bank_ref.strip().lower()
+    
+    if tax_ref_lower in bank_ref_lower or bank_ref_lower in tax_ref_lower:
+        return 0.7
+    
+    # Character similarity
+    from difflib import SequenceMatcher
+    similarity = SequenceMatcher(None, tax_ref_lower, bank_ref_lower).ratio()
+    
+    return similarity if similarity > 0.6 else 0.0
+
 @app.route('/api/tax-returns/<int:tax_return_id>/match-transactions', methods=['GET'])
 @jwt_required()
 def get_potential_matches(tax_return_id):
@@ -2943,8 +3036,9 @@ def get_potential_matches(tax_return_id):
             BusinessAccount.user_id == current_user_id
         ).all()
         
-        # Create potential matches based on amount and date proximity
+        # Create potential matches with improved algorithm
         potential_matches = []
+        auto_matched_count = 0
         
         for tax_transaction in unmatched_tax_transactions:
             tax_amount = tax_transaction.debit if tax_transaction.debit > 0 else -tax_transaction.credit
@@ -2953,26 +3047,26 @@ def get_potential_matches(tax_return_id):
             matches = []
             
             for bank_transaction in bank_transactions:
-                # Calculate similarity score
-                amount_similarity = 1.0 if abs(bank_transaction.amount - tax_amount) < 0.01 else 0.0
+                # Skip if bank transaction already matched
+                if TransactionMatch.query.filter_by(
+                    bank_transaction_id=bank_transaction.id,
+                    user_id=current_user_id
+                ).first():
+                    continue
                 
-                # Date similarity (within 7 days)
-                date_similarity = 0.0
-                if tax_date and bank_transaction.transaction_date:
-                    days_diff = abs((tax_date - bank_transaction.transaction_date).days)
-                    date_similarity = max(0, 1.0 - (days_diff / 7.0))
+                # Calculate similarity scores
+                amount_similarity = calculate_amount_similarity(tax_amount, bank_transaction.amount)
+                date_similarity = calculate_date_similarity(tax_date, bank_transaction.transaction_date)
+                description_similarity = calculate_description_similarity(tax_transaction.name, bank_transaction.description)
+                reference_similarity = calculate_reference_similarity(tax_transaction.reference, bank_transaction.reference)
                 
-                # Description similarity (simple keyword matching)
-                description_similarity = 0.0
-                if tax_transaction.name and bank_transaction.description:
-                    tax_words = set(tax_transaction.name.lower().split())
-                    bank_words = set(bank_transaction.description.lower().split())
-                    common_words = tax_words.intersection(bank_words)
-                    if tax_words or bank_words:
-                        description_similarity = len(common_words) / max(len(tax_words), len(bank_words))
-                
-                # Overall confidence score
-                confidence = (amount_similarity * 0.5 + date_similarity * 0.3 + description_similarity * 0.2)
+                # Weighted confidence score
+                confidence = (
+                    amount_similarity * 0.4 +      # Amount is most important
+                    date_similarity * 0.25 +       # Date proximity
+                    description_similarity * 0.25 + # Description keywords
+                    reference_similarity * 0.1     # Reference matching
+                )
                 
                 if confidence > 0.1:  # Only include potential matches with some similarity
                     matches.append({
@@ -2980,19 +3074,93 @@ def get_potential_matches(tax_return_id):
                         'confidence': confidence,
                         'amount_similarity': amount_similarity,
                         'date_similarity': date_similarity,
-                        'description_similarity': description_similarity
+                        'description_similarity': description_similarity,
+                        'reference_similarity': reference_similarity
                     })
             
             # Sort by confidence and take top 5
             matches.sort(key=lambda x: x['confidence'], reverse=True)
-            potential_matches.append({
-                'tax_transaction': tax_transaction.to_dict(),
-                'potential_matches': matches[:5]
-            })
+            
+            # Check if we should auto-match the top result
+            auto_matched = False
+            if matches and matches[0]['confidence'] >= 0.85:  # High confidence threshold
+                best_match = matches[0]
+                try:
+                    # Auto-create match
+                    match = TransactionMatch(
+                        tax_return_transaction_id=tax_transaction.id,
+                        bank_transaction_id=best_match['bank_transaction']['id'],
+                        user_id=current_user_id,
+                        confidence_score=best_match['confidence'],
+                        match_method='auto_high_confidence',
+                        accountant_category=None  # Will be filled later
+                    )
+                    db.session.add(match)
+                    auto_matched = True
+                    auto_matched_count += 1
+                except Exception as e:
+                    print(f"Error auto-matching: {e}")
+            
+            if not auto_matched:
+                potential_matches.append({
+                    'tax_transaction': tax_transaction.to_dict(),
+                    'potential_matches': matches[:5]
+                })
+        
+        # Commit auto-matches
+        if auto_matched_count > 0:
+            db.session.commit()
         
         return jsonify({
             'potential_matches': potential_matches,
-            'total_unmatched': len(unmatched_tax_transactions)
+            'total_unmatched': len(unmatched_tax_transactions),
+            'auto_matched_count': auto_matched_count,
+            'message': f'Automatically matched {auto_matched_count} high-confidence transactions' if auto_matched_count > 0 else None
+        })
+        
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/tax-returns/<int:tax_return_id>/auto-matches', methods=['GET'])
+@jwt_required()
+def get_auto_matches(tax_return_id):
+    """Get automatically matched transactions that need category assignment"""
+    try:
+        current_user_id = get_jwt_identity()
+        
+        # Verify tax return belongs to user
+        tax_return = TaxReturn.query.filter_by(
+            id=tax_return_id, 
+            user_id=current_user_id
+        ).first()
+        
+        if not tax_return:
+            return jsonify({'error': 'Tax return not found'}), 404
+        
+        # Get auto-matched transactions
+        auto_matches = TransactionMatch.query.join(TaxReturnTransaction).filter(
+            TaxReturnTransaction.tax_return_id == tax_return_id,
+            TransactionMatch.user_id == current_user_id,
+            TransactionMatch.match_method == 'auto_high_confidence',
+            TransactionMatch.accountant_category.is_(None)  # No category assigned yet
+        ).all()
+        
+        matches_data = []
+        for match in auto_matches:
+            tax_transaction = match.tax_return_transaction
+            bank_transaction = match.bank_transaction
+            
+            matches_data.append({
+                'match_id': match.id,
+                'tax_transaction': tax_transaction.to_dict(),
+                'bank_transaction': bank_transaction.to_dict(),
+                'confidence_score': match.confidence_score,
+                'match_method': match.match_method
+            })
+        
+        return jsonify({
+            'auto_matches': matches_data,
+            'total_auto_matched': len(matches_data)
         })
         
     except Exception as e:
@@ -3059,6 +3227,48 @@ def create_transaction_match():
         
         return jsonify({
             'message': 'Match created successfully',
+            'match': match.to_dict()
+        })
+        
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/transaction-matches/<int:match_id>/category', methods=['PUT'])
+@jwt_required()
+def update_match_category(match_id):
+    """Update the category for an auto-matched transaction"""
+    try:
+        current_user_id = get_jwt_identity()
+        data = request.get_json()
+        
+        category = data.get('category')
+        if not category:
+            return jsonify({'error': 'Category is required'}), 400
+        
+        # Get the match
+        match = TransactionMatch.query.filter_by(
+            id=match_id,
+            user_id=current_user_id
+        ).first()
+        
+        if not match:
+            return jsonify({'error': 'Match not found'}), 404
+        
+        # Update the category
+        match.accountant_category = category
+        
+        # Update the bank transaction category
+        bank_transaction = match.bank_transaction
+        bank_transaction.category = category
+        
+        db.session.commit()
+        
+        # Learn from this match
+        learn_from_match(match.tax_return_transaction, bank_transaction, category, current_user_id)
+        
+        return jsonify({
+            'message': 'Category updated successfully',
             'match': match.to_dict()
         })
         
