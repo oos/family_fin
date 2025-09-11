@@ -6,6 +6,13 @@ from werkzeug.security import generate_password_hash, check_password_hash
 import hashlib
 from datetime import datetime, timedelta
 import pandas as pd
+import json
+import re
+from sklearn.feature_extraction.text import TfidfVectorizer
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.model_selection import train_test_split
+from sklearn.metrics import classification_report, accuracy_score
+import numpy as np
 import os
 import csv
 import io
@@ -24,7 +31,7 @@ app.config['JWT_SECRET_KEY'] = os.getenv('JWT_SECRET_KEY', 'jwt-secret-string')
 app.config['JWT_ACCESS_TOKEN_EXPIRES'] = timedelta(hours=24)
 
 # Import models and db
-from models import db, User, Person, Property, Income, Loan, Family, BusinessAccount, Pension, PensionAccount, LoanERC, LoanPayment, BankTransaction, AirbnbBooking, DashboardSettings, AccountBalance, TaxReturn, TaxReturnTransaction, TransactionMatch, TransactionLearningPattern
+from models import db, User, Person, Property, Income, Loan, Family, BusinessAccount, Pension, PensionAccount, LoanERC, LoanPayment, BankTransaction, AirbnbBooking, DashboardSettings, AccountBalance, TaxReturn, TaxReturnTransaction, TransactionMatch, TransactionLearningPattern, TransactionCategoryPrediction
 
 # Initialize extensions
 db.init_app(app)
@@ -3350,6 +3357,365 @@ def learn_from_match(tax_transaction, bank_transaction, category, user_id):
     except Exception as e:
         print(f"Error learning from match: {e}")
         # Don't fail the main operation if learning fails
+
+class TransactionCategoryPredictor:
+    """Machine learning service for predicting transaction categories"""
+    
+    def __init__(self):
+        self.model = None
+        self.vectorizer = None
+        self.model_version = "1.0"
+        self.is_trained = False
+    
+    def extract_features(self, transaction):
+        """Extract features from a bank transaction for ML prediction"""
+        features = {}
+        
+        # Text features from description
+        description = str(transaction.description or '').lower()
+        features['description_length'] = len(description)
+        features['has_numbers'] = bool(re.search(r'\d', description))
+        features['has_currency'] = bool(re.search(r'[€$£]', description))
+        features['word_count'] = len(description.split())
+        
+        # Amount features
+        amount = abs(transaction.amount)
+        features['amount'] = amount
+        features['amount_log'] = np.log(amount + 1) if amount > 0 else 0
+        features['is_positive'] = transaction.amount > 0
+        features['is_round_amount'] = amount % 1 == 0
+        
+        # Date features
+        if transaction.transaction_date:
+            features['day_of_week'] = transaction.transaction_date.weekday()
+            features['day_of_month'] = transaction.transaction_date.day
+            features['month'] = transaction.transaction_date.month
+            features['is_weekend'] = transaction.transaction_date.weekday() >= 5
+        
+        # Reference features
+        reference = str(transaction.reference or '')
+        features['has_reference'] = bool(reference)
+        features['reference_length'] = len(reference)
+        
+        return features
+    
+    def prepare_training_data(self, user_id):
+        """Prepare training data from matched transactions"""
+        # Get all matched transactions with categories
+        matches = TransactionMatch.query.filter_by(
+            user_id=user_id,
+            accountant_category=TransactionMatch.accountant_category.isnot(None)
+        ).join(BankTransaction).all()
+        
+        if len(matches) < 10:  # Need minimum data for training
+            return None, None
+        
+        X = []  # Features
+        y = []  # Categories
+        
+        for match in matches:
+            features = self.extract_features(match.bank_transaction)
+            X.append(features)
+            y.append(match.accountant_category)
+        
+        return X, y
+    
+    def train_model(self, user_id):
+        """Train the ML model on matched transaction data"""
+        try:
+            X, y = self.prepare_training_data(user_id)
+            
+            if X is None or len(X) < 10:
+                return False, "Not enough training data. Need at least 10 matched transactions with categories."
+            
+            # Convert features to DataFrame
+            df_features = pd.DataFrame(X)
+            
+            # Prepare text data for TF-IDF
+            descriptions = []
+            for match in TransactionMatch.query.filter_by(
+                user_id=user_id,
+                accountant_category=TransactionMatch.accountant_category.isnot(None)
+            ).join(BankTransaction).all():
+                descriptions.append(str(match.bank_transaction.description or ''))
+            
+            # Create TF-IDF features
+            self.vectorizer = TfidfVectorizer(
+                max_features=100,
+                stop_words='english',
+                ngram_range=(1, 2)
+            )
+            tfidf_features = self.vectorizer.fit_transform(descriptions).toarray()
+            
+            # Combine numerical and text features
+            tfidf_df = pd.DataFrame(tfidf_features, columns=[f'tfidf_{i}' for i in range(tfidf_features.shape[1])])
+            combined_features = pd.concat([df_features.reset_index(drop=True), tfidf_df.reset_index(drop=True)], axis=1)
+            
+            # Fill NaN values
+            combined_features = combined_features.fillna(0)
+            
+            # Train the model
+            self.model = RandomForestClassifier(
+                n_estimators=100,
+                max_depth=10,
+                random_state=42,
+                class_weight='balanced'
+            )
+            
+            # Split data for validation
+            X_train, X_test, y_train, y_test = train_test_split(
+                combined_features, y, test_size=0.2, random_state=42, stratify=y
+            )
+            
+            self.model.fit(X_train, y_train)
+            
+            # Evaluate model
+            y_pred = self.model.predict(X_test)
+            accuracy = accuracy_score(y_test, y_pred)
+            
+            self.is_trained = True
+            
+            return True, f"Model trained successfully! Accuracy: {accuracy:.2%}"
+            
+        except Exception as e:
+            return False, f"Training failed: {str(e)}"
+    
+    def predict_category(self, transaction):
+        """Predict category for a single transaction"""
+        if not self.is_trained or not self.model:
+            return None, 0.0
+        
+        try:
+            # Extract features
+            features = self.extract_features(transaction)
+            df_features = pd.DataFrame([features])
+            
+            # Get TF-IDF features for description
+            description = str(transaction.description or '')
+            tfidf_features = self.vectorizer.transform([description]).toarray()
+            tfidf_df = pd.DataFrame(tfidf_features, columns=[f'tfidf_{i}' for i in range(tfidf_features.shape[1])])
+            
+            # Combine features
+            combined_features = pd.concat([df_features.reset_index(drop=True), tfidf_df.reset_index(drop=True)], axis=1)
+            combined_features = combined_features.fillna(0)
+            
+            # Make prediction
+            prediction = self.model.predict(combined_features)[0]
+            confidence = max(self.model.predict_proba(combined_features)[0])
+            
+            return prediction, confidence
+            
+        except Exception as e:
+            print(f"Prediction error: {e}")
+            return None, 0.0
+
+# Global predictor instance
+predictor = TransactionCategoryPredictor()
+
+@app.route('/api/train-category-model', methods=['POST'])
+@jwt_required()
+def train_category_model():
+    """Train the ML model on matched transaction data"""
+    try:
+        current_user_id = get_jwt_identity()
+        
+        success, message = predictor.train_model(current_user_id)
+        
+        if success:
+            return jsonify({
+                'message': message,
+                'model_version': predictor.model_version,
+                'is_trained': predictor.is_trained
+            })
+        else:
+            return jsonify({'error': message}), 400
+            
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/predict-all-transactions', methods=['POST'])
+@jwt_required()
+def predict_all_transactions():
+    """Apply predictions to all historical bank transactions"""
+    try:
+        current_user_id = get_jwt_identity()
+        
+        if not predictor.is_trained:
+            return jsonify({'error': 'Model not trained. Please train the model first.'}), 400
+        
+        # Get all bank transactions for the user
+        bank_transactions = BankTransaction.query.join(BusinessAccount).filter(
+            BusinessAccount.user_id == current_user_id
+        ).all()
+        
+        predictions_created = 0
+        predictions_updated = 0
+        
+        for transaction in bank_transactions:
+            # Check if prediction already exists
+            existing_prediction = TransactionCategoryPrediction.query.filter_by(
+                bank_transaction_id=transaction.id,
+                user_id=current_user_id
+            ).first()
+            
+            # Get prediction
+            predicted_category, confidence = predictor.predict_category(transaction)
+            
+            if predicted_category:
+                if existing_prediction:
+                    # Update existing prediction
+                    existing_prediction.predicted_category = predicted_category
+                    existing_prediction.prediction_confidence = confidence
+                    existing_prediction.prediction_model_version = predictor.model_version
+                    predictions_updated += 1
+                else:
+                    # Create new prediction
+                    prediction = TransactionCategoryPrediction(
+                        bank_transaction_id=transaction.id,
+                        user_id=current_user_id,
+                        predicted_category=predicted_category,
+                        prediction_confidence=confidence,
+                        prediction_model_version=predictor.model_version,
+                        validation_status='pending'
+                    )
+                    db.session.add(prediction)
+                    predictions_created += 1
+        
+        db.session.commit()
+        
+        return jsonify({
+            'message': f'Predictions applied successfully!',
+            'predictions_created': predictions_created,
+            'predictions_updated': predictions_updated,
+            'total_transactions': len(bank_transactions)
+        })
+        
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/transaction-predictions', methods=['GET'])
+@jwt_required()
+def get_transaction_predictions():
+    """Get all transaction predictions for validation"""
+    try:
+        current_user_id = get_jwt_identity()
+        page = request.args.get('page', 1, type=int)
+        per_page = request.args.get('per_page', 50, type=int)
+        status = request.args.get('status', 'all')  # all, pending, validated, rejected
+        
+        query = TransactionCategoryPrediction.query.filter_by(user_id=current_user_id)
+        
+        if status != 'all':
+            query = query.filter_by(validation_status=status)
+        
+        predictions = query.join(BankTransaction).order_by(
+            TransactionCategoryPrediction.prediction_confidence.desc()
+        ).paginate(
+            page=page, per_page=per_page, error_out=False
+        )
+        
+        predictions_data = []
+        for pred in predictions.items:
+            predictions_data.append({
+                'prediction': pred.to_dict(),
+                'bank_transaction': pred.bank_transaction.to_dict()
+            })
+        
+        return jsonify({
+            'predictions': predictions_data,
+            'pagination': {
+                'page': page,
+                'per_page': per_page,
+                'total': predictions.total,
+                'pages': predictions.pages,
+                'has_next': predictions.has_next,
+                'has_prev': predictions.has_prev
+            }
+        })
+        
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/transaction-predictions/<int:prediction_id>/validate', methods=['PUT'])
+@jwt_required()
+def validate_prediction(prediction_id):
+    """Validate or update a transaction prediction"""
+    try:
+        current_user_id = get_jwt_identity()
+        data = request.get_json()
+        
+        prediction = TransactionCategoryPrediction.query.filter_by(
+            id=prediction_id,
+            user_id=current_user_id
+        ).first()
+        
+        if not prediction:
+            return jsonify({'error': 'Prediction not found'}), 404
+        
+        # Update validation data
+        prediction.validated_category = data.get('validated_category')
+        prediction.validation_status = data.get('validation_status', 'validated')
+        prediction.validation_notes = data.get('validation_notes', '')
+        
+        # Update bank transaction category if validated
+        if prediction.validation_status == 'validated' and prediction.validated_category:
+            prediction.bank_transaction.category = prediction.validated_category
+        
+        db.session.commit()
+        
+        return jsonify({
+            'message': 'Prediction validated successfully',
+            'prediction': prediction.to_dict()
+        })
+        
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/transaction-predictions/bulk-validate', methods=['POST'])
+@jwt_required()
+def bulk_validate_predictions():
+    """Bulk validate multiple predictions"""
+    try:
+        current_user_id = get_jwt_identity()
+        data = request.get_json()
+        
+        validations = data.get('validations', [])
+        validated_count = 0
+        
+        for validation in validations:
+            prediction_id = validation.get('prediction_id')
+            validated_category = validation.get('validated_category')
+            validation_status = validation.get('validation_status', 'validated')
+            validation_notes = validation.get('validation_notes', '')
+            
+            prediction = TransactionCategoryPrediction.query.filter_by(
+                id=prediction_id,
+                user_id=current_user_id
+            ).first()
+            
+            if prediction:
+                prediction.validated_category = validated_category
+                prediction.validation_status = validation_status
+                prediction.validation_notes = validation_notes
+                
+                # Update bank transaction category if validated
+                if validation_status == 'validated' and validated_category:
+                    prediction.bank_transaction.category = validated_category
+                
+                validated_count += 1
+        
+        db.session.commit()
+        
+        return jsonify({
+            'message': f'Bulk validation completed successfully',
+            'validated_count': validated_count
+        })
+        
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': str(e)}), 500
 
 if __name__ == '__main__':
     with app.app_context():

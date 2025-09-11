@@ -833,3 +833,50 @@ class TransactionLearningPattern(db.Model):
             'created_at': self.created_at.isoformat() if self.created_at else None,
             'updated_at': self.updated_at.isoformat() if self.updated_at else None
         }
+
+class TransactionCategoryPrediction(db.Model):
+    """Model for storing predicted and validated categories for bank transactions"""
+    id = db.Column(db.Integer, primary_key=True)
+    bank_transaction_id = db.Column(db.Integer, db.ForeignKey('bank_transaction.id'), nullable=False)
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+    
+    # Prediction data
+    predicted_category = db.Column(db.String(200), nullable=True)  # ML model prediction
+    prediction_confidence = db.Column(db.Float, default=0.0)  # 0.0 to 1.0
+    prediction_model_version = db.Column(db.String(50), nullable=True)  # Track model version
+    prediction_features = db.Column(db.Text, nullable=True)  # JSON of features used
+    
+    # Validation data
+    validated_category = db.Column(db.String(200), nullable=True)  # Manually confirmed category
+    validation_status = db.Column(db.String(20), default='pending')  # pending, validated, rejected
+    validation_notes = db.Column(db.Text, nullable=True)  # User notes about validation
+    
+    # Learning data
+    is_training_data = db.Column(db.Boolean, default=False)  # Used for training
+    training_source = db.Column(db.String(100), nullable=True)  # Which tax return provided this training data
+    
+    # Metadata
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    
+    # Relationships
+    bank_transaction = db.relationship('BankTransaction', backref='category_predictions')
+    user = db.relationship('User', backref='category_predictions')
+    
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'bank_transaction_id': self.bank_transaction_id,
+            'user_id': self.user_id,
+            'predicted_category': self.predicted_category,
+            'prediction_confidence': self.prediction_confidence,
+            'prediction_model_version': self.prediction_model_version,
+            'prediction_features': self.prediction_features,
+            'validated_category': self.validated_category,
+            'validation_status': self.validation_status,
+            'validation_notes': self.validation_notes,
+            'is_training_data': self.is_training_data,
+            'training_source': self.training_source,
+            'created_at': self.created_at.isoformat() if self.created_at else None,
+            'updated_at': self.updated_at.isoformat() if self.updated_at else None
+        }

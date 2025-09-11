@@ -17,6 +17,7 @@ import NetWorth from './components/NetWorth';
 import Transactions from './components/Transactions';
 import TaxReturns from './components/TaxReturns';
 import TransactionMatching from './components/TransactionMatching';
+import TransactionPredictions from './components/TransactionPredictions';
 import Bookings from './components/Bookings';
 import AdminPanel from './components/AdminPanel';
 import UserDashboard from './components/UserDashboard';
@@ -86,6 +87,7 @@ function Sidebar({ userRole, sidebarOpen, setSidebarOpen }) {
         { path: '/transactions', icon: 'fas fa-exchange-alt', label: 'Transactions' },
         { path: '/tax-returns', icon: 'fas fa-file-invoice', label: 'Tax Returns' },
         { path: '/transaction-matching', icon: 'fas fa-link', label: 'Transaction Matching' },
+        { path: '/transaction-predictions', icon: 'fas fa-brain', label: 'ML Predictions' },
         { path: '/bookings', icon: 'fas fa-calendar-check', label: 'Bookings' },
     { path: '/admin', icon: 'fas fa-cog', label: 'Admin Panel' }
   ];
@@ -302,6 +304,11 @@ function App() {
         <Route path="/transaction-matching" element={
           <ProtectedRoute userRole={userRole} requiredRole="admin" fallbackPath="/user-dashboard">
             <TransactionMatching />
+          </ProtectedRoute>
+        } />
+        <Route path="/transaction-predictions" element={
+          <ProtectedRoute userRole={userRole} requiredRole="admin" fallbackPath="/user-dashboard">
+            <TransactionPredictions />
           </ProtectedRoute>
         } />
               <Route path="/bookings" element={

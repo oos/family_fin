@@ -316,6 +316,12 @@ const TaxReturns = () => {
                         🔗 Match Transactions
                       </button>
                       <button
+                        onClick={() => window.location.href = '/transaction-predictions'}
+                        className="btn btn-outline-success btn-sm ms-1"
+                      >
+                        🤖 Train ML Model
+                      </button>
+                      <button
                         onClick={() => handleViewData(taxReturn.id)}
                         className="btn btn-outline-info btn-sm"
                         disabled={dataLoading}
