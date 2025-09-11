@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
-import { format } from 'date-fns';
 
 const TransactionMatching = () => {
   const [taxReturns, setTaxReturns] = useState([]);
@@ -152,7 +151,12 @@ const TransactionMatching = () => {
   };
 
   const formatDate = (dateString) => {
-    return new Date(dateString).toLocaleDateString('en-IE');
+    if (!dateString) return 'N/A';
+    return new Date(dateString).toLocaleDateString('en-IE', {
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit'
+    });
   };
 
   const getConfidenceColor = (confidence) => {
