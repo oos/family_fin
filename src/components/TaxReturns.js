@@ -33,14 +33,29 @@ const TaxReturns = () => {
     setLoading(true);
     try {
       const token = localStorage.getItem('token');
+      
+      if (!token) {
+        setError('Please log in to access tax returns');
+        return;
+      }
+      
       const response = await axios.get('/api/tax-returns', {
         headers: { Authorization: `Bearer ${token}` }
       });
       setTaxReturns(response.data);
       setError(null);
     } catch (err) {
-      setError('Failed to load tax returns');
       console.error('Error fetching tax returns:', err);
+      
+      if (err.response?.status === 401) {
+        setError('Authentication failed. Please log in again.');
+        // Optionally redirect to login
+        // window.location.href = '/login';
+      } else if (err.response?.status === 403) {
+        setError('Access denied. You do not have permission to view tax returns.');
+      } else {
+        setError(`Failed to load tax returns: ${err.response?.data?.message || err.message}`);
+      }
     } finally {
       setLoading(false);
     }
