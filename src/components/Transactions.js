@@ -378,6 +378,18 @@ const Transactions = () => {
             </h4>
           </div>
           
+          {/* Transaction Count Display */}
+          {!loading && !error && (
+            <div className="d-flex justify-content-between align-items-center mb-2">
+              <div className="text-muted small">
+                Showing {filteredTransactions.length} of {Array.isArray(transactions) ? transactions.length : 0} transactions
+              </div>
+              <div className="text-muted small">
+                Page 1 of 1
+              </div>
+            </div>
+          )}
+          
           {loading && <div className="text-center">Loading transactions...</div>}
           {error && <div className="alert alert-danger">{error}</div>}
           
