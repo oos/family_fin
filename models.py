@@ -716,3 +716,46 @@ class TaxReturn(db.Model):
             'created_at': self.created_at.isoformat() if self.created_at else None,
             'updated_at': self.updated_at.isoformat() if self.updated_at else None
         }
+
+class TaxReturnTransaction(db.Model):
+    """Model for storing individual transactions from accountant tax return CSV files"""
+    id = db.Column(db.Integer, primary_key=True)
+    tax_return_id = db.Column(db.Integer, db.ForeignKey('tax_return.id'), nullable=False)
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+    
+    # Transaction data from CSV
+    name = db.Column(db.String(500), nullable=False)  # Transaction description/name
+    date = db.Column(db.Date, nullable=True)  # Transaction date
+    number = db.Column(db.String(50), nullable=True)  # Transaction number
+    reference = db.Column(db.String(100), nullable=True)  # Reference code
+    source = db.Column(db.String(50), nullable=True)  # Source system (AJ, PJ, etc.)
+    annotation = db.Column(db.Text, nullable=True)  # Additional notes
+    debit = db.Column(db.Float, default=0.0)  # Debit amount
+    credit = db.Column(db.Float, default=0.0)  # Credit amount
+    balance = db.Column(db.Float, default=0.0)  # Running balance
+    
+    # Metadata
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    
+    # Relationships
+    tax_return = db.relationship('TaxReturn', backref='transactions')
+    user = db.relationship('User', backref='tax_return_transactions')
+    
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'tax_return_id': self.tax_return_id,
+            'user_id': self.user_id,
+            'name': self.name,
+            'date': self.date.isoformat() if self.date else None,
+            'number': self.number,
+            'reference': self.reference,
+            'source': self.source,
+            'annotation': self.annotation,
+            'debit': self.debit,
+            'credit': self.credit,
+            'balance': self.balance,
+            'created_at': self.created_at.isoformat() if self.created_at else None,
+            'updated_at': self.updated_at.isoformat() if self.updated_at else None
+        }

@@ -24,7 +24,7 @@ app.config['JWT_SECRET_KEY'] = os.getenv('JWT_SECRET_KEY', 'jwt-secret-string')
 app.config['JWT_ACCESS_TOKEN_EXPIRES'] = timedelta(hours=24)
 
 # Import models and db
-from models import db, User, Person, Property, Income, Loan, Family, BusinessAccount, Pension, PensionAccount, LoanERC, LoanPayment, BankTransaction, AirbnbBooking, DashboardSettings, AccountBalance, TaxReturn
+from models import db, User, Person, Property, Income, Loan, Family, BusinessAccount, Pension, PensionAccount, LoanERC, LoanPayment, BankTransaction, AirbnbBooking, DashboardSettings, AccountBalance, TaxReturn, TaxReturnTransaction
 
 # Initialize extensions
 db.init_app(app)
@@ -2696,6 +2696,9 @@ def upload_tax_return():
             df = df.dropna(how='all')  # Remove completely empty rows
             df = df.fillna('')  # Fill NaN values with empty strings
             
+            # Skip first 5 rows as requested by user
+            df = df.iloc[5:].reset_index(drop=True)
+            
             # Convert date column to proper format if needed
             if 'Date' in df.columns:
                 try:
@@ -2735,12 +2738,35 @@ def upload_tax_return():
         )
         
         db.session.add(tax_return)
+        db.session.flush()  # Get the tax_return.id before committing
+        
+        # Save individual transactions to database
+        saved_transactions = 0
+        for _, row in df.iterrows():
+            if pd.notna(row['Name']) and str(row['Name']).strip() != '':
+                transaction = TaxReturnTransaction(
+                    tax_return_id=tax_return.id,
+                    user_id=current_user_id,
+                    name=str(row['Name']).strip(),
+                    date=row['Date'] if pd.notna(row['Date']) else None,
+                    number=str(row['Number']).strip() if pd.notna(row['Number']) else None,
+                    reference=str(row['Reference']).strip() if pd.notna(row['Reference']) else None,
+                    source=str(row['Source']).strip() if pd.notna(row['Source']) else None,
+                    annotation=str(row['Annotation']).strip() if pd.notna(row['Annotation']) else None,
+                    debit=float(row['Debit']) if pd.notna(row['Debit']) else 0.0,
+                    credit=float(row['Credit']) if pd.notna(row['Credit']) else 0.0,
+                    balance=float(row['Balance']) if pd.notna(row['Balance']) else 0.0
+                )
+                db.session.add(transaction)
+                saved_transactions += 1
+        
         db.session.commit()
         
         return jsonify({
             'message': 'Tax return uploaded successfully',
             'id': tax_return.id,
-            'transaction_count': tax_return.transaction_count
+            'transaction_count': tax_return.transaction_count,
+            'saved_transactions': saved_transactions
         })
         
     except Exception as e:
@@ -2844,6 +2870,42 @@ def get_tax_return_data(tax_return_id):
             'data': data,
             'total_rows': len(data),
             'columns': list(df.columns)
+        })
+        
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/tax-returns/<int:tax_return_id>/transactions', methods=['GET'])
+@jwt_required()
+def get_tax_return_transactions(tax_return_id):
+    """Get saved transaction data from database for a tax return"""
+    try:
+        current_user_id = get_jwt_identity()
+        
+        # Verify tax return belongs to user
+        tax_return = TaxReturn.query.filter_by(
+            id=tax_return_id, 
+            user_id=current_user_id
+        ).first()
+        
+        if not tax_return:
+            return jsonify({'error': 'Tax return not found'}), 404
+        
+        # Get transactions from database
+        transactions = TaxReturnTransaction.query.filter_by(
+            tax_return_id=tax_return_id,
+            user_id=current_user_id
+        ).order_by(TaxReturnTransaction.date.asc(), TaxReturnTransaction.id.asc()).all()
+        
+        return jsonify({
+            'transactions': [transaction.to_dict() for transaction in transactions],
+            'total_count': len(transactions),
+            'tax_return': {
+                'id': tax_return.id,
+                'year': tax_return.year,
+                'filename': tax_return.filename,
+                'uploaded_at': tax_return.uploaded_at.isoformat()
+            }
         })
         
     except Exception as e:

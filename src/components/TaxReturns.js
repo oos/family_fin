@@ -13,6 +13,9 @@ const TaxReturns = () => {
   const [showDataModal, setShowDataModal] = useState(false);
   const [selectedReturnData, setSelectedReturnData] = useState(null);
   const [dataLoading, setDataLoading] = useState(false);
+  const [showSavedDataModal, setShowSavedDataModal] = useState(false);
+  const [savedTransactions, setSavedTransactions] = useState(null);
+  const [savedDataLoading, setSavedDataLoading] = useState(false);
 
   useEffect(() => {
     fetchTaxReturns();
@@ -126,6 +129,26 @@ const TaxReturns = () => {
       console.error('Error fetching tax return data:', err);
     } finally {
       setDataLoading(false);
+    }
+  };
+
+  const handleViewSavedData = async (id) => {
+    setSavedDataLoading(true);
+    setError(null);
+
+    try {
+      const token = localStorage.getItem('token');
+      const response = await axios.get(`/api/tax-returns/${id}/transactions`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      
+      setSavedTransactions(response.data);
+      setShowSavedDataModal(true);
+    } catch (err) {
+      setError(`Failed to load saved data: ${err.response?.data?.message || err.message}`);
+      console.error('Error fetching saved transactions:', err);
+    } finally {
+      setSavedDataLoading(false);
     }
   };
 
@@ -263,13 +286,20 @@ const TaxReturns = () => {
                       <strong>Size:</strong> {formatFileSize(taxReturn.file_size)}<br/>
                       <strong>Transactions:</strong> {taxReturn.transaction_count || 'N/A'}
                     </p>
-                    <div className="d-flex gap-2">
+                    <div className="d-flex gap-2 flex-wrap">
+                      <button
+                        onClick={() => handleViewSavedData(taxReturn.id)}
+                        className="btn btn-outline-success btn-sm"
+                        disabled={savedDataLoading}
+                      >
+                        {savedDataLoading ? '⏳ Loading...' : '💾 View Saved Data'}
+                      </button>
                       <button
                         onClick={() => handleViewData(taxReturn.id)}
                         className="btn btn-outline-info btn-sm"
                         disabled={dataLoading}
                       >
-                        {dataLoading ? '⏳ Loading...' : '👁️ View Data'}
+                        {dataLoading ? '⏳ Loading...' : '👁️ View Raw Data'}
                       </button>
                       <button
                         onClick={() => window.open(`/api/tax-returns/${taxReturn.id}/download`, '_blank')}
@@ -425,6 +455,95 @@ const TaxReturns = () => {
             <div className="modal-footer">
               <button
                 onClick={() => setShowDataModal(false)}
+                className="btn btn-secondary"
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Saved Data Modal */}
+      {showSavedDataModal && savedTransactions && (
+        <div className="modal-overlay" onClick={() => setShowSavedDataModal(false)}>
+          <div className="modal-content" onClick={e => e.stopPropagation()} style={{ maxWidth: '95%', width: '95%' }}>
+            <div className="modal-header">
+              <h2>Saved Tax Return Data (from Database)</h2>
+              <button 
+                className="close" 
+                onClick={() => setShowSavedDataModal(false)}
+              >
+                &times;
+              </button>
+            </div>
+            <div className="modal-body" style={{ maxHeight: '70vh', overflowY: 'auto' }}>
+              <div className="mb-3">
+                <strong>Tax Return:</strong> {savedTransactions.tax_return.filename} ({savedTransactions.tax_return.year}) | 
+                <strong> Total Transactions:</strong> {savedTransactions.total_count} | 
+                <strong> Uploaded:</strong> {formatDate(savedTransactions.tax_return.uploaded_at)}
+              </div>
+              
+              <div className="table-responsive">
+                <table className="table table-striped table-sm">
+                  <thead className="table-dark">
+                    <tr>
+                      <th>Name</th>
+                      <th>Date</th>
+                      <th>Number</th>
+                      <th>Reference</th>
+                      <th>Source</th>
+                      <th>Annotation</th>
+                      <th>Debit</th>
+                      <th>Credit</th>
+                      <th>Balance</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {savedTransactions.transactions.map((transaction, index) => (
+                      <tr key={transaction.id}>
+                        <td>{transaction.name}</td>
+                        <td>{transaction.date ? formatDate(transaction.date) : ''}</td>
+                        <td>{transaction.number || ''}</td>
+                        <td>{transaction.reference || ''}</td>
+                        <td>{transaction.source || ''}</td>
+                        <td>{transaction.annotation || ''}</td>
+                        <td className="text-danger">
+                          {transaction.debit > 0 ? 
+                            parseFloat(transaction.debit).toLocaleString('en-IE', { 
+                              style: 'currency', 
+                              currency: 'EUR',
+                              minimumFractionDigits: 2 
+                            }) : ''
+                          }
+                        </td>
+                        <td className="text-success">
+                          {transaction.credit > 0 ? 
+                            parseFloat(transaction.credit).toLocaleString('en-IE', { 
+                              style: 'currency', 
+                              currency: 'EUR',
+                              minimumFractionDigits: 2 
+                            }) : ''
+                          }
+                        </td>
+                        <td className="text-info">
+                          {transaction.balance ? 
+                            parseFloat(transaction.balance).toLocaleString('en-IE', { 
+                              style: 'currency', 
+                              currency: 'EUR',
+                              minimumFractionDigits: 2 
+                            }) : ''
+                          }
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+            <div className="modal-footer">
+              <button
+                onClick={() => setShowSavedDataModal(false)}
                 className="btn btn-secondary"
               >
                 Close
