@@ -687,3 +687,32 @@ class AccountBalance(db.Model):
             'account_name': self.account.name if self.account else None,
             'loan_name': f"{self.loan.bank} - {self.loan.property_name}" if self.loan else None
         }
+
+class TaxReturn(db.Model):
+    """Model for storing accountant tax return CSV files"""
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+    year = db.Column(db.String(4), nullable=False)  # Tax year (e.g., "2024")
+    filename = db.Column(db.String(255), nullable=False)
+    file_content = db.Column(db.LargeBinary, nullable=False)  # Store the actual CSV file content
+    file_size = db.Column(db.Integer, nullable=False)  # File size in bytes
+    transaction_count = db.Column(db.Integer, nullable=True)  # Number of transactions in the CSV
+    uploaded_at = db.Column(db.DateTime, default=datetime.utcnow)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    
+    # Relationships
+    user = db.relationship('User', backref='tax_returns', lazy=True)
+    
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'user_id': self.user_id,
+            'year': self.year,
+            'filename': self.filename,
+            'file_size': self.file_size,
+            'transaction_count': self.transaction_count,
+            'uploaded_at': self.uploaded_at.isoformat() if self.uploaded_at else None,
+            'created_at': self.created_at.isoformat() if self.created_at else None,
+            'updated_at': self.updated_at.isoformat() if self.updated_at else None
+        }

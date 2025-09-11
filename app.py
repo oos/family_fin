@@ -5,6 +5,7 @@ from flask_migrate import Migrate
 from werkzeug.security import generate_password_hash, check_password_hash
 import hashlib
 from datetime import datetime, timedelta
+import pandas as pd
 import os
 import csv
 import io
@@ -23,7 +24,7 @@ app.config['JWT_SECRET_KEY'] = os.getenv('JWT_SECRET_KEY', 'jwt-secret-string')
 app.config['JWT_ACCESS_TOKEN_EXPIRES'] = timedelta(hours=24)
 
 # Import models and db
-from models import db, User, Person, Property, Income, Loan, Family, BusinessAccount, Pension, PensionAccount, LoanERC, LoanPayment, BankTransaction, AirbnbBooking, DashboardSettings, AccountBalance
+from models import db, User, Person, Property, Income, Loan, Family, BusinessAccount, Pension, PensionAccount, LoanERC, LoanPayment, BankTransaction, AirbnbBooking, DashboardSettings, AccountBalance, TaxReturn
 
 # Initialize extensions
 db.init_app(app)
@@ -541,8 +542,11 @@ def get_dashboard_summary():
     # Calculate total property values
     properties = Property.query.all()
     total_property_value = sum(p.valuation for p in properties)
-    total_mortgage_balance = sum(p.mortgage_balance for p in properties)
     total_rental_income = sum(p.rental_income_yearly for p in properties)
+    
+    # Calculate total mortgage balance from loans
+    loans = Loan.query.filter_by(is_active=True).all()
+    total_mortgage_balance = sum(loan.current_balance for loan in loans if loan.current_balance)
     
     # Calculate total income
     income_records = Income.query.all()
@@ -2628,6 +2632,145 @@ def delete_airbnb_booking(booking_id):
             'success': False,
             'message': f'Failed to delete booking: {str(e)}'
         }), 500
+
+# Tax Returns API endpoints
+@app.route('/api/tax-returns', methods=['GET'])
+@jwt_required()
+def get_tax_returns():
+    """Get all tax returns for the authenticated user"""
+    try:
+        current_user_id = get_jwt_identity()
+        
+        # Get all tax returns for the user
+        tax_returns = TaxReturn.query.filter_by(user_id=current_user_id).order_by(TaxReturn.uploaded_at.desc()).all()
+        
+        return jsonify([{
+            'id': tr.id,
+            'year': tr.year,
+            'filename': tr.filename,
+            'file_size': tr.file_size,
+            'uploaded_at': tr.uploaded_at.isoformat(),
+            'transaction_count': tr.transaction_count
+        } for tr in tax_returns])
+        
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/tax-returns/upload', methods=['POST'])
+@jwt_required()
+def upload_tax_return():
+    """Upload a tax return CSV file"""
+    try:
+        current_user_id = get_jwt_identity()
+        
+        if 'file' not in request.files:
+            return jsonify({'error': 'No file provided'}), 400
+            
+        file = request.files['file']
+        year = request.form.get('year', str(datetime.now().year))
+        
+        if file.filename == '':
+            return jsonify({'error': 'No file selected'}), 400
+            
+        if not file.filename.lower().endswith('.csv'):
+            return jsonify({'error': 'File must be a CSV'}), 400
+        
+        # Read and validate CSV
+        try:
+            df = pd.read_csv(file)
+            required_columns = ['Transaction Date', 'Description', 'Amount', 'Tax Category']
+            
+            # Check if required columns exist (case insensitive)
+            df_columns_lower = [col.lower() for col in df.columns]
+            missing_columns = []
+            for req_col in required_columns:
+                if req_col.lower() not in df_columns_lower:
+                    missing_columns.append(req_col)
+            
+            if missing_columns:
+                return jsonify({
+                    'error': f'Missing required columns: {", ".join(missing_columns)}'
+                }), 400
+                
+        except Exception as e:
+            return jsonify({'error': f'Invalid CSV file: {str(e)}'}), 400
+        
+        # Reset file pointer
+        file.seek(0)
+        file_content = file.read()
+        
+        # Create tax return record
+        tax_return = TaxReturn(
+            user_id=current_user_id,
+            year=year,
+            filename=file.filename,
+            file_content=file_content,
+            file_size=len(file_content),
+            transaction_count=len(df)
+        )
+        
+        db.session.add(tax_return)
+        db.session.commit()
+        
+        return jsonify({
+            'message': 'Tax return uploaded successfully',
+            'id': tax_return.id,
+            'transaction_count': tax_return.transaction_count
+        })
+        
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/tax-returns/<int:tax_return_id>/download', methods=['GET'])
+@jwt_required()
+def download_tax_return(tax_return_id):
+    """Download a tax return CSV file"""
+    try:
+        current_user_id = get_jwt_identity()
+        
+        tax_return = TaxReturn.query.filter_by(
+            id=tax_return_id, 
+            user_id=current_user_id
+        ).first()
+        
+        if not tax_return:
+            return jsonify({'error': 'Tax return not found'}), 404
+        
+        return Response(
+            tax_return.file_content,
+            mimetype='text/csv',
+            headers={
+                'Content-Disposition': f'attachment; filename={tax_return.filename}'
+            }
+        )
+        
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/tax-returns/<int:tax_return_id>', methods=['DELETE'])
+@jwt_required()
+def delete_tax_return(tax_return_id):
+    """Delete a tax return"""
+    try:
+        current_user_id = get_jwt_identity()
+        
+        tax_return = TaxReturn.query.filter_by(
+            id=tax_return_id, 
+            user_id=current_user_id
+        ).first()
+        
+        if not tax_return:
+            return jsonify({'error': 'Tax return not found'}), 404
+        
+        db.session.delete(tax_return)
+        db.session.commit()
+        
+        return jsonify({'message': 'Tax return deleted successfully'})
+        
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': str(e)}), 500
 
 if __name__ == '__main__':
     with app.app_context():

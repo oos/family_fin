@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import axios from 'axios';
 
 const Transactions = () => {
@@ -28,6 +28,11 @@ const Transactions = () => {
     type: '',
     category: ''
   });
+
+  // CSV Import and Refresh states
+  const [importing, setImporting] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
+  const fileInputRef = useRef(null);
 
   useEffect(() => {
     fetchBusinessAccounts();
@@ -315,6 +320,70 @@ const Transactions = () => {
     return allTypes.sort();
   };
 
+  // CSV Import functions
+  const handleCsvImport = () => {
+    if (fileInputRef.current) {
+      fileInputRef.current.click();
+    }
+  };
+
+  const handleFileSelect = (e) => {
+    const file = e.target.files[0];
+    if (file && file.type === 'text/csv') {
+      uploadCsvFile(file);
+    } else {
+      setError('Please select a valid CSV file');
+    }
+  };
+
+  const uploadCsvFile = async (file) => {
+    setImporting(true);
+    setError(null);
+
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
+
+      const token = localStorage.getItem('token');
+      const response = await axios.post(`/business-accounts/${selectedAccount}/import-csv`, formData, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'multipart/form-data'
+        }
+      });
+
+      // Refresh transactions after successful upload
+      await fetchTransactions();
+      alert('CSV file uploaded successfully!');
+    } catch (err) {
+      setError(`Upload failed: ${err.response?.data?.message || err.message}`);
+      console.error('Error uploading CSV:', err);
+    } finally {
+      setImporting(false);
+    }
+  };
+
+  const handleRefreshTransactions = async () => {
+    setRefreshing(true);
+    setError(null);
+
+    try {
+      const token = localStorage.getItem('token');
+      const response = await axios.post(`/business-accounts/${selectedAccount}/refresh-transactions`, {}, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+
+      // Refresh transactions after successful API call
+      await fetchTransactions();
+      alert('Transactions refreshed successfully!');
+    } catch (err) {
+      setError(`Refresh failed: ${err.response?.data?.message || err.message}`);
+      console.error('Error refreshing transactions:', err);
+    } finally {
+      setRefreshing(false);
+    }
+  };
+
   const selectedAccountData = businessAccounts.find(acc => acc.id.toString() === selectedAccount);
 
   return (
@@ -399,6 +468,37 @@ const Transactions = () => {
             <div className="col-md-3">
               <strong>Last Refreshed:</strong> {selectedAccountData.last_refreshed ? 
                 new Date(selectedAccountData.last_refreshed).toLocaleString() : 'Never'}
+            </div>
+          </div>
+        )}
+        
+        {/* CSV Import and Refresh API buttons */}
+        {selectedAccount && (
+          <div className="row mt-3">
+            <div className="col-12">
+              <div className="d-flex gap-2">
+                <button 
+                  onClick={handleCsvImport}
+                  className="btn btn-success"
+                  disabled={importing}
+                >
+                  {importing ? '⏳ Importing...' : '📁 Import CSV'}
+                </button>
+                <button 
+                  onClick={handleRefreshTransactions}
+                  className="btn btn-info"
+                  disabled={refreshing}
+                >
+                  {refreshing ? '⏳ Refreshing...' : '🔄 Refresh API'}
+                </button>
+                <input
+                  type="file"
+                  ref={fileInputRef}
+                  onChange={handleFileSelect}
+                  accept=".csv"
+                  style={{ display: 'none' }}
+                />
+              </div>
             </div>
           </div>
         )}

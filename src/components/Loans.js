@@ -390,7 +390,7 @@ function Loans() {
 
   return (
     <div>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+      <div className="d-flex justify-content-between align-items-center mb-3">
         <h1>Loans</h1>
         <button className="btn btn-primary" onClick={handleAddNew}>
           Add New Loan
@@ -400,7 +400,7 @@ function Loans() {
       {error && <div className="error">{error}</div>}
 
       {/* All Loans Table */}
-      <div className="card" style={{ marginBottom: '20px' }}>
+      <div className="card mb-3">
         <h3>All Loans</h3>
         <table className="table">
           <thead>
@@ -487,8 +487,8 @@ function Loans() {
       </div>
 
       {/* Loan Selector for Details View */}
-      <div className="card" style={{ marginBottom: '20px' }}>
-        <div style={{ display: 'flex', gap: '20px', alignItems: 'center', flexWrap: 'wrap' }}>
+      <div className="card mb-3">
+        <div className="d-flex gap-3 align-items-center flex-wrap">
           <div style={{ minWidth: '300px' }}>
             <label htmlFor="loan-select" style={{ display: 'block', marginBottom: '8px', fontWeight: '600' }}>
               Select Loan to View Detailed Schedule:
