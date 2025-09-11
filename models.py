@@ -759,3 +759,77 @@ class TaxReturnTransaction(db.Model):
             'created_at': self.created_at.isoformat() if self.created_at else None,
             'updated_at': self.updated_at.isoformat() if self.updated_at else None
         }
+
+class TransactionMatch(db.Model):
+    """Model for storing matches between tax return transactions and bank transactions"""
+    id = db.Column(db.Integer, primary_key=True)
+    tax_return_transaction_id = db.Column(db.Integer, db.ForeignKey('tax_return_transaction.id'), nullable=False)
+    bank_transaction_id = db.Column(db.Integer, db.ForeignKey('bank_transaction.id'), nullable=False)
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+    
+    # Matching confidence and method
+    confidence_score = db.Column(db.Float, default=1.0)  # 0.0 to 1.0
+    match_method = db.Column(db.String(50), nullable=False)  # 'manual', 'auto_amount', 'auto_description', 'auto_date'
+    
+    # Learning data
+    accountant_category = db.Column(db.String(200), nullable=True)  # Category from accountant
+    learned_pattern = db.Column(db.Text, nullable=True)  # JSON string of learned patterns
+    
+    # Metadata
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    
+    # Relationships
+    tax_return_transaction = db.relationship('TaxReturnTransaction', backref='matches')
+    bank_transaction = db.relationship('BankTransaction', backref='matches')
+    user = db.relationship('User', backref='transaction_matches')
+    
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'tax_return_transaction_id': self.tax_return_transaction_id,
+            'bank_transaction_id': self.bank_transaction_id,
+            'user_id': self.user_id,
+            'confidence_score': self.confidence_score,
+            'match_method': self.match_method,
+            'accountant_category': self.accountant_category,
+            'learned_pattern': self.learned_pattern,
+            'created_at': self.created_at.isoformat() if self.created_at else None,
+            'updated_at': self.updated_at.isoformat() if self.updated_at else None
+        }
+
+class TransactionLearningPattern(db.Model):
+    """Model for storing learned patterns for automatic categorization"""
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+    
+    # Pattern data
+    pattern_type = db.Column(db.String(50), nullable=False)  # 'description', 'amount', 'date', 'reference'
+    pattern_value = db.Column(db.String(500), nullable=False)  # The actual pattern (regex, amount range, etc.)
+    category = db.Column(db.String(200), nullable=False)  # The category this pattern maps to
+    confidence = db.Column(db.Float, default=0.5)  # How confident we are in this pattern
+    
+    # Usage tracking
+    times_used = db.Column(db.Integer, default=0)
+    success_rate = db.Column(db.Float, default=0.0)  # How often this pattern was correct
+    
+    # Metadata
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    
+    # Relationships
+    user = db.relationship('User', backref='learning_patterns')
+    
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'user_id': self.user_id,
+            'pattern_type': self.pattern_type,
+            'pattern_value': self.pattern_value,
+            'category': self.category,
+            'confidence': self.confidence,
+            'times_used': self.times_used,
+            'success_rate': self.success_rate,
+            'created_at': self.created_at.isoformat() if self.created_at else None,
+            'updated_at': self.updated_at.isoformat() if self.updated_at else None
+        }

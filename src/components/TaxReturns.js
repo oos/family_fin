@@ -295,6 +295,12 @@ const TaxReturns = () => {
                         {savedDataLoading ? '⏳ Loading...' : '💾 View Saved Data'}
                       </button>
                       <button
+                        onClick={() => window.location.href = '/transaction-matching'}
+                        className="btn btn-outline-warning btn-sm"
+                      >
+                        🔗 Match Transactions
+                      </button>
+                      <button
                         onClick={() => handleViewData(taxReturn.id)}
                         className="btn btn-outline-info btn-sm"
                         disabled={dataLoading}

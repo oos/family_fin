@@ -16,6 +16,7 @@ import CompanyPensionCalculator from './components/CompanyPensionCalculator';
 import NetWorth from './components/NetWorth';
 import Transactions from './components/Transactions';
 import TaxReturns from './components/TaxReturns';
+import TransactionMatching from './components/TransactionMatching';
 import Bookings from './components/Bookings';
 import AdminPanel from './components/AdminPanel';
 import UserDashboard from './components/UserDashboard';
@@ -82,9 +83,10 @@ function Sidebar({ userRole, sidebarOpen, setSidebarOpen }) {
     { path: '/company-taxation', icon: 'fas fa-building', label: 'Company Taxation' },
     { path: '/pension', icon: 'fas fa-piggy-bank', label: 'Pension' },
     { path: '/company-pension', icon: 'fas fa-building', label: 'Company Pension' },
-    { path: '/transactions', icon: 'fas fa-exchange-alt', label: 'Transactions' },
-    { path: '/tax-returns', icon: 'fas fa-file-invoice', label: 'Tax Returns' },
-    { path: '/bookings', icon: 'fas fa-calendar-check', label: 'Bookings' },
+        { path: '/transactions', icon: 'fas fa-exchange-alt', label: 'Transactions' },
+        { path: '/tax-returns', icon: 'fas fa-file-invoice', label: 'Tax Returns' },
+        { path: '/transaction-matching', icon: 'fas fa-link', label: 'Transaction Matching' },
+        { path: '/bookings', icon: 'fas fa-calendar-check', label: 'Bookings' },
     { path: '/admin', icon: 'fas fa-cog', label: 'Admin Panel' }
   ];
 
@@ -292,11 +294,16 @@ function App() {
                   <Transactions />
                 </ProtectedRoute>
               } />
-              <Route path="/tax-returns" element={
-                <ProtectedRoute userRole={userRole} requiredRole="admin" fallbackPath="/user-dashboard">
-                  <TaxReturns />
-                </ProtectedRoute>
-              } />
+        <Route path="/tax-returns" element={
+          <ProtectedRoute userRole={userRole} requiredRole="admin" fallbackPath="/user-dashboard">
+            <TaxReturns />
+          </ProtectedRoute>
+        } />
+        <Route path="/transaction-matching" element={
+          <ProtectedRoute userRole={userRole} requiredRole="admin" fallbackPath="/user-dashboard">
+            <TransactionMatching />
+          </ProtectedRoute>
+        } />
               <Route path="/bookings" element={
                 <ProtectedRoute userRole={userRole} requiredRole="admin" fallbackPath="/user-dashboard">
                   <Bookings />

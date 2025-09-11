@@ -24,7 +24,7 @@ app.config['JWT_SECRET_KEY'] = os.getenv('JWT_SECRET_KEY', 'jwt-secret-string')
 app.config['JWT_ACCESS_TOKEN_EXPIRES'] = timedelta(hours=24)
 
 # Import models and db
-from models import db, User, Person, Property, Income, Loan, Family, BusinessAccount, Pension, PensionAccount, LoanERC, LoanPayment, BankTransaction, AirbnbBooking, DashboardSettings, AccountBalance, TaxReturn, TaxReturnTransaction
+from models import db, User, Person, Property, Income, Loan, Family, BusinessAccount, Pension, PensionAccount, LoanERC, LoanPayment, BankTransaction, AirbnbBooking, DashboardSettings, AccountBalance, TaxReturn, TaxReturnTransaction, TransactionMatch, TransactionLearningPattern
 
 # Initialize extensions
 db.init_app(app)
@@ -2910,6 +2910,228 @@ def get_tax_return_transactions(tax_return_id):
         
     except Exception as e:
         return jsonify({'error': str(e)}), 500
+
+@app.route('/api/tax-returns/<int:tax_return_id>/match-transactions', methods=['GET'])
+@jwt_required()
+def get_potential_matches(tax_return_id):
+    """Get potential bank transaction matches for tax return transactions"""
+    try:
+        current_user_id = get_jwt_identity()
+        
+        # Verify tax return belongs to user
+        tax_return = TaxReturn.query.filter_by(
+            id=tax_return_id, 
+            user_id=current_user_id
+        ).first()
+        
+        if not tax_return:
+            return jsonify({'error': 'Tax return not found'}), 404
+        
+        # Get all tax return transactions that don't have matches yet
+        unmatched_tax_transactions = TaxReturnTransaction.query.filter_by(
+            tax_return_id=tax_return_id,
+            user_id=current_user_id
+        ).filter(
+            ~TaxReturnTransaction.id.in_(
+                db.session.query(TransactionMatch.tax_return_transaction_id)
+                .filter_by(user_id=current_user_id)
+            )
+        ).all()
+        
+        # Get all bank transactions for the user
+        bank_transactions = BankTransaction.query.join(BusinessAccount).filter(
+            BusinessAccount.user_id == current_user_id
+        ).all()
+        
+        # Create potential matches based on amount and date proximity
+        potential_matches = []
+        
+        for tax_transaction in unmatched_tax_transactions:
+            tax_amount = tax_transaction.debit if tax_transaction.debit > 0 else -tax_transaction.credit
+            tax_date = tax_transaction.date
+            
+            matches = []
+            
+            for bank_transaction in bank_transactions:
+                # Calculate similarity score
+                amount_similarity = 1.0 if abs(bank_transaction.amount - tax_amount) < 0.01 else 0.0
+                
+                # Date similarity (within 7 days)
+                date_similarity = 0.0
+                if tax_date and bank_transaction.transaction_date:
+                    days_diff = abs((tax_date - bank_transaction.transaction_date).days)
+                    date_similarity = max(0, 1.0 - (days_diff / 7.0))
+                
+                # Description similarity (simple keyword matching)
+                description_similarity = 0.0
+                if tax_transaction.name and bank_transaction.description:
+                    tax_words = set(tax_transaction.name.lower().split())
+                    bank_words = set(bank_transaction.description.lower().split())
+                    common_words = tax_words.intersection(bank_words)
+                    if tax_words or bank_words:
+                        description_similarity = len(common_words) / max(len(tax_words), len(bank_words))
+                
+                # Overall confidence score
+                confidence = (amount_similarity * 0.5 + date_similarity * 0.3 + description_similarity * 0.2)
+                
+                if confidence > 0.1:  # Only include potential matches with some similarity
+                    matches.append({
+                        'bank_transaction': bank_transaction.to_dict(),
+                        'confidence': confidence,
+                        'amount_similarity': amount_similarity,
+                        'date_similarity': date_similarity,
+                        'description_similarity': description_similarity
+                    })
+            
+            # Sort by confidence and take top 5
+            matches.sort(key=lambda x: x['confidence'], reverse=True)
+            potential_matches.append({
+                'tax_transaction': tax_transaction.to_dict(),
+                'potential_matches': matches[:5]
+            })
+        
+        return jsonify({
+            'potential_matches': potential_matches,
+            'total_unmatched': len(unmatched_tax_transactions)
+        })
+        
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/transaction-matches', methods=['POST'])
+@jwt_required()
+def create_transaction_match():
+    """Create a match between a tax return transaction and a bank transaction"""
+    try:
+        current_user_id = get_jwt_identity()
+        data = request.get_json()
+        
+        tax_return_transaction_id = data.get('tax_return_transaction_id')
+        bank_transaction_id = data.get('bank_transaction_id')
+        match_method = data.get('match_method', 'manual')
+        confidence_score = data.get('confidence_score', 1.0)
+        accountant_category = data.get('accountant_category')
+        
+        # Verify both transactions belong to the user
+        tax_transaction = TaxReturnTransaction.query.filter_by(
+            id=tax_return_transaction_id,
+            user_id=current_user_id
+        ).first()
+        
+        bank_transaction = BankTransaction.query.join(BusinessAccount).filter(
+            BankTransaction.id == bank_transaction_id,
+            BusinessAccount.user_id == current_user_id
+        ).first()
+        
+        if not tax_transaction or not bank_transaction:
+            return jsonify({'error': 'Transaction not found or access denied'}), 404
+        
+        # Check if match already exists
+        existing_match = TransactionMatch.query.filter_by(
+            tax_return_transaction_id=tax_return_transaction_id,
+            bank_transaction_id=bank_transaction_id,
+            user_id=current_user_id
+        ).first()
+        
+        if existing_match:
+            return jsonify({'error': 'Match already exists'}), 400
+        
+        # Create the match
+        match = TransactionMatch(
+            tax_return_transaction_id=tax_return_transaction_id,
+            bank_transaction_id=bank_transaction_id,
+            user_id=current_user_id,
+            confidence_score=confidence_score,
+            match_method=match_method,
+            accountant_category=accountant_category
+        )
+        
+        db.session.add(match)
+        
+        # Update bank transaction category if provided
+        if accountant_category:
+            bank_transaction.category = accountant_category
+        
+        db.session.commit()
+        
+        # Learn patterns from this match
+        learn_from_match(tax_transaction, bank_transaction, accountant_category, current_user_id)
+        
+        return jsonify({
+            'message': 'Match created successfully',
+            'match': match.to_dict()
+        })
+        
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': str(e)}), 500
+
+def learn_from_match(tax_transaction, bank_transaction, category, user_id):
+    """Learn patterns from a successful match"""
+    try:
+        # Learn description patterns
+        if tax_transaction.name and bank_transaction.description and category:
+            # Extract key words from both descriptions
+            tax_words = set(tax_transaction.name.lower().split())
+            bank_words = set(bank_transaction.description.lower().split())
+            common_words = tax_words.intersection(bank_words)
+            
+            for word in common_words:
+                if len(word) > 3:  # Only learn meaningful words
+                    pattern = TransactionLearningPattern.query.filter_by(
+                        user_id=user_id,
+                        pattern_type='description',
+                        pattern_value=word,
+                        category=category
+                    ).first()
+                    
+                    if pattern:
+                        pattern.times_used += 1
+                        pattern.success_rate = (pattern.success_rate * (pattern.times_used - 1) + 1.0) / pattern.times_used
+                    else:
+                        pattern = TransactionLearningPattern(
+                            user_id=user_id,
+                            pattern_type='description',
+                            pattern_value=word,
+                            category=category,
+                            confidence=0.8,
+                            times_used=1,
+                            success_rate=1.0
+                        )
+                        db.session.add(pattern)
+        
+        # Learn amount patterns
+        if category:
+            amount = abs(bank_transaction.amount)
+            amount_range = f"{amount * 0.95:.2f}-{amount * 1.05:.2f}"
+            
+            pattern = TransactionLearningPattern.query.filter_by(
+                user_id=user_id,
+                pattern_type='amount',
+                pattern_value=amount_range,
+                category=category
+            ).first()
+            
+            if pattern:
+                pattern.times_used += 1
+                pattern.success_rate = (pattern.success_rate * (pattern.times_used - 1) + 1.0) / pattern.times_used
+            else:
+                pattern = TransactionLearningPattern(
+                    user_id=user_id,
+                    pattern_type='amount',
+                    pattern_value=amount_range,
+                    category=category,
+                    confidence=0.6,
+                    times_used=1,
+                    success_rate=1.0
+                )
+                db.session.add(pattern)
+        
+        db.session.commit()
+        
+    except Exception as e:
+        print(f"Error learning from match: {e}")
+        # Don't fail the main operation if learning fails
 
 if __name__ == '__main__':
     with app.app_context():
