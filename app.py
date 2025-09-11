@@ -1,4 +1,4 @@
-from flask import Flask, request, jsonify
+from flask import Flask, request, jsonify, Response
 from flask_jwt_extended import JWTManager, create_access_token, jwt_required, get_jwt_identity
 from flask_cors import CORS
 from flask_migrate import Migrate
@@ -2678,7 +2678,7 @@ def upload_tax_return():
         # Read and validate CSV
         try:
             df = pd.read_csv(file)
-            required_columns = ['Transaction Date', 'Description', 'Amount', 'Tax Category']
+            required_columns = ['Name', 'Date', 'Number', 'Reference', 'Source', 'Annotation', 'Debit', 'Credit', 'Balance']
             
             # Check if required columns exist (case insensitive)
             df_columns_lower = [col.lower() for col in df.columns]
@@ -2691,6 +2691,31 @@ def upload_tax_return():
                 return jsonify({
                     'error': f'Missing required columns: {", ".join(missing_columns)}'
                 }), 400
+            
+            # Clean up the data - remove empty rows and handle missing values
+            df = df.dropna(how='all')  # Remove completely empty rows
+            df = df.fillna('')  # Fill NaN values with empty strings
+            
+            # Convert date column to proper format if needed
+            if 'Date' in df.columns:
+                try:
+                    # Handle DD/MM/YYYY format
+                    df['Date'] = pd.to_datetime(df['Date'], format='%d/%m/%Y', errors='coerce')
+                except:
+                    # Fallback to default parsing
+                    df['Date'] = pd.to_datetime(df['Date'], errors='coerce')
+            
+            # Convert numeric columns
+            numeric_columns = ['Debit', 'Credit', 'Balance']
+            for col in numeric_columns:
+                if col in df.columns:
+                    df[col] = pd.to_numeric(df[col], errors='coerce').fillna(0)
+            
+            # Filter out rows where Name is empty (these are usually summary rows)
+            df = df[df['Name'].str.strip() != '']
+            
+            # Count actual transaction rows (excluding summary rows)
+            transaction_count = len(df[df['Name'].str.strip() != ''])
                 
         except Exception as e:
             return jsonify({'error': f'Invalid CSV file: {str(e)}'}), 400
@@ -2706,7 +2731,7 @@ def upload_tax_return():
             filename=file.filename,
             file_content=file_content,
             file_size=len(file_content),
-            transaction_count=len(df)
+            transaction_count=transaction_count
         )
         
         db.session.add(tax_return)
@@ -2770,6 +2795,58 @@ def delete_tax_return(tax_return_id):
         
     except Exception as e:
         db.session.rollback()
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/tax-returns/<int:tax_return_id>/data', methods=['GET'])
+@jwt_required()
+def get_tax_return_data(tax_return_id):
+    """Get parsed CSV data from a tax return"""
+    try:
+        current_user_id = get_jwt_identity()
+        
+        tax_return = TaxReturn.query.filter_by(
+            id=tax_return_id, 
+            user_id=current_user_id
+        ).first()
+        
+        if not tax_return:
+            return jsonify({'error': 'Tax return not found'}), 404
+        
+        # Parse the CSV data
+        import io
+        csv_data = io.StringIO(tax_return.file_content.decode('utf-8'))
+        df = pd.read_csv(csv_data)
+        
+        # Clean up the data
+        df = df.dropna(how='all')
+        df = df.fillna('')
+        
+        # Convert date column
+        if 'Date' in df.columns:
+            try:
+                df['Date'] = pd.to_datetime(df['Date'], format='%d/%m/%Y', errors='coerce')
+            except:
+                df['Date'] = pd.to_datetime(df['Date'], errors='coerce')
+        
+        # Convert numeric columns
+        numeric_columns = ['Debit', 'Credit', 'Balance']
+        for col in numeric_columns:
+            if col in df.columns:
+                df[col] = pd.to_numeric(df[col], errors='coerce').fillna(0)
+        
+        # Filter out empty rows
+        df = df[df['Name'].str.strip() != '']
+        
+        # Convert to JSON
+        data = df.to_dict('records')
+        
+        return jsonify({
+            'data': data,
+            'total_rows': len(data),
+            'columns': list(df.columns)
+        })
+        
+    except Exception as e:
         return jsonify({'error': str(e)}), 500
 
 if __name__ == '__main__':

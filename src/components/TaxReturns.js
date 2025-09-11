@@ -10,6 +10,9 @@ const TaxReturns = () => {
   const [showUploadModal, setShowUploadModal] = useState(false);
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear().toString());
   const [filteredReturns, setFilteredReturns] = useState([]);
+  const [showDataModal, setShowDataModal] = useState(false);
+  const [selectedReturnData, setSelectedReturnData] = useState(null);
+  const [dataLoading, setDataLoading] = useState(false);
 
   useEffect(() => {
     fetchTaxReturns();
@@ -103,6 +106,26 @@ const TaxReturns = () => {
     } catch (err) {
       setError(`Delete failed: ${err.response?.data?.message || err.message}`);
       console.error('Error deleting tax return:', err);
+    }
+  };
+
+  const handleViewData = async (id) => {
+    setDataLoading(true);
+    setError(null);
+
+    try {
+      const token = localStorage.getItem('token');
+      const response = await axios.get(`/api/tax-returns/${id}/data`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      
+      setSelectedReturnData(response.data);
+      setShowDataModal(true);
+    } catch (err) {
+      setError(`Failed to load data: ${err.response?.data?.message || err.message}`);
+      console.error('Error fetching tax return data:', err);
+    } finally {
+      setDataLoading(false);
     }
   };
 
@@ -242,6 +265,13 @@ const TaxReturns = () => {
                     </p>
                     <div className="d-flex gap-2">
                       <button
+                        onClick={() => handleViewData(taxReturn.id)}
+                        className="btn btn-outline-info btn-sm"
+                        disabled={dataLoading}
+                      >
+                        {dataLoading ? '⏳ Loading...' : '👁️ View Data'}
+                      </button>
+                      <button
                         onClick={() => window.open(`/api/tax-returns/${taxReturn.id}/download`, '_blank')}
                         className="btn btn-outline-primary btn-sm"
                       >
@@ -309,11 +339,15 @@ const TaxReturns = () => {
               <div className="alert alert-info">
                 <strong>Note:</strong> The CSV file should contain columns for:
                 <ul className="mb-0 mt-2">
-                  <li>Transaction Date</li>
-                  <li>Description</li>
-                  <li>Amount</li>
-                  <li>Tax Category</li>
-                  <li>Deductible Amount (if applicable)</li>
+                  <li>Name - Transaction description</li>
+                  <li>Date - Transaction date (DD/MM/YYYY)</li>
+                  <li>Number - Transaction number</li>
+                  <li>Reference - Reference code</li>
+                  <li>Source - Source system</li>
+                  <li>Annotation - Additional notes</li>
+                  <li>Debit - Debit amount</li>
+                  <li>Credit - Credit amount</li>
+                  <li>Balance - Running balance</li>
                 </ul>
               </div>
             </div>
@@ -331,6 +365,69 @@ const TaxReturns = () => {
                 disabled={!selectedFile || uploading}
               >
                 {uploading ? '⏳ Uploading...' : '📁 Upload File'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Data Viewing Modal */}
+      {showDataModal && selectedReturnData && (
+        <div className="modal-overlay" onClick={() => setShowDataModal(false)}>
+          <div className="modal-content" onClick={e => e.stopPropagation()} style={{ maxWidth: '95%', width: '95%' }}>
+            <div className="modal-header">
+              <h2>Tax Return Data</h2>
+              <button 
+                className="close" 
+                onClick={() => setShowDataModal(false)}
+              >
+                &times;
+              </button>
+            </div>
+            <div className="modal-body" style={{ maxHeight: '70vh', overflowY: 'auto' }}>
+              <div className="mb-3">
+                <strong>Total Rows:</strong> {selectedReturnData.total_rows} | 
+                <strong> Columns:</strong> {selectedReturnData.columns.join(', ')}
+              </div>
+              
+              <div className="table-responsive">
+                <table className="table table-striped table-sm">
+                  <thead className="table-dark">
+                    <tr>
+                      {selectedReturnData.columns.map((column, index) => (
+                        <th key={index}>{column}</th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {selectedReturnData.data.map((row, index) => (
+                      <tr key={index}>
+                        {selectedReturnData.columns.map((column, colIndex) => (
+                          <td key={colIndex}>
+                            {column === 'Date' && row[column] ? 
+                              new Date(row[column]).toLocaleDateString('en-IE') :
+                              column === 'Debit' || column === 'Credit' || column === 'Balance' ?
+                              (row[column] ? parseFloat(row[column]).toLocaleString('en-IE', { 
+                                style: 'currency', 
+                                currency: 'EUR',
+                                minimumFractionDigits: 2 
+                              }) : '') :
+                              row[column] || ''
+                            }
+                          </td>
+                        ))}
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+            <div className="modal-footer">
+              <button
+                onClick={() => setShowDataModal(false)}
+                className="btn btn-secondary"
+              >
+                Close
               </button>
             </div>
           </div>
