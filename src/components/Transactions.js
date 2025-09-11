@@ -153,6 +153,16 @@ const Transactions = () => {
     });
   };
 
+  // Handle page refresh while preserving selected account
+  const handlePageRefresh = () => {
+    // Store the current selected account in localStorage before refresh
+    if (selectedAccount) {
+      localStorage.setItem('selectedAccount', selectedAccount);
+    }
+    // Refresh the page
+    window.location.reload();
+  };
+
   const openFiltersModal = () => {
     setShowFiltersModal(true);
   };
@@ -400,6 +410,13 @@ const Transactions = () => {
           <div className="d-flex justify-content-between align-items-center">
             <h3>Transactions</h3>
             <div>
+              <button 
+                onClick={handlePageRefresh}
+                className="btn btn-outline-secondary me-2"
+                title="Refresh page while keeping current account selected"
+              >
+                🔄 Refresh Page
+              </button>
               <button 
                 onClick={openFiltersModal}
                 className="btn btn-primary me-2"
