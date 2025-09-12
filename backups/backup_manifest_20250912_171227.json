@@ -1,0 +1,9 @@
+{
+  "timestamp": "20250912_171227",
+  "backup_date": "2025-09-12T17:12:27.769345",
+  "database_backup": "/Users/oos/family_fin/backups/database/family_finance_20250912_171227.db.gz",
+  "files_backup": null,
+  "config_backup": "/Users/oos/family_fin/backups/files/config_20250912_171227.tar.gz",
+  "project_root": "/Users/oos/family_fin",
+  "backup_version": "1.0.0"
+}
