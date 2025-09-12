@@ -41,7 +41,7 @@ add a new user login for my dad Sean (seanosullivan@gmail.com) with the password
 >>>>>>
 
 
-I want to create an authenticated, modular, object-orientated flask/react app to manage my wider family business and finances. We have a number of properties that are rented out (some long-term and some short-term via platfroms like AirBnB and VRBO), loans and people. There is an offical Irish busines (Reinvented Recruitment Ltd) and a wholly owned UK subsidary (SECODWOM UK LTD). My wife Heidi and I are the directors of both these businesses (50:50 ownership). I am looking to restructure the loans via refinancing them currently to increase cash flow in the short-term and so I want to do some calculations and cash flows to decide what is the best approach. Certain people have incomes outside the family business, others just earn money from the family business. Give me a UI with all of these details below shown and allow me to edit (CRUD) any of them via the UI
+I want to create an authenticated, modular, object-orientated flask/react app to manage my wider family business and finances. We have a number of properties that are rented out (some long-term and some short-term via platfroms like AirBnB and VRBO), loans and people. There is an offical Irish busines (RRLtd) and a wholly owned UK subsidary (SECODWOM UK LTD). My wife Heidi and I are the directors of both these businesses (50:50 ownership). I am looking to restructure the loans via refinancing them currently to increase cash flow in the short-term and so I want to do some calculations and cash flows to decide what is the best approach. Certain people have incomes outside the family business, others just earn money from the family business. Give me a UI with all of these details below shown and allow me to edit (CRUD) any of them via the UI
 
 People:
 Omar (me)
@@ -53,7 +53,7 @@ Coral (my late mum - died in June 2023)
 
 
 Business Bank Accounts:
-Revolut Business Account for Reinvented Recruitemnt Ltd (account number ends in 488)
+Revolut Business Account for RRLtd (account number ends in 488)
 Revolut Business Account for SECODWOM UK Ltd (account number ends in ???)
 AIB SeCo account (account number ends in 084) - this has very recently been closed down but was used for some transactions for years
 

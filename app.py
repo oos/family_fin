@@ -8,6 +8,9 @@ from datetime import datetime, timedelta
 import pandas as pd
 import json
 import re
+import math
+import pdfplumber
+import PyPDF2
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.model_selection import train_test_split
@@ -2842,6 +2845,558 @@ def get_tax_returns():
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
+@app.route('/api/tax-returns/analytics', methods=['GET'])
+@jwt_required()
+def get_tax_returns_analytics():
+    """Get financial analytics and insights for tax return transaction data"""
+    try:
+        current_user_id = get_jwt_identity()
+        
+        # Get all tax returns for the user
+        tax_returns = TaxReturn.query.filter_by(user_id=current_user_id).all()
+        
+        if not tax_returns:
+            return jsonify({
+                'message': 'No tax returns found',
+                'financial_data': None,
+                'insights': ['No tax returns uploaded yet. Upload your first file to see financial analytics!']
+            })
+        
+        # Get all transactions for all tax returns
+        all_transactions = []
+        for tr in tax_returns:
+            transactions = TaxReturnTransaction.query.filter_by(tax_return_id=tr.id).all()
+            for txn in transactions:
+                all_transactions.append({
+                    'year': tr.year,
+                    'name': txn.name,
+                    'date': txn.date,
+                    'debit': float(txn.debit or 0),
+                    'credit': float(txn.credit or 0),
+                    'reference': txn.reference,
+                    'source': txn.source,
+                    'annotation': txn.annotation
+                })
+        
+        if not all_transactions:
+            return jsonify({
+                'message': 'No transaction data found',
+                'financial_data': None,
+                'insights': ['Tax returns uploaded but no transaction data available.']
+            })
+        
+        # Analyze financial data
+        financial_data = analyze_financial_data(all_transactions)
+        
+        return jsonify(financial_data)
+        
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+def analyze_financial_data(transactions):
+    """Analyze financial data from tax return transactions"""
+    
+    # Group by year
+    yearly_data = {}
+    for txn in transactions:
+        year = txn['year']
+        if year not in yearly_data:
+            yearly_data[year] = {
+                'transactions': [],
+                'total_income': 0,
+                'total_expenses': 0,
+                'net_profit': 0,
+                'categories': {}
+            }
+        yearly_data[year]['transactions'].append(txn)
+    
+    # Calculate financial metrics for each year
+    for year, data in yearly_data.items():
+        total_income = 0
+        total_expenses = 0
+        categories = {}
+        
+        for txn in data['transactions']:
+            # Determine if this is income or expense based on debit/credit
+            amount = txn['debit'] if txn['debit'] > 0 else txn['credit']
+            
+            # Categorize based on name/annotation
+            category = categorize_transaction(txn)
+            
+            if category not in categories:
+                categories[category] = {'income': 0, 'expenses': 0, 'count': 0}
+            
+            categories[category]['count'] += 1
+            
+            # Determine if income or expense
+            is_income = is_income_transaction(txn)
+            
+            if is_income:
+                total_income += amount
+                categories[category]['income'] += amount
+            else:
+                total_expenses += amount
+                categories[category]['expenses'] += amount
+        
+        data['total_income'] = total_income
+        data['total_expenses'] = total_expenses
+        data['net_profit'] = total_income - total_expenses
+        data['categories'] = categories
+        data['transaction_count'] = len(data['transactions'])
+    
+    # Sort years
+    sorted_years = sorted(yearly_data.keys())
+    
+    # Calculate trends
+    trends = calculate_trends(yearly_data, sorted_years)
+    
+    # Generate insights
+    insights = generate_financial_insights(yearly_data, sorted_years, trends)
+    
+    # Prepare response
+    yearly_summary = []
+    for year in sorted_years:
+        data = yearly_data[year]
+        yearly_summary.append({
+            'year': year,
+            'total_income': data['total_income'],
+            'total_expenses': data['total_expenses'],
+            'net_profit': data['net_profit'],
+            'transaction_count': data['transaction_count'],
+            'profit_margin': (data['net_profit'] / data['total_income'] * 100) if data['total_income'] > 0 else 0,
+            'top_categories': get_top_categories(data['categories'])
+        })
+    
+    return {
+        'message': 'Financial analytics generated successfully',
+        'financial_data': {
+            'years_analyzed': len(sorted_years),
+            'total_transactions': sum(len(data['transactions']) for data in yearly_data.values()),
+            'yearly_summary': yearly_summary,
+            'trends': trends,
+            'category_analysis': analyze_categories_across_years(yearly_data),
+            'profitability_analysis': analyze_profitability(yearly_data, sorted_years)
+        },
+        'insights': insights
+    }
+
+def categorize_transaction(txn):
+    """Categorize a transaction based on its name, reference, and annotation"""
+    name = (txn['name'] or '').lower()
+    reference = (txn['reference'] or '').lower()
+    annotation = (txn['annotation'] or '').lower()
+    
+    # Income categories
+    if any(word in name for word in ['rent', 'rental', 'property']):
+        return 'Rental Income'
+    elif any(word in name for word in ['salary', 'wage', 'payroll']):
+        return 'Salary/Wages'
+    elif any(word in name for word in ['consulting', 'freelance', 'service']):
+        return 'Consulting/Services'
+    elif any(word in name for word in ['dividend', 'interest', 'investment']):
+        return 'Investment Income'
+    elif any(word in name for word in ['sale', 'revenue', 'income']):
+        return 'Business Revenue'
+    
+    # Expense categories
+    elif any(word in name for word in ['mortgage', 'loan', 'payment']):
+        return 'Loan Payments'
+    elif any(word in name for word in ['tax', 'vat', 'revenue']):
+        return 'Taxes'
+    elif any(word in name for word in ['insurance', 'premium']):
+        return 'Insurance'
+    elif any(word in name for word in ['maintenance', 'repair', 'upkeep']):
+        return 'Maintenance'
+    elif any(word in name for word in ['utility', 'electric', 'gas', 'water']):
+        return 'Utilities'
+    elif any(word in name for word in ['management', 'agent', 'letting']):
+        return 'Management Fees'
+    elif any(word in name for word in ['legal', 'solicitor', 'lawyer']):
+        return 'Legal Fees'
+    elif any(word in name for word in ['accounting', 'bookkeeping', 'audit']):
+        return 'Accounting Fees'
+    elif any(word in name for word in ['advertising', 'marketing', 'promotion']):
+        return 'Marketing'
+    elif any(word in name for word in ['travel', 'mileage', 'fuel']):
+        return 'Travel'
+    elif any(word in name for word in ['office', 'stationery', 'supplies']):
+        return 'Office Expenses'
+    else:
+        return 'Other'
+
+def is_income_transaction(txn):
+    """Determine if a transaction is income based on its characteristics"""
+    name = (txn['name'] or '').lower()
+    reference = (txn['reference'] or '').lower()
+    annotation = (txn['annotation'] or '').lower()
+    
+    # Exclude accounting adjustments and summaries
+    exclude_terms = ['posting', 'summary', 'adjustment', 'closing', 'opening', 'balance', 'end', 'total', 'movement', 'split', 'being vat', 'being tax']
+    if any(term in name for term in exclude_terms):
+        return False
+    
+    # Only count major income sources, not individual transaction details
+    major_income_patterns = [
+        'aib 79715197 (airbnb)',  # Major Airbnb income (2023)
+        'revolut x418 (rev airbnb)',  # Major Airbnb income (2024)
+        'being rent charge for year',  # Rent income (2023)
+        'being rent chg for year',  # Rent income (2024)
+        'consultancy work',  # Consulting income (2023)
+        'consultancy chargew for year',  # Consulting income (2024)
+        'airbnb receipts owed at the year',  # Airbnb year-end receipts
+        'reverse opening debtor - airbnb',  # Airbnb year-end receipts (2024)
+        'money added from reinvented recruit',  # Business income
+        'money added from sean francis o\'sul',  # Personal income
+        'money added from track capital inve'  # Investment income (2024)
+    ]
+    
+    # Check for major income patterns
+    if any(pattern in name for pattern in major_income_patterns):
+        return True
+    
+    # Include individual Airbnb payments but exclude very small amounts
+    if 'money added from airbnb payments lu' in name and txn['credit'] > 100:
+        return True
+    
+    # Exclude other individual transaction details
+    if 'money added from' in name and 'airbnb' not in name and 'reinvented' not in name and 'sean' not in name and 'track' not in name:
+        return False
+    
+    return False
+
+def calculate_trends(yearly_data, sorted_years):
+    """Calculate financial trends across years"""
+    if len(sorted_years) < 2:
+        return {'message': 'Need at least 2 years of data to calculate trends'}
+    
+    trends = {
+        'income_trend': calculate_trend([yearly_data[year]['total_income'] for year in sorted_years]),
+        'expense_trend': calculate_trend([yearly_data[year]['total_expenses'] for year in sorted_years]),
+        'profit_trend': calculate_trend([yearly_data[year]['net_profit'] for year in sorted_years]),
+        'transaction_volume_trend': calculate_trend([yearly_data[year]['transaction_count'] for year in sorted_years])
+    }
+    
+    return trends
+
+def calculate_trend(values):
+    """Calculate trend direction and percentage change"""
+    if len(values) < 2:
+        return {'direction': 'stable', 'percentage_change': 0}
+    
+    first_value = values[0]
+    last_value = values[-1]
+    
+    if first_value == 0:
+        return {'direction': 'stable', 'percentage_change': 0}
+    
+    percentage_change = ((last_value - first_value) / first_value) * 100
+    
+    if percentage_change > 5:
+        direction = 'increasing'
+    elif percentage_change < -5:
+        direction = 'decreasing'
+    else:
+        direction = 'stable'
+    
+    return {
+        'direction': direction,
+        'percentage_change': round(percentage_change, 1),
+        'first_value': first_value,
+        'last_value': last_value
+    }
+
+def get_top_categories(categories, limit=5):
+    """Get top categories by total amount"""
+    category_totals = []
+    for category, data in categories.items():
+        total = data['income'] + data['expenses']
+        category_totals.append({
+            'category': category,
+            'total_amount': total,
+            'income': data['income'],
+            'expenses': data['expenses'],
+            'count': data['count']
+        })
+    
+    return sorted(category_totals, key=lambda x: x['total_amount'], reverse=True)[:limit]
+
+def analyze_categories_across_years(yearly_data):
+    """Analyze how categories perform across years"""
+    all_categories = set()
+    for year_data in yearly_data.values():
+        all_categories.update(year_data['categories'].keys())
+    
+    category_analysis = {}
+    for category in all_categories:
+        category_analysis[category] = {
+            'years_present': [],
+            'total_across_years': 0,
+            'average_per_year': 0,
+            'trend': 'stable'
+        }
+        
+        amounts = []
+        for year, year_data in yearly_data.items():
+            if category in year_data['categories']:
+                total = year_data['categories'][category]['income'] + year_data['categories'][category]['expenses']
+                category_analysis[category]['years_present'].append(year)
+                category_analysis[category]['total_across_years'] += total
+                amounts.append(total)
+        
+        if amounts:
+            category_analysis[category]['average_per_year'] = sum(amounts) / len(amounts)
+            if len(amounts) >= 2:
+                trend = calculate_trend(amounts)
+                category_analysis[category]['trend'] = trend['direction']
+    
+    return category_analysis
+
+def analyze_profitability(yearly_data, sorted_years):
+    """Analyze profitability patterns"""
+    profitability = {
+        'best_year': None,
+        'worst_year': None,
+        'most_volatile_year': None,
+        'average_profit_margin': 0,
+        'profit_growth_rate': 0
+    }
+    
+    profits = []
+    profit_margins = []
+    
+    for year in sorted_years:
+        data = yearly_data[year]
+        profit = data['net_profit']
+        margin = (profit / data['total_income'] * 100) if data['total_income'] > 0 else 0
+        
+        profits.append(profit)
+        profit_margins.append(margin)
+        
+        if profitability['best_year'] is None or profit > profitability['best_year']['profit']:
+            profitability['best_year'] = {'year': year, 'profit': profit, 'margin': margin}
+        
+        if profitability['worst_year'] is None or profit < profitability['worst_year']['profit']:
+            profitability['worst_year'] = {'year': year, 'profit': profit, 'margin': margin}
+    
+    if profits:
+        profitability['average_profit_margin'] = sum(profit_margins) / len(profit_margins)
+        
+        if len(profits) >= 2:
+            profit_trend = calculate_trend(profits)
+            profitability['profit_growth_rate'] = profit_trend['percentage_change']
+    
+    return profitability
+
+def generate_financial_insights(yearly_data, sorted_years, trends):
+    """Generate financial insights based on the analysis"""
+    insights = []
+    
+    if not yearly_data:
+        return ['No financial data available for analysis']
+    
+    # Profitability insights
+    latest_year = sorted_years[-1]
+    latest_data = yearly_data[latest_year]
+    
+    if latest_data['net_profit'] > 0:
+        insights.append(f"Profitable in {latest_year}: Net profit of €{latest_data['net_profit']:,.2f}")
+    else:
+        insights.append(f"Loss in {latest_year}: Net loss of €{abs(latest_data['net_profit']):,.2f}")
+    
+    # Trend insights
+    if trends['profit_trend']['direction'] == 'increasing':
+        insights.append(f"Profit trend: {trends['profit_trend']['percentage_change']:.1f}% increase over time")
+    elif trends['profit_trend']['direction'] == 'decreasing':
+        insights.append(f"Profit trend: {trends['profit_trend']['percentage_change']:.1f}% decrease over time")
+    
+    if trends['income_trend']['direction'] == 'increasing':
+        insights.append(f"Income growth: {trends['income_trend']['percentage_change']:.1f}% increase")
+    elif trends['income_trend']['direction'] == 'decreasing':
+        insights.append(f"Income decline: {trends['income_trend']['percentage_change']:.1f}% decrease")
+    
+    # Category insights
+    latest_categories = latest_data['categories']
+    if latest_categories:
+        top_category = max(latest_categories.items(), key=lambda x: x[1]['income'] + x[1]['expenses'])
+        insights.append(f"Largest category in {latest_year}: {top_category[0]} (€{top_category[1]['income'] + top_category[1]['expenses']:,.2f})")
+    
+    # Year-over-year comparison
+    if len(sorted_years) >= 2:
+        prev_year = sorted_years[-2]
+        prev_data = yearly_data[prev_year]
+        
+        profit_change = latest_data['net_profit'] - prev_data['net_profit']
+        if profit_change > 0:
+            insights.append(f"Profit improved by €{profit_change:,.2f} from {prev_year} to {latest_year}")
+        elif profit_change < 0:
+            insights.append(f"Profit decreased by €{abs(profit_change):,.2f} from {prev_year} to {latest_year}")
+    
+    return insights
+
+def format_file_size(bytes):
+    """Helper function to format file size"""
+    if bytes == 0:
+        return '0 Bytes'
+    k = 1024
+    sizes = ['Bytes', 'KB', 'MB', 'GB']
+    i = int(math.floor(math.log(bytes) / math.log(k)))
+    return f"{round(bytes / math.pow(k, i), 2)} {sizes[i]}"
+
+def process_pdf_file(file):
+    """Process PDF file and extract tabular data"""
+    try:
+        # Reset file pointer
+        file.seek(0)
+        
+        # Try pdfplumber first (better for tables)
+        with pdfplumber.open(file) as pdf:
+            all_tables = []
+            
+            for page_num, page in enumerate(pdf.pages):
+                # Extract tables from the page
+                tables = page.extract_tables()
+                
+                for table in tables:
+                    if table and len(table) > 1:  # Ensure table has data
+                        try:
+                            # Convert table to DataFrame
+                            df_page = pd.DataFrame(table[1:], columns=table[0])  # Skip header row
+                            all_tables.append(df_page)
+                        except Exception as e:
+                            print(f"DEBUG: Error processing table on page {page_num}: {str(e)}")
+                            continue
+            
+            if all_tables:
+                # Combine all tables
+                df = pd.concat(all_tables, ignore_index=True)
+            else:
+                # If no tables found, try text extraction
+                text_content = []
+                for page in pdf.pages:
+                    text = page.extract_text()
+                    if text:
+                        text_content.append(text)
+                
+                if not text_content:
+                    raise Exception("No text content found in PDF")
+                
+                # Try to parse text as CSV-like data
+                combined_text = '\n'.join(text_content)
+                lines = combined_text.split('\n')
+                
+                # Look for lines that might be data rows
+                data_lines = []
+                for line in lines:
+                    # Check if line contains multiple values separated by spaces or tabs
+                    if len(line.split()) >= 3:  # Reduced minimum columns for more flexibility
+                        data_lines.append(line)
+                
+                if data_lines:
+                    # Try to create DataFrame from text lines
+                    try:
+                        df = pd.DataFrame([line.split() for line in data_lines])
+                        print(f"DEBUG: Created DataFrame with {len(df.columns)} columns")
+                        print(f"DEBUG: First few rows: {df.head()}")
+                        
+                        # Set column names based on expected structure
+                        expected_columns = ['Name', 'Date', 'Number', 'Reference', 'Source', 'Annotation', 'Debit', 'Credit', 'Balance']
+                        
+                        # Handle variable column counts more flexibly
+                        if len(df.columns) == len(expected_columns):
+                            df.columns = expected_columns
+                        elif len(df.columns) > len(expected_columns):
+                            # If more columns than expected, use the first 9 and ignore extras
+                            df = df.iloc[:, :len(expected_columns)]
+                            df.columns = expected_columns
+                        else:
+                            # If fewer columns, pad with empty columns
+                            for i in range(len(df.columns), len(expected_columns)):
+                                df[f'col_{i}'] = ''
+                            df.columns = expected_columns
+                            
+                    except Exception as e:
+                        print(f"DEBUG: Error creating DataFrame from text: {str(e)}")
+                        raise Exception(f"Could not parse PDF text into structured data: {str(e)}")
+                else:
+                    raise Exception("No structured data found in PDF - no lines with sufficient data")
+        
+        # Clean up the data
+        if 'df' not in locals():
+            raise Exception("No data extracted from PDF")
+            
+        df = df.dropna(how='all')  # Remove completely empty rows
+        df = df.fillna('')  # Fill NaN values with empty strings
+        
+        # Remove rows where all values are empty
+        df = df[~(df == '').all(axis=1)]
+        
+        if len(df) == 0:
+            raise Exception("No valid data rows found in PDF after processing")
+        
+        return df
+        
+    except Exception as e:
+        print(f"Error processing PDF with pdfplumber: {str(e)}")
+        
+        # Fallback to PyPDF2 for basic text extraction
+        try:
+            file.seek(0)
+            pdf_reader = PyPDF2.PdfReader(file)
+            text_content = ""
+            
+            for page in pdf_reader.pages:
+                text_content += page.extract_text() + "\n"
+            
+            if not text_content.strip():
+                raise Exception("No text content found in PDF using PyPDF2")
+            
+            # Try to parse the text as structured data
+            lines = text_content.split('\n')
+            data_lines = []
+            
+            for line in lines:
+                # Look for lines that might contain transaction data
+                if len(line.split()) >= 3:  # Reduced minimum for more flexibility
+                    data_lines.append(line)
+            
+            if data_lines:
+                try:
+                    df = pd.DataFrame([line.split() for line in data_lines])
+                    print(f"DEBUG: PyPDF2 created DataFrame with {len(df.columns)} columns")
+                    
+                    # Set basic column structure
+                    expected_columns = ['Name', 'Date', 'Number', 'Reference', 'Source', 'Annotation', 'Debit', 'Credit', 'Balance']
+                    
+                    # Handle variable column counts more flexibly
+                    if len(df.columns) == len(expected_columns):
+                        df.columns = expected_columns
+                    elif len(df.columns) > len(expected_columns):
+                        # If more columns than expected, use the first 9 and ignore extras
+                        df = df.iloc[:, :len(expected_columns)]
+                        df.columns = expected_columns
+                    else:
+                        # If fewer columns, pad with empty columns
+                        for i in range(len(df.columns), len(expected_columns)):
+                            df[f'col_{i}'] = ''
+                        df.columns = expected_columns
+                    
+                    # Clean up the data
+                    df = df.dropna(how='all')
+                    df = df.fillna('')
+                    df = df[~(df == '').all(axis=1)]
+                    
+                    if len(df) == 0:
+                        raise Exception("No valid data rows found after PyPDF2 processing")
+                    
+                    return df
+                except Exception as e3:
+                    raise Exception(f"Could not parse PDF text into structured data: {str(e3)}")
+            else:
+                raise Exception("No structured data found in PDF using PyPDF2 - no lines with sufficient data")
+                
+        except Exception as e2:
+            raise Exception(f"Failed to process PDF. Please ensure the file is a valid PDF document with readable text or tables. Error details: {str(e)} and {str(e2)}")
+
 @app.route('/api/tax-returns/upload', methods=['POST'])
 @jwt_required()
 def upload_tax_return():
@@ -2858,12 +3413,17 @@ def upload_tax_return():
         if file.filename == '':
             return jsonify({'error': 'No file selected'}), 400
             
-        if not (file.filename.lower().endswith('.csv') or file.filename.lower().endswith('.xlsx')):
-            return jsonify({'error': 'File must be a CSV or Excel (.xlsx) file'}), 400
+        if not (file.filename.lower().endswith('.csv') or file.filename.lower().endswith('.xlsx') or file.filename.lower().endswith('.pdf')):
+            return jsonify({'error': 'File must be a CSV, Excel (.xlsx), or PDF file'}), 400
         
-        # Read and validate file (CSV or Excel)
+        # Read and validate file (CSV, Excel, or PDF)
         try:
-            if file.filename.lower().endswith('.xlsx'):
+            if file.filename.lower().endswith('.pdf'):
+                # Process PDF file
+                print(f"DEBUG: Processing PDF file: {file.filename}")
+                df = process_pdf_file(file)
+                print(f"DEBUG: PDF processed successfully, shape: {df.shape}")
+            elif file.filename.lower().endswith('.xlsx'):
                 # Skip first 5 rows and use row 6 as headers
                 df = pd.read_excel(file, skiprows=5)
             else:
@@ -2923,13 +3483,32 @@ def upload_tax_return():
         except Exception as e:
             print(f"DEBUG: Error processing file: {str(e)}")
             print(f"DEBUG: Error type: {type(e).__name__}")
+            print(f"DEBUG: File type: {file.filename}")
             import traceback
             print(f"DEBUG: Full traceback: {traceback.format_exc()}")
-            return jsonify({'error': f'Invalid file: {str(e)}'}), 400
+            
+            # Provide more specific error messages
+            if file.filename.lower().endswith('.pdf'):
+                return jsonify({'error': f'Failed to process PDF file. Please ensure it is a valid PDF document with readable text or tables. Error: {str(e)}'}), 400
+            else:
+                return jsonify({'error': f'Invalid file: {str(e)}'}), 400
         
         # Reset file pointer
         file.seek(0)
         file_content = file.read()
+        
+        # Check if a tax return already exists for this year and user
+        existing_return = TaxReturn.query.filter_by(
+            user_id=current_user_id, 
+            year=year
+        ).first()
+        
+        if existing_return:
+            # Delete existing transactions first
+            TaxReturnTransaction.query.filter_by(tax_return_id=existing_return.id).delete()
+            # Delete the existing tax return
+            db.session.delete(existing_return)
+            db.session.flush()
         
         # Create tax return record
         tax_return = TaxReturn(

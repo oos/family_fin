@@ -56,11 +56,13 @@ const Transactions = () => {
       }
       
       // Fallback to account 488 or first account
-      const account488 = businessAccounts.find(acc => acc.id === 488);
-      console.log('Looking for account 488, found:', account488);
+      const account488 = businessAccounts.find(acc => 
+        acc.account_number && acc.account_number.includes('488')
+      );
+      console.log('Looking for account with 488 in account number, found:', account488);
       if (account488) {
-        console.log('Auto-selecting account 488');
-        setSelectedAccount('488');
+        console.log('Auto-selecting account 488:', account488.id);
+        setSelectedAccount(account488.id.toString());
       } else {
         // If 488 doesn't exist, select the first account
         console.log('Account 488 not found, selecting first account:', businessAccounts[0].id);
@@ -470,7 +472,7 @@ const Transactions = () => {
           border-bottom: 2px solid #dee2e6;
         }
         .table td {
-          font-size: 0.8rem;
+          font-size: 0.85rem;
         }
         .badge {
           font-size: 0.7em;
@@ -479,6 +481,17 @@ const Transactions = () => {
         .btn-sm {
           padding: 0.2rem 0.4rem;
           font-size: 0.8rem;
+        }
+        
+        /* Transaction row hover effect */
+        .transaction-row {
+          transition: background-color 0.2s ease;
+        }
+        .transaction-row:hover {
+          background-color: #f8f9fa !important;
+        }
+        .transaction-row:hover td {
+          background-color: transparent !important;
         }
       `}</style>
       <div className="mb-4">
@@ -652,7 +665,7 @@ const Transactions = () => {
                     <th 
                       className="sortable-header"
                       onClick={() => handleSort('transaction_date')}
-                      style={{ cursor: 'pointer', userSelect: 'none', width: '8%' }}
+                      style={{ cursor: 'pointer', userSelect: 'none', width: '7%' }}
                       title="Click to sort by date"
                     >
                       Date <span className="sort-icon">{getSortIcon('transaction_date')}</span>
@@ -660,7 +673,7 @@ const Transactions = () => {
                     <th 
                       className="sortable-header"
                       onClick={() => handleSort('description')}
-                      style={{ cursor: 'pointer', userSelect: 'none', width: '35%' }}
+                      style={{ cursor: 'pointer', userSelect: 'none', width: '25%' }}
                       title="Click to sort by description"
                     >
                       Description <span className="sort-icon">{getSortIcon('description')}</span>
@@ -668,7 +681,7 @@ const Transactions = () => {
                     <th 
                       className="sortable-header"
                       onClick={() => handleSort('payer')}
-                      style={{ cursor: 'pointer', userSelect: 'none', width: '8%' }}
+                      style={{ cursor: 'pointer', userSelect: 'none', width: '10%' }}
                       title="Click to sort by payer"
                     >
                       Payer <span className="sort-icon">{getSortIcon('payer')}</span>
@@ -676,16 +689,16 @@ const Transactions = () => {
                     <th 
                       className="sortable-header"
                       onClick={() => handleSort('amount')}
-                      style={{ cursor: 'pointer', userSelect: 'none', width: '8%' }}
+                      style={{ cursor: 'pointer', userSelect: 'none', width: '7%' }}
                       title="Click to sort by amount"
                     >
                       Amount <span className="sort-icon">{getSortIcon('amount')}</span>
                     </th>
-                    <th style={{ width: '8%' }}>Debit/Credit</th>
+                    <th style={{ width: '6%' }}>Debit/Credit</th>
                     <th 
                       className="sortable-header"
                       onClick={() => handleSort('balance')}
-                      style={{ cursor: 'pointer', userSelect: 'none', width: '8%' }}
+                      style={{ cursor: 'pointer', userSelect: 'none', width: '7%' }}
                       title="Click to sort by balance"
                     >
                       Balance <span className="sort-icon">{getSortIcon('balance')}</span>
@@ -701,13 +714,13 @@ const Transactions = () => {
                     <th 
                       className="sortable-header"
                       onClick={() => handleSort('reference')}
-                      style={{ cursor: 'pointer', userSelect: 'none', width: '8%' }}
+                      style={{ cursor: 'pointer', userSelect: 'none', width: '15%' }}
                       title="Click to sort by reference"
                     >
                       Reference <span className="sort-icon">{getSortIcon('reference')}</span>
                     </th>
-                    <th style={{ width: '8%' }}>Warnings</th>
-                    <th style={{ width: '8%' }}>Actions</th>
+                    <th style={{ width: '6%' }}>Warnings</th>
+                    <th style={{ width: '6%' }}>Actions</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -719,10 +732,15 @@ const Transactions = () => {
                     </tr>
                   ) : (
                     paginatedTransactions.map(transaction => (
-                      <tr key={transaction.id}>
+                      <tr 
+                        key={transaction.id}
+                        onClick={() => openTransactionModal(transaction)}
+                        style={{ cursor: 'pointer' }}
+                        className="transaction-row"
+                      >
                         <td>{formatDate(transaction.transaction_date)}</td>
                         <td style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }} title={transaction.description}>{transaction.description}</td>
-                        <td>{transaction.payer || '-'}</td>
+                        <td style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }} title={transaction.payer || '-'}>{transaction.payer || '-'}</td>
                         <td className={transaction.amount >= 0 ? 'text-success' : 'text-danger'}>
                           {formatCurrency(transaction.amount)}
                         </td>
@@ -733,7 +751,7 @@ const Transactions = () => {
                         </td>
                         <td>{transaction.balance ? formatCurrency(transaction.balance) : '-'}</td>
                         <td>{transaction.transaction_type || '-'}</td>
-                        <td>{transaction.reference || '-'}</td>
+                        <td style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }} title={transaction.reference || '-'}>{transaction.reference || '-'}</td>
                         <td>
                           {transaction.warnings && transaction.warnings.length > 0 ? (
                             <div className="d-flex flex-wrap gap-1">
@@ -758,7 +776,10 @@ const Transactions = () => {
                         </td>
                         <td>
                           <button 
-                            onClick={() => openTransactionModal(transaction)}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              openTransactionModal(transaction);
+                            }}
                             className="btn btn-sm btn-outline-primary"
                             title="View full transaction details"
                           >

@@ -157,10 +157,10 @@ def seed_data():
         # Create business accounts
         accounts_data = [
             {
-                'account_name': 'Revolut Business Account for Reinvented Recruitment Ltd',
+                'account_name': 'Revolut Business Account for RRLtd',
                 'account_number': '***488',
                 'bank_name': 'Revolut',
-                'company_name': 'Reinvented Recruitment Ltd',
+                'company_name': 'RRLtd',
                 'is_active': True
             },
             {
@@ -192,7 +192,7 @@ def seed_data():
             {'person_name': 'Lena', 'income_type': 'external_source', 'amount_yearly': 36000, 'amount_monthly': 3000},
             {'person_name': 'Dwayne', 'income_type': 'external_source', 'amount_yearly': 0, 'amount_monthly': 0},
             
-            # RRltd (Reinvented Recruitment Ltd)
+            # RRLtd (Reinvented Recruitment Ltd)
             {'person_name': 'Omar', 'income_type': 'rrltd', 'amount_yearly': 28800, 'amount_monthly': 2400},
             {'person_name': 'Heidi', 'income_type': 'rrltd', 'amount_yearly': 28800, 'amount_monthly': 2400},
             {'person_name': 'Dwayne', 'income_type': 'rrltd', 'amount_yearly': 28800, 'amount_monthly': 2400},
