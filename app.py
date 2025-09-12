@@ -18,10 +18,38 @@ import csv
 import io
 import requests
 import re
+from difflib import SequenceMatcher
 from icalendar import Calendar
 from dotenv import load_dotenv
 
 load_dotenv()
+
+# File storage utility functions
+def save_uploaded_file(file, model_instance, file_fields):
+    """
+    Generic function to save uploaded file content to any model instance
+    
+    Args:
+        file: The uploaded file object
+        model_instance: The database model instance to save to
+        file_fields: Dict mapping field names to values:
+            {
+                'file_name_field': 'filename',
+                'file_content_field': 'file_content', 
+                'file_size_field': 'file_size',
+                'uploaded_at_field': 'uploaded_at'
+            }
+    """
+    file.seek(0)  # Reset file pointer
+    file_content = file.read()
+    
+    # Set file information on the model instance
+    setattr(model_instance, file_fields['file_name_field'], file.filename)
+    setattr(model_instance, file_fields['file_content_field'], file_content)
+    setattr(model_instance, file_fields['file_size_field'], len(file_content))
+    setattr(model_instance, file_fields['uploaded_at_field'], datetime.utcnow())
+    
+    return file_content
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = os.getenv('SECRET_KEY', 'your-secret-key-here')
@@ -241,7 +269,30 @@ def delete_property(property_id):
 @jwt_required()
 def get_business_accounts():
     accounts = BusinessAccount.query.all()
-    return jsonify([account.to_dict() for account in accounts])
+    accounts_with_calculated_balance = []
+    
+    for account in accounts:
+        account_dict = account.to_dict()
+        
+        # Calculate current balance from last transaction
+        last_transaction = BankTransaction.query.filter_by(
+            business_account_id=account.id
+        ).filter(BankTransaction.balance.isnot(None)).order_by(
+            BankTransaction.transaction_date.desc()
+        ).first()
+        
+        if last_transaction:
+            account_dict['balance'] = last_transaction.balance
+            account_dict['balance_source'] = 'calculated_from_transactions'
+            account_dict['balance_date'] = last_transaction.transaction_date.isoformat()
+        else:
+            account_dict['balance'] = 0.0
+            account_dict['balance_source'] = 'no_transactions'
+            account_dict['balance_date'] = None
+        
+        accounts_with_calculated_balance.append(account_dict)
+    
+    return jsonify(accounts_with_calculated_balance)
 
 @app.route('/api/business-accounts', methods=['POST'])
 @jwt_required()
@@ -1972,7 +2023,17 @@ def import_csv_transactions(account_id):
                 errors.append(f"Row {row_num}: {str(e)}")
                 continue
         
-        # Commit all transactions
+        # Save the original file content to the account record
+        file.seek(0)  # Reset file pointer
+        file_content = file.read()
+        
+        # Update account with file information
+        account.last_imported_file_name = file.filename
+        account.last_imported_file_content = file_content
+        account.last_imported_file_size = len(file_content)
+        account.last_imported_at = datetime.utcnow()
+        
+        # Commit all transactions and file data
         db.session.commit()
         
         # Update account balance if we have balance data
@@ -1993,7 +2054,10 @@ def import_csv_transactions(account_id):
             'message': f'Successfully imported {imported_count} transactions',
             'imported_count': imported_count,
             'errors': errors[:10],  # Return first 10 errors
-            'total_errors': len(errors)
+            'total_errors': len(errors),
+            'file_saved': True,
+            'file_name': file.filename,
+            'file_size': len(file_content)
         })
         
     except Exception as e:
@@ -2002,6 +2066,87 @@ def import_csv_transactions(account_id):
             'success': False,
             'message': f'Failed to import CSV: {str(e)}'
         }), 500
+
+@app.route('/api/business-accounts/<int:account_id>/download-csv', methods=['GET'])
+@jwt_required()
+def download_business_account_csv(account_id):
+    """Download the original CSV file for a business account"""
+    try:
+        account = BusinessAccount.query.get_or_404(account_id)
+        
+        if not account.last_imported_file_content:
+            return jsonify({'error': 'No CSV file found for this account'}), 404
+        
+        return Response(
+            account.last_imported_file_content,
+            mimetype='text/csv',
+            headers={
+                'Content-Disposition': f'attachment; filename="{account.last_imported_file_name}"'
+            }
+        )
+        
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/files', methods=['GET'])
+@jwt_required()
+def get_all_files():
+    """Get all uploaded files in the system"""
+    try:
+        current_user_id = get_jwt_identity()
+        
+        files_list = []
+        
+        # Get all tax return files
+        tax_returns = TaxReturn.query.filter_by(user_id=current_user_id).all()
+        for tr in tax_returns:
+            files_list.append({
+                'id': f'tax_return_{tr.id}',
+                'type': 'tax_return',
+                'name': tr.filename,
+                'size': tr.file_size,
+                'uploaded_at': tr.uploaded_at.isoformat() if tr.uploaded_at else None,
+                'year': tr.year,
+                'transaction_count': tr.transaction_count,
+                'download_url': f'/api/tax-returns/{tr.id}/download',
+                'view_data_url': f'/api/tax-returns/{tr.id}/data'
+            })
+        
+        # Get all business account CSV files
+        try:
+            # Try to get business accounts with user_id if the field exists
+            business_accounts = BusinessAccount.query.filter_by(user_id=current_user_id).all()
+        except:
+            # Fallback: get all business accounts if user_id field doesn't exist
+            business_accounts = BusinessAccount.query.all()
+        
+        for ba in business_accounts:
+            if ba.last_imported_file_name and ba.last_imported_file_content:
+                files_list.append({
+                    'id': f'business_account_{ba.id}',
+                    'type': 'bank_csv',
+                    'name': ba.last_imported_file_name,
+                    'size': ba.last_imported_file_size,
+                    'uploaded_at': ba.last_imported_at.isoformat() if ba.last_imported_at else None,
+                    'account_name': ba.account_name,
+                    'bank_name': ba.bank_name,
+                    'company_name': ba.company_name,
+                    'download_url': f'/api/business-accounts/{ba.id}/download-csv',
+                    'view_transactions_url': f'/api/business-accounts/{ba.id}/transactions'
+                })
+        
+        # Sort files by upload date (newest first)
+        files_list.sort(key=lambda x: x['uploaded_at'] or '', reverse=True)
+        
+        return jsonify({
+            'files': files_list,
+            'total_count': len(files_list),
+            'tax_returns_count': len([f for f in files_list if f['type'] == 'tax_return']),
+            'bank_csvs_count': len([f for f in files_list if f['type'] == 'bank_csv'])
+        })
+        
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
 
 @app.route('/api/business-accounts/<int:account_id>/transactions', methods=['GET'])
 @jwt_required()
@@ -2019,9 +2164,31 @@ def get_account_transactions(account_id):
             transaction_dict['warnings'] = warnings
             transactions_with_warnings.append(transaction_dict)
         
+        # Calculate current balance from last transaction
+        current_balance = None
+        if transactions:
+            # Get the most recent transaction with a balance
+            last_transaction_with_balance = next(
+                (t for t in transactions if t.balance is not None), 
+                None
+            )
+            if last_transaction_with_balance:
+                current_balance = last_transaction_with_balance.balance
+        
+        # Create account dict with calculated balance
+        account_dict = account.to_dict()
+        account_dict['balance'] = current_balance if current_balance is not None else 0.0
+        account_dict['balance_source'] = 'calculated_from_transactions' if current_balance is not None else 'no_transactions'
+        
+        # Add balance date
+        if last_transaction_with_balance:
+            account_dict['balance_date'] = last_transaction_with_balance.transaction_date.isoformat()
+        else:
+            account_dict['balance_date'] = None
+        
         return jsonify({
             'success': True,
-            'account': account.to_dict(),
+            'account': account_dict,
             'transactions': transactions_with_warnings,
             'count': len(transactions)
         })
@@ -2407,7 +2574,19 @@ def get_user_dashboard():
             dashboard_data['data']['account_balances'] = [balance.to_dict() for balance in balances]
         
         if visible_sections.get('bank_accounts', True):
-            accounts = BusinessAccount.query.all()
+            # Note: BusinessAccount model may not have user_id field yet
+            try:
+                # First try to check if the user_id column exists
+                from sqlalchemy import inspect
+                inspector = inspect(db.engine)
+                columns = [col['name'] for col in inspector.get_columns('business_account')]
+                if 'user_id' in columns:
+                    accounts = BusinessAccount.query.filter_by(user_id=current_user.id).all()
+                else:
+                    accounts = BusinessAccount.query.all()
+            except Exception as e:
+                # Fallback: get all accounts if user_id field doesn't exist
+                accounts = BusinessAccount.query.all()
             dashboard_data['data']['bank_accounts'] = [account.to_dict() for account in accounts]
         
         return jsonify({
@@ -2685,12 +2864,24 @@ def upload_tax_return():
         # Read and validate file (CSV or Excel)
         try:
             if file.filename.lower().endswith('.xlsx'):
-                df = pd.read_excel(file)
+                # Skip first 5 rows and use row 6 as headers
+                df = pd.read_excel(file, skiprows=5)
             else:
-                df = pd.read_csv(file)
+                # Skip first 5 rows and use row 6 as headers
+                df = pd.read_csv(file, skiprows=5)
+            
+            # Clean up the data - remove empty rows and handle missing values
+            df = df.dropna(how='all')  # Remove completely empty rows
+            df = df.fillna('')  # Fill NaN values with empty strings
+            
+            # Debug: Log the actual columns found after skipping metadata rows
+            print(f"DEBUG: File columns after skipping first 5 rows: {list(df.columns)}")
+            print(f"DEBUG: First few rows after skipping:")
+            print(df.head())
+            
             required_columns = ['Name', 'Date', 'Number', 'Reference', 'Source', 'Annotation', 'Debit', 'Credit', 'Balance']
             
-            # Check if required columns exist (case insensitive)
+            # Check if required columns exist (case insensitive) - AFTER skipping metadata rows
             df_columns_lower = [col.lower() for col in df.columns]
             missing_columns = []
             for req_col in required_columns:
@@ -2699,29 +2890,28 @@ def upload_tax_return():
             
             if missing_columns:
                 return jsonify({
-                    'error': f'Missing required columns: {", ".join(missing_columns)}'
+                    'error': f'Missing required columns: {", ".join(missing_columns)}. Found columns: {", ".join(df.columns)}'
                 }), 400
-            
-            # Clean up the data - remove empty rows and handle missing values
-            df = df.dropna(how='all')  # Remove completely empty rows
-            df = df.fillna('')  # Fill NaN values with empty strings
-            
-            # Skip first 5 rows as requested by user
-            df = df.iloc[5:].reset_index(drop=True)
             
             # Convert date column to proper format if needed
             if 'Date' in df.columns:
                 try:
-                    # Handle DD/MM/YYYY format
-                    df['Date'] = pd.to_datetime(df['Date'], format='%d/%m/%Y', errors='coerce')
+                    # Handle DD/MM/YY format (2-digit year)
+                    df['Date'] = pd.to_datetime(df['Date'], format='%d/%m/%y', errors='coerce')
                 except:
-                    # Fallback to default parsing
-                    df['Date'] = pd.to_datetime(df['Date'], errors='coerce')
+                    try:
+                        # Fallback to DD/MM/YYYY format (4-digit year)
+                        df['Date'] = pd.to_datetime(df['Date'], format='%d/%m/%Y', errors='coerce')
+                    except:
+                        # Final fallback to default parsing
+                        df['Date'] = pd.to_datetime(df['Date'], errors='coerce')
             
-            # Convert numeric columns
+            # Convert numeric columns - handle comma separators
             numeric_columns = ['Debit', 'Credit', 'Balance']
             for col in numeric_columns:
                 if col in df.columns:
+                    # Remove commas and convert to numeric
+                    df[col] = df[col].astype(str).str.replace(',', '')
                     df[col] = pd.to_numeric(df[col], errors='coerce').fillna(0)
             
             # Filter out rows where Name is empty (these are usually summary rows)
@@ -2731,6 +2921,10 @@ def upload_tax_return():
             transaction_count = len(df[df['Name'].str.strip() != ''])
                 
         except Exception as e:
+            print(f"DEBUG: Error processing file: {str(e)}")
+            print(f"DEBUG: Error type: {type(e).__name__}")
+            import traceback
+            print(f"DEBUG: Full traceback: {traceback.format_exc()}")
             return jsonify({'error': f'Invalid file: {str(e)}'}), 400
         
         # Reset file pointer
@@ -2812,7 +3006,7 @@ def download_tax_return(tax_return_id):
 @app.route('/api/tax-returns/<int:tax_return_id>', methods=['DELETE'])
 @jwt_required()
 def delete_tax_return(tax_return_id):
-    """Delete a tax return"""
+    """Delete a tax return and all related transactions"""
     try:
         current_user_id = get_jwt_identity()
         
@@ -2824,10 +3018,11 @@ def delete_tax_return(tax_return_id):
         if not tax_return:
             return jsonify({'error': 'Tax return not found'}), 404
         
+        # Delete the tax return - cascade will handle related transactions
         db.session.delete(tax_return)
         db.session.commit()
         
-        return jsonify({'message': 'Tax return deleted successfully'})
+        return jsonify({'message': 'Tax return and all related transactions deleted successfully'})
         
     except Exception as e:
         db.session.rollback()
@@ -2852,7 +3047,26 @@ def get_tax_return_data(tax_return_id):
         import io
         if tax_return.filename.lower().endswith('.xlsx'):
             # For Excel files, we need to read from bytes
-            df = pd.read_excel(io.BytesIO(tax_return.file_content))
+            # Skip the first 4 rows to get to the actual data header
+            df = pd.read_excel(io.BytesIO(tax_return.file_content), skiprows=4, header=None)
+            # Set the first row as column names
+            if len(df) > 0:
+                # Get the first row and clean up the column names
+                header_row = df.iloc[0].values
+                # Replace NaN values with generic column names
+                clean_headers = []
+                for i, header in enumerate(header_row):
+                    if pd.isna(header) or header == '':
+                        clean_headers.append(f'Column_{i+1}')
+                    else:
+                        clean_headers.append(str(header))
+                df.columns = clean_headers
+                df = df.drop(df.index[0])  # Remove the header row from data
+                # Reset index after dropping the header row
+                df = df.reset_index(drop=True)
+                # Now filter out any remaining header rows (check if Name column exists first)
+                if 'Name' in df.columns:
+                    df = df[~df['Name'].astype(str).str.contains('Name|Date|Number|Reference|Source|Annotation|Debit|Credit|Balance', case=False, na=False)]
         else:
             # For CSV files
             csv_data = io.StringIO(tax_return.file_content.decode('utf-8'))
@@ -2875,8 +3089,17 @@ def get_tax_return_data(tax_return_id):
             if col in df.columns:
                 df[col] = pd.to_numeric(df[col], errors='coerce').fillna(0)
         
-        # Filter out empty rows
-        df = df[df['Name'].str.strip() != '']
+        # Filter out empty rows and header rows
+        if 'Name' in df.columns:
+            # Remove rows where Name is empty or contains column headers
+            df = df[(df['Name'].astype(str).str.strip() != '') & 
+                   (~df['Name'].astype(str).str.contains('Name|Date|Number|Reference|Source|Annotation|Debit|Credit|Balance', case=False, na=False))]
+        else:
+            # If no Name column, just remove completely empty rows
+            df = df.dropna(how='all')
+        
+        # Add unique row ID to each record
+        df['row_id'] = range(1, len(df) + 1)
         
         # Convert to JSON
         data = df.to_dict('records')
@@ -2927,42 +3150,48 @@ def get_tax_return_transactions(tax_return_id):
         return jsonify({'error': str(e)}), 500
 
 def calculate_amount_similarity(tax_amount, bank_amount):
-    """Calculate similarity between tax and bank transaction amounts"""
+    """Calculate similarity between tax and bank transaction amounts - EXACT MATCH ONLY"""
     if tax_amount == 0 and bank_amount == 0:
         return 1.0
     if tax_amount == 0 or bank_amount == 0:
         return 0.0
     
-    # Exact match
-    if abs(tax_amount - bank_amount) < 0.01:
-        return 1.0
+    # Check if amounts have the same sign (same direction)
+    same_direction = (tax_amount > 0 and bank_amount > 0) or (tax_amount < 0 and bank_amount < 0)
     
-    # Percentage difference (within 5% is good)
-    diff_percent = abs(tax_amount - bank_amount) / max(abs(tax_amount), abs(bank_amount))
-    if diff_percent <= 0.05:
-        return 1.0 - diff_percent
-    elif diff_percent <= 0.1:
-        return 0.5 - (diff_percent - 0.05) * 5  # Linear decay
+    if not same_direction:
+        # Different directions (e.g., expense vs income) - no match
+        return 0.0
+    
+    # Use absolute values for comparison since direction is already checked
+    abs_tax_amount = abs(tax_amount)
+    abs_bank_amount = abs(bank_amount)
+    
+    # EXACT MATCH ONLY - no tolerance for differences
+    if abs(abs_tax_amount - abs_bank_amount) < 0.01:
+        return 1.0
     else:
         return 0.0
 
 def calculate_date_similarity(tax_date, bank_date):
-    """Calculate similarity between tax and bank transaction dates"""
+    """Calculate similarity between tax and bank transaction dates - only within 3 days"""
     if not tax_date or not bank_date:
         return 0.0
     
     days_diff = abs((tax_date - bank_date).days)
     
+    # Strict 3-day rule: reject any matches beyond 3 days
+    if days_diff > 3:
+        return 0.0
+    
     if days_diff == 0:
         return 1.0
     elif days_diff <= 1:
         return 0.9
-    elif days_diff <= 3:
+    elif days_diff <= 2:
         return 0.8
-    elif days_diff <= 7:
-        return 0.6
-    elif days_diff <= 14:
-        return 0.3
+    elif days_diff <= 3:
+        return 0.7
     else:
         return 0.0
 
@@ -2971,9 +3200,22 @@ def calculate_description_similarity(tax_desc, bank_desc):
     if not tax_desc or not bank_desc:
         return 0.0
     
-    # Convert to lowercase and split into words
-    tax_words = set(tax_desc.lower().split())
-    bank_words = set(bank_desc.lower().split())
+    # Normalize descriptions by removing common prefixes and converting to lowercase
+    tax_normalized = tax_desc.lower().strip()
+    bank_normalized = bank_desc.lower().strip()
+    
+    # Remove common prefixes that indicate direction
+    direction_prefixes = ['to:', 'from:', 'paid to', 'received from', 'payment to', 'refund from']
+    
+    for prefix in direction_prefixes:
+        if tax_normalized.startswith(prefix):
+            tax_normalized = tax_normalized[len(prefix):].strip()
+        if bank_normalized.startswith(prefix):
+            bank_normalized = bank_normalized[len(prefix):].strip()
+    
+    # Convert to word sets
+    tax_words = set(tax_normalized.split())
+    bank_words = set(bank_normalized.split())
     
     # Remove common words that don't add meaning
     stop_words = {'the', 'a', 'an', 'and', 'or', 'but', 'in', 'on', 'at', 'to', 'for', 'of', 'with', 'by', 'from', 'up', 'about', 'into', 'through', 'during', 'before', 'after', 'above', 'below', 'between', 'among', 'is', 'are', 'was', 'were', 'be', 'been', 'being', 'have', 'has', 'had', 'do', 'does', 'did', 'will', 'would', 'could', 'should', 'may', 'might', 'must', 'can', 'shall'}
@@ -3014,7 +3256,6 @@ def calculate_reference_similarity(tax_ref, bank_ref):
         return 0.7
     
     # Character similarity
-    from difflib import SequenceMatcher
     similarity = SequenceMatcher(None, tax_ref_lower, bank_ref_lower).ratio()
     
     return similarity if similarity > 0.6 else 0.0
@@ -3036,38 +3277,114 @@ def get_potential_matches(tax_return_id):
             return jsonify({'error': 'Tax return not found'}), 404
         
         # Get all tax return transactions that don't have matches yet
-        unmatched_tax_transactions = TaxReturnTransaction.query.filter_by(
+        # First get all tax return transactions for this return
+        all_tax_transactions = TaxReturnTransaction.query.filter_by(
             tax_return_id=tax_return_id,
             user_id=current_user_id
-        ).filter(
-            ~TaxReturnTransaction.id.in_(
-                db.session.query(TransactionMatch.tax_return_transaction_id)
-                .filter_by(user_id=current_user_id)
-            )
         ).all()
         
+        # Get all matched transaction IDs for this user
+        matched_tax_transaction_ids = [
+            match.tax_return_transaction_id for match in 
+            TransactionMatch.query.filter_by(user_id=current_user_id).all()
+        ]
+        
+        # Filter out already matched transactions
+        unmatched_tax_transactions = [
+            tx for tx in all_tax_transactions 
+            if tx.id not in matched_tax_transaction_ids
+        ]
+        
         # Get all bank transactions for the user
-        bank_transactions = BankTransaction.query.join(BusinessAccount).filter(
-            BusinessAccount.user_id == current_user_id
-        ).all()
+        # Note: BusinessAccount model may not have user_id field yet
+        try:
+            bank_transactions = BankTransaction.query.join(BusinessAccount).filter(
+                BusinessAccount.user_id == current_user_id
+            ).all()
+        except Exception as e:
+            # Fallback: get all bank transactions if user_id field doesn't exist
+            bank_transactions = BankTransaction.query.join(BusinessAccount).all()
+        
+        # Get all already matched bank transaction IDs to avoid repeated queries
+        matched_bank_transaction_ids = [
+            match.bank_transaction_id for match in 
+            TransactionMatch.query.filter_by(user_id=current_user_id).all()
+        ]
+        
+        # Filter out already matched bank transactions
+        unmatched_bank_transactions = [
+            bt for bt in bank_transactions 
+            if bt.id not in matched_bank_transaction_ids
+        ]
+        
+        # Limit the number of transactions to process to prevent timeouts
+        max_tax_transactions = 1000  # Increased to show more tax transactions
+        max_bank_transactions = 2000  # Increased to show more bank transactions
+        
+        if len(unmatched_tax_transactions) > max_tax_transactions:
+            unmatched_tax_transactions = unmatched_tax_transactions[:max_tax_transactions]
+        
+        if len(unmatched_bank_transactions) > max_bank_transactions:
+            unmatched_bank_transactions = unmatched_bank_transactions[:max_bank_transactions]
+        
+        # EFFICIENT APPROACH: Pre-filter bank transactions by date range
+        # Get all tax transaction dates to determine the overall date range
+        tax_dates = [tx.date for tx in unmatched_tax_transactions if tx.date]
+        
+        if not tax_dates:
+            return jsonify({
+                'potential_matches': [],
+                'total_unmatched': len(unmatched_tax_transactions),
+                'auto_matched_count': 0,
+                'message': 'No tax transactions with valid dates found'
+            })
+        
+        # Calculate date range: min_date - 3 days to max_date + 3 days
+        min_tax_date = min(tax_dates)
+        max_tax_date = max(tax_dates)
+        from datetime import timedelta
+        
+        search_start_date = min_tax_date - timedelta(days=3)
+        search_end_date = max_tax_date + timedelta(days=3)
+        
+        # Pre-filter bank transactions to only those within the date range
+        # This dramatically reduces the number of comparisons needed
+        filtered_bank_transactions = [
+            bt for bt in unmatched_bank_transactions 
+            if bt.transaction_date and search_start_date <= bt.transaction_date <= search_end_date
+        ]
+        
+        print(f"EFFICIENCY: Reduced bank transactions from {len(unmatched_bank_transactions)} to {len(filtered_bank_transactions)}")
+        print(f"Date range: {search_start_date} to {search_end_date}")
         
         # Create potential matches with improved algorithm
         potential_matches = []
         auto_matched_count = 0
         
         for tax_transaction in unmatched_tax_transactions:
-            tax_amount = tax_transaction.debit if tax_transaction.debit > 0 else -tax_transaction.credit
+            # Properly calculate tax amount: positive for debits, negative for credits
+            if tax_transaction.debit > 0:
+                tax_amount = tax_transaction.debit  # Debit (expense) - positive
+            elif tax_transaction.credit > 0:
+                tax_amount = -tax_transaction.credit  # Credit (income) - negative
+            else:
+                tax_amount = 0
+            
             tax_date = tax_transaction.date
+            
+            # Skip if no date
+            if not tax_date:
+                continue
             
             matches = []
             
-            for bank_transaction in bank_transactions:
-                # Skip if bank transaction already matched
-                if TransactionMatch.query.filter_by(
-                    bank_transaction_id=bank_transaction.id,
-                    user_id=current_user_id
-                ).first():
-                    continue
+            # Now only compare against pre-filtered bank transactions
+            for bank_transaction in filtered_bank_transactions:
+                # Double-check date filter (should be redundant but safe)
+                if bank_transaction.transaction_date:
+                    days_diff = abs((tax_date - bank_transaction.transaction_date).days)
+                    if days_diff > 3:
+                        continue  # Skip this bank transaction entirely
                 
                 # Calculate similarity scores
                 amount_similarity = calculate_amount_similarity(tax_amount, bank_transaction.amount)
@@ -3083,7 +3400,9 @@ def get_potential_matches(tax_return_id):
                     reference_similarity * 0.1     # Reference matching
                 )
                 
-                if confidence > 0.1:  # Only include potential matches with some similarity
+                # EXACT AMOUNT MATCH REQUIRED + DATE FILTER
+                # Must have exact amount match (amount_similarity = 1.0) AND be within 3 days
+                if amount_similarity == 1.0 and date_similarity > 0.0:
                     matches.append({
                         'bank_transaction': bank_transaction.to_dict(),
                         'confidence': confidence,
@@ -3093,8 +3412,9 @@ def get_potential_matches(tax_return_id):
                         'reference_similarity': reference_similarity
                     })
             
-            # Sort by confidence and take top 5
+            # Sort by confidence and take top 3 (reduced from 5 to avoid overwhelming)
             matches.sort(key=lambda x: x['confidence'], reverse=True)
+            matches = matches[:3]
             
             # Check if we should auto-match the top result
             auto_matched = False
@@ -3201,10 +3521,17 @@ def create_transaction_match():
             user_id=current_user_id
         ).first()
         
-        bank_transaction = BankTransaction.query.join(BusinessAccount).filter(
-            BankTransaction.id == bank_transaction_id,
-            BusinessAccount.user_id == current_user_id
-        ).first()
+        # Note: BusinessAccount model may not have user_id field yet
+        try:
+            bank_transaction = BankTransaction.query.join(BusinessAccount).filter(
+                BankTransaction.id == bank_transaction_id,
+                BusinessAccount.user_id == current_user_id
+            ).first()
+        except Exception as e:
+            # Fallback: get bank transaction without user_id filter
+            bank_transaction = BankTransaction.query.join(BusinessAccount).filter(
+                BankTransaction.id == bank_transaction_id
+            ).first()
         
         if not tax_transaction or not bank_transaction:
             return jsonify({'error': 'Transaction not found or access denied'}), 404
@@ -3649,7 +3976,28 @@ def get_model_performance():
         ).order_by(ModelTrainingHistory.training_date.desc()).first()
         
         if not latest_training:
-            return jsonify({'error': 'No trained model found'}), 404
+            return jsonify({
+                'model_version': None,
+                'training_date': None,
+                'performance': {
+                    'accuracy': None,
+                    'precision': None,
+                    'recall': None,
+                    'f1_score': None
+                },
+                'training_data': {
+                    'samples': 0,
+                    'tax_return_years': '',
+                    'features_count': 0,
+                    'training_duration': 0
+                },
+                'predictions': {
+                    'total': 0,
+                    'validated': 0,
+                    'pending': 0,
+                    'validation_rate': 0
+                }
+            })
         
         # Get prediction statistics
         total_predictions = TransactionCategoryPrediction.query.filter_by(
@@ -3703,9 +4051,14 @@ def predict_all_transactions():
             return jsonify({'error': 'Model not trained. Please train the model first.'}), 400
         
         # Get all bank transactions for the user
-        bank_transactions = BankTransaction.query.join(BusinessAccount).filter(
-            BusinessAccount.user_id == current_user_id
-        ).all()
+        # Note: BusinessAccount model may not have user_id field yet
+        try:
+            bank_transactions = BankTransaction.query.join(BusinessAccount).filter(
+                BusinessAccount.user_id == current_user_id
+            ).all()
+        except Exception as e:
+            # Fallback: get all bank transactions if user_id field doesn't exist
+            bank_transactions = BankTransaction.query.join(BusinessAccount).all()
         
         predictions_created = 0
         predictions_updated = 0

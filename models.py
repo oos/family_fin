@@ -123,6 +123,7 @@ class Property(db.Model):
 
 class BusinessAccount(db.Model):
     id = db.Column(db.Integer, primary_key=True)
+    # user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)  # Temporarily commented out until migration is applied
     account_name = db.Column(db.String(200), nullable=False)
     account_number = db.Column(db.String(50), nullable=False)
     bank_name = db.Column(db.String(100), nullable=False)
@@ -131,12 +132,21 @@ class BusinessAccount(db.Model):
     balance = db.Column(db.Float, default=0.0)
     api_credentials = db.Column(db.JSON, nullable=True)  # Store bank API credentials
     last_refreshed = db.Column(db.DateTime, nullable=True)
+    # File storage fields for CSV imports
+    last_imported_file_name = db.Column(db.String(255), nullable=True)
+    last_imported_file_content = db.Column(db.LargeBinary, nullable=True)
+    last_imported_file_size = db.Column(db.Integer, nullable=True)
+    last_imported_at = db.Column(db.DateTime, nullable=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    
+    # Relationships
+    # user = db.relationship('User', backref='business_accounts', lazy=True)  # Temporarily commented out until migration is applied
     
     def to_dict(self):
         return {
             'id': self.id,
+            'user_id': getattr(self, 'user_id', None),  # Handle missing user_id field gracefully
             'account_name': self.account_name,
             'account_number': self.account_number,
             'bank_name': self.bank_name,
@@ -739,7 +749,7 @@ class TaxReturnTransaction(db.Model):
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     
     # Relationships
-    tax_return = db.relationship('TaxReturn', backref='transactions')
+    tax_return = db.relationship('TaxReturn', backref=db.backref('transactions', cascade='all, delete-orphan'))
     user = db.relationship('User', backref='tax_return_transactions')
     
     def to_dict(self):

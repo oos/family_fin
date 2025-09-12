@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import axios from 'axios';
 
 const TransactionMatching = () => {
@@ -11,6 +11,12 @@ const TransactionMatching = () => {
   const [matching, setMatching] = useState(false);
   const [updatingCategory, setUpdatingCategory] = useState(false);
   const [showAutoMatches, setShowAutoMatches] = useState(false);
+  const [sortField, setSortField] = useState('matchPercentage');
+  const [sortDirection, setSortDirection] = useState('desc');
+  const [categoryInputs, setCategoryInputs] = useState({});
+  const [skippedMatches, setSkippedMatches] = useState(new Set());
+  const [expandedRows, setExpandedRows] = useState(new Set());
+  const [visibleRows, setVisibleRows] = useState(100); // Show only first 100 rows initially
 
   useEffect(() => {
     fetchTaxReturns();
@@ -160,15 +166,156 @@ const TransactionMatching = () => {
   };
 
   const getConfidenceColor = (confidence) => {
-    if (confidence >= 0.8) return 'text-success';
-    if (confidence >= 0.6) return 'text-warning';
-    return 'text-danger';
+    if (confidence >= 0.8) return 'bg-success';
+    if (confidence >= 0.6) return 'bg-warning';
+    return 'bg-danger';
   };
+
+  // Helper functions for table functionality
+  const getTotalPotentialMatches = () => {
+    return potentialMatches.reduce((total, match) => total + match.potential_matches.length, 0);
+  };
+
+  const getSortedMatches = useMemo(() => {
+    // Create a comprehensive list of ALL tax transactions with their potential matches
+    const allMatches = [];
+    
+    potentialMatches.forEach(match => {
+      const taxTransaction = match.tax_transaction;
+      
+      if (match.potential_matches && match.potential_matches.length > 0) {
+        // This tax transaction has potential matches - show each match as a row
+        match.potential_matches.forEach(potentialMatch => {
+          const key = `${taxTransaction.id}-${potentialMatch.bank_transaction.id}`;
+          if (!skippedMatches.has(key)) {
+            allMatches.push({
+              taxId: taxTransaction.id,
+              bankId: potentialMatch.bank_transaction.id,
+              taxName: taxTransaction.name,
+              taxAmount: taxTransaction.debit || -taxTransaction.credit,
+              taxType: taxTransaction.debit > 0 ? 'Debit' : 'Credit',
+              taxDate: taxTransaction.date,
+              taxReference: taxTransaction.reference,
+              taxSource: taxTransaction.source,
+              bankDescription: potentialMatch.bank_transaction.description,
+              bankAmount: potentialMatch.bank_transaction.amount,
+              bankType: potentialMatch.bank_transaction.transaction_type,
+              bankDate: potentialMatch.bank_transaction.transaction_date,
+              bankReference: potentialMatch.bank_transaction.reference,
+              bankAccount: potentialMatch.bank_transaction.account,
+              bankMcc: potentialMatch.bank_transaction.mcc,
+              confidence: potentialMatch.confidence,
+              amountSimilarity: potentialMatch.amount_similarity,
+              dateSimilarity: potentialMatch.date_similarity,
+              descriptionSimilarity: potentialMatch.description_similarity,
+              referenceSimilarity: potentialMatch.reference_similarity,
+              category: categoryInputs[`${taxTransaction.id}-${potentialMatch.bank_transaction.id}`] || '',
+              hasMatches: true
+            });
+          }
+        });
+      } else {
+        // This tax transaction has NO potential matches - show it as a single row
+        allMatches.push({
+          taxId: taxTransaction.id,
+          bankId: null,
+          taxName: taxTransaction.name,
+          taxAmount: taxTransaction.debit || -taxTransaction.credit,
+          taxType: taxTransaction.debit > 0 ? 'Debit' : 'Credit',
+          taxDate: taxTransaction.date,
+          taxReference: taxTransaction.reference,
+          taxSource: taxTransaction.source,
+          bankDescription: 'No potential matches found',
+          bankAmount: null,
+          bankType: null,
+          bankDate: null,
+          bankReference: null,
+          bankAccount: null,
+          bankMcc: null,
+          confidence: 0,
+          amountSimilarity: 0,
+          dateSimilarity: 0,
+          descriptionSimilarity: 0,
+          referenceSimilarity: 0,
+          category: '',
+          hasMatches: false
+        });
+      }
+    });
+
+    // Sort the matches
+    return allMatches.sort((a, b) => {
+      let aValue, bValue;
+      
+      if (sortField === 'category') {
+        aValue = a.category.toLowerCase();
+        bValue = b.category.toLowerCase();
+      } else if (sortField === 'matchPercentage') {
+        aValue = a.confidence;
+        bValue = b.confidence;
+      }
+      
+      if (sortDirection === 'asc') {
+        return aValue > bValue ? 1 : -1;
+      } else {
+        return aValue < bValue ? 1 : -1;
+      }
+    });
+  }, [potentialMatches, skippedMatches, categoryInputs, sortField, sortDirection]);
+
+  const handleSort = (field) => {
+    if (sortField === field) {
+      setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc');
+    } else {
+      setSortField(field);
+      setSortDirection('desc');
+    }
+  };
+
+  const handleCategoryChange = useCallback((taxId, bankId, value) => {
+    const key = `${taxId}-${bankId}`;
+    setCategoryInputs(prev => ({
+      ...prev,
+      [key]: value
+    }));
+  }, []);
+
+  const handleSkipMatch = (taxId, bankId) => {
+    const key = `${taxId}-${bankId}`;
+    setSkippedMatches(prev => new Set([...prev, key]));
+  };
+
+  const toggleRowExpansion = useCallback((taxId, bankId) => {
+    const key = `${taxId}-${bankId}`;
+    setExpandedRows(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(key)) {
+        newSet.delete(key);
+      } else {
+        newSet.add(key);
+      }
+      return newSet;
+    });
+  }, []);
 
   return (
     <div className="container mt-4">
+      <style jsx>{`
+        .hover-row:hover {
+          background-color: #f8f9fa !important;
+        }
+        .hover-row:hover td {
+          background-color: #f8f9fa !important;
+        }
+        .table-active {
+          background-color: #e3f2fd !important;
+        }
+        .table-active td {
+          background-color: #e3f2fd !important;
+        }
+      `}</style>
       <h1>Transaction Matching</h1>
-      <p className="text-muted">Match tax return transactions with bank transactions to learn categorization patterns.</p>
+      <p className="text-muted">Match tax return transactions with bank transactions to learn categorization patterns. <strong>Click anywhere on a row to view more details.</strong></p>
 
       {error && <div className="alert alert-danger">{error}</div>}
 
@@ -285,14 +432,14 @@ const TransactionMatching = () => {
         </div>
       )}
 
-      {/* Potential Matches */}
+      {/* Potential Matches Table */}
       {selectedTaxReturn && (
         <div className="card">
           <div className="card-header d-flex justify-content-between align-items-center">
             <div>
               <h5>Potential Matches for {selectedTaxReturn.filename}</h5>
               <small className="text-muted">
-                {potentialMatches.length} unmatched transactions found
+                {getSortedMatches().length} total rows ({getTotalPotentialMatches()} potential matches across {potentialMatches.length} transactions)
               </small>
             </div>
             <button
@@ -311,126 +458,188 @@ const TransactionMatching = () => {
                 All transactions have been matched! 🎉
               </div>
             ) : (
-              <div className="accordion" id="matchesAccordion">
-                {potentialMatches.map((match, index) => (
-                  <div key={index} className="accordion-item">
-                    <h2 className="accordion-header" id={`heading${index}`}>
-                      <button
-                        className="accordion-button collapsed"
-                        type="button"
-                        data-bs-toggle="collapse"
-                        data-bs-target={`#collapse${index}`}
-                        aria-expanded="false"
-                        aria-controls={`collapse${index}`}
-                      >
-                        <div className="d-flex justify-content-between w-100 me-3">
+              <>
+                <div className="table-responsive">
+                  <table className="table table-hover table-striped">
+                    <thead className="table-dark">
+                      <tr>
+                        <th style={{ cursor: 'pointer' }} onClick={() => handleSort('category')}>
+                          Category {sortField === 'category' && (sortDirection === 'asc' ? '↑' : '↓')}
+                        </th>
+                        <th style={{ cursor: 'pointer' }} onClick={() => handleSort('matchPercentage')}>
+                          Match % {sortField === 'matchPercentage' && (sortDirection === 'asc' ? '↑' : '↓')}
+                        </th>
+                        <th>Tax Transaction</th>
+                        <th>Bank Transaction</th>
+                        <th>Similarity Details</th>
+                        <th>Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                    {getSortedMatches().slice(0, visibleRows).map((row, index) => (
+                      <React.Fragment key={`${row.taxId}-${row.bankId}`}>
+                        <tr 
+                          style={{ cursor: 'pointer' }}
+                          onClick={() => toggleRowExpansion(row.taxId, row.bankId)}
+                          className={`${expandedRows.has(`${row.taxId}-${row.bankId}`) ? 'table-active' : ''} hover-row`}
+                          title="Click anywhere on the row to view more details"
+                        >
+                          <td onClick={(e) => e.stopPropagation()}>
+                            {row.hasMatches ? (
+                              <input
+                                type="text"
+                                className="form-control form-control-sm"
+                                placeholder="Enter category"
+                                value={row.category || ''}
+                                onChange={(e) => handleCategoryChange(row.taxId, row.bankId, e.target.value)}
+                              />
+                            ) : (
+                              <small className="text-muted">N/A</small>
+                            )}
+                          </td>
+                          <td>
+                            {row.hasMatches ? (
+                              <span className={`badge ${getConfidenceColor(row.confidence)}`}>
+                                {Math.round(row.confidence * 100)}%
+                              </span>
+                            ) : (
+                              <small className="text-muted">N/A</small>
+                            )}
+                          </td>
+                        <td>
                           <div>
-                            <strong>{match.tax_transaction.name}</strong>
-                            <br/>
+                            <strong>{row.taxName}</strong><br/>
                             <small className="text-muted">
-                              Amount: {formatCurrency(match.tax_transaction.debit || -match.tax_transaction.credit)} | 
-                              Date: {match.tax_transaction.date ? formatDate(match.tax_transaction.date) : 'N/A'}
+                              {formatCurrency(row.taxAmount)} | {formatDate(row.taxDate)}<br/>
+                              <span className={`badge ${row.taxType === 'Debit' ? 'bg-danger' : 'bg-success'} badge-sm`}>
+                                {row.taxType}
+                              </span>
                             </small>
                           </div>
-                          <div className="text-end">
-                            <span className="badge bg-secondary">
-                              {match.potential_matches.length} potential matches
+                        </td>
+                        <td>
+                          <div>
+                            <strong>{row.bankDescription}</strong><br/>
+                            {row.hasMatches ? (
+                              <>
+                                <small className="text-muted">
+                                  {formatCurrency(row.bankAmount)} | {formatDate(row.bankDate)}<br/>
+                                  <span className={`badge ${row.bankAmount > 0 ? 'bg-success' : 'bg-danger'} badge-sm`}>
+                                    {row.bankAmount > 0 ? 'Credit' : 'Debit'}
                             </span>
+                                </small>
+                                {row.bankReference && (
+                                  <>
+                                    <br/><small className="text-muted">Ref: {row.bankReference}</small>
+                                  </>
+                                )}
+                              </>
+                            ) : (
+                              <small className="text-muted text-danger">
+                                No potential matches found
+                              </small>
+                            )}
                           </div>
-                        </div>
+                        </td>
+                          <td>
+                            {row.hasMatches ? (
+                              <small>
+                                Amount: {Math.round(row.amountSimilarity * 100)}%<br/>
+                                Date: {Math.round(row.dateSimilarity * 100)}%<br/>
+                                Desc: {Math.round(row.descriptionSimilarity * 100)}%
+                              </small>
+                            ) : (
+                              <small className="text-muted">N/A</small>
+                            )}
+                          </td>
+                          <td onClick={(e) => e.stopPropagation()}>
+                            {row.hasMatches ? (
+                              <div className="d-flex gap-1">
+                                <button
+                                  className="btn btn-success btn-sm"
+                                  onClick={() => handleCreateMatch(row.taxId, row.bankId, row.confidence, row.category)}
+                                  disabled={matching || !row.category?.trim()}
+                                  title={!row.category?.trim() ? 'Enter a category first' : 'Create match'}
+                                >
+                                  {matching ? '⏳' : '✅'}
+                                </button>
+                                <button
+                                  className="btn btn-outline-secondary btn-sm"
+                                  onClick={() => handleSkipMatch(row.taxId, row.bankId)}
+                                  title="Skip this match"
+                                >
+                                  ⏭️
                       </button>
-                    </h2>
-                    <div
-                      id={`collapse${index}`}
-                      className="accordion-collapse collapse"
-                      aria-labelledby={`heading${index}`}
-                      data-bs-parent="#matchesAccordion"
-                    >
-                      <div className="accordion-body">
-                        {match.potential_matches.length === 0 ? (
-                          <div className="alert alert-warning">
-                            No potential matches found. You may need to manually match this transaction.
+                                <button
+                                  className="btn btn-outline-info btn-sm"
+                                  onClick={() => toggleRowExpansion(row.taxId, row.bankId)}
+                                  title="Show more details"
+                                >
+                                  {expandedRows.has(`${row.taxId}-${row.bankId}`) ? '📖' : '📄'}
+                                </button>
                           </div>
                         ) : (
-                          <div className="row">
-                            {match.potential_matches.map((potentialMatch, pmIndex) => (
-                              <div key={pmIndex} className="col-md-6 mb-3">
-                                <div className="card">
-                                  <div className="card-header d-flex justify-content-between align-items-center">
-                                    <h6 className="mb-0">Bank Transaction</h6>
-                                    <span className={`badge ${getConfidenceColor(potentialMatch.confidence)}`}>
-                                      {Math.round(potentialMatch.confidence * 100)}% match
-                                    </span>
+                              <small className="text-muted">No actions available</small>
+                            )}
+                          </td>
+                        </tr>
+                        {expandedRows.has(`${row.taxId}-${row.bankId}`) && row.hasMatches && (
+                          <tr>
+                            <td colSpan="6" className="bg-light p-2">
+                              <div className="row g-2">
+                                <div className="col-md-6">
+                                  <div className="border rounded p-2 bg-white">
+                                    <h6 className="text-success mb-2">📊 Tax Transaction</h6>
+                                    <div className="small">
+                                      <div><strong>ID:</strong> {row.taxId}</div>
+                                      <div><strong>Name:</strong> {row.taxName}</div>
+                                      <div><strong>Amount:</strong> {formatCurrency(row.taxAmount)} <span className={`badge ${row.taxType === 'Debit' ? 'bg-danger' : 'bg-success'} badge-sm`}>{row.taxType}</span></div>
+                                      <div><strong>Date:</strong> {formatDate(row.taxDate)}</div>
+                                      <div><strong>Ref:</strong> {row.taxReference || 'N/A'}</div>
+                                    </div>
                                   </div>
-                                  <div className="card-body">
-                                    <p className="card-text">
-                                      <strong>Description:</strong> {potentialMatch.bank_transaction.description}<br/>
-                                      <strong>Amount:</strong> {formatCurrency(potentialMatch.bank_transaction.amount)}<br/>
-                                      <strong>Date:</strong> {formatDate(potentialMatch.bank_transaction.transaction_date)}<br/>
-                                      <strong>Reference:</strong> {potentialMatch.bank_transaction.reference || 'N/A'}
-                                    </p>
-                                    
-                                    <div className="mb-3">
-                                      <label htmlFor={`category${index}${pmIndex}`} className="form-label">
-                                        Accountant Category:
-                                      </label>
-                                      <input
-                                        type="text"
-                                        className="form-control"
-                                        id={`category${index}${pmIndex}`}
-                                        placeholder="Enter category (e.g., Business Expense, Rental Income)"
-                                      />
-                                    </div>
-                                    
-                                    <div className="d-flex gap-2">
-                                      <button
-                                        className="btn btn-success btn-sm"
-                                        onClick={() => {
-                                          const category = document.getElementById(`category${index}${pmIndex}`).value;
-                                          if (!category.trim()) {
-                                            alert('Please enter a category');
-                                            return;
-                                          }
-                                          handleCreateMatch(
-                                            match.tax_transaction.id,
-                                            potentialMatch.bank_transaction.id,
-                                            potentialMatch.confidence,
-                                            category.trim()
-                                          );
-                                        }}
-                                        disabled={matching}
-                                      >
-                                        {matching ? '⏳ Matching...' : '✅ Create Match'}
-                                      </button>
-                                      <button
-                                        className="btn btn-outline-secondary btn-sm"
-                                        onClick={() => {
-                                          // Skip this transaction
-                                          console.log('Skipped transaction:', match.tax_transaction.id);
-                                        }}
-                                      >
-                                        Skip
-                                      </button>
-                                    </div>
-                                    
-                                    <div className="mt-2">
-                                      <small className="text-muted">
-                                        Similarity: Amount {Math.round(potentialMatch.amount_similarity * 100)}% | 
-                                        Date {Math.round(potentialMatch.date_similarity * 100)}% | 
-                                        Description {Math.round(potentialMatch.description_similarity * 100)}%
-                                      </small>
+                                </div>
+                                <div className="col-md-6">
+                                  <div className="border rounded p-2 bg-white">
+                                    <h6 className="text-info mb-2">🏦 Bank Transaction</h6>
+                                    <div className="small">
+                                      <div><strong>ID:</strong> {row.bankId}</div>
+                                      <div><strong>Description:</strong> {row.bankDescription}</div>
+                                      <div><strong>Amount:</strong> {formatCurrency(row.bankAmount)} <span className={`badge ${row.bankAmount > 0 ? 'bg-success' : 'bg-danger'} badge-sm`}>{row.bankAmount > 0 ? 'Credit' : 'Debit'}</span></div>
+                                      <div><strong>Date:</strong> {formatDate(row.bankDate)}</div>
+                                      <div><strong>Account:</strong> {row.bankAccount || 'N/A'}</div>
                                     </div>
                                   </div>
                                 </div>
                               </div>
-                            ))}
-                          </div>
+                              <div className="mt-2">
+                                <div className="d-flex gap-3 justify-content-center">
+                                  <span className="badge bg-warning">Amount: {Math.round(row.amountSimilarity * 100)}%</span>
+                                  <span className="badge bg-warning">Date: {Math.round(row.dateSimilarity * 100)}%</span>
+                                  <span className="badge bg-warning">Desc: {Math.round(row.descriptionSimilarity * 100)}%</span>
+                                </div>
+                              </div>
+                            </td>
+                          </tr>
                         )}
-                      </div>
-                    </div>
-                  </div>
+                      </React.Fragment>
                 ))}
+                  </tbody>
+                </table>
               </div>
+              
+              {/* Show More Button */}
+              {getSortedMatches().length > visibleRows && (
+                <div className="text-center mt-3">
+                  <button
+                    className="btn btn-outline-primary"
+                    onClick={() => setVisibleRows(prev => Math.min(prev + 100, getSortedMatches().length))}
+                  >
+                    Show More ({visibleRows} of {getSortedMatches().length} rows)
+                  </button>
+                </div>
+              )}
+              </>
             )}
           </div>
         </div>

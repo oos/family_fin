@@ -60,7 +60,7 @@ const TransactionPredictions = () => {
       });
       setModelPerformance(response.data);
       setModelStatus({
-        is_trained: true,
+        is_trained: response.data.model_version !== null,
         version: response.data.model_version
       });
     } catch (err) {
@@ -204,7 +204,7 @@ const TransactionPredictions = () => {
               )}
             </div>
             <div className="col-md-4">
-              {modelPerformance && (
+              {modelPerformance && modelPerformance.model_version ? (
                 <div>
                   <h6>Performance Metrics</h6>
                   <div className="row text-center">
@@ -233,6 +233,13 @@ const TransactionPredictions = () => {
                       </div>
                     </div>
                   </div>
+                </div>
+              ) : (
+                <div>
+                  <h6>Ready to Train</h6>
+                  <p className="text-muted mb-0">
+                    Upload your tax return data and train the model to start categorizing transactions automatically.
+                  </p>
                 </div>
               )}
             </div>

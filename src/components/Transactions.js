@@ -16,7 +16,7 @@ const Transactions = () => {
   
   // Pagination states
   const [currentPage, setCurrentPage] = useState(1);
-  const [rowsPerPage, setRowsPerPage] = useState(50);
+  const [rowsPerPage, setRowsPerPage] = useState(100);
   
   // Filter states
   const [filters, setFilters] = useState({
@@ -26,7 +26,8 @@ const Transactions = () => {
     amountMin: '',
     amountMax: '',
     type: '',
-    category: ''
+    category: '',
+    year: ''
   });
 
   // CSV Import and Refresh states
@@ -228,11 +229,14 @@ const Transactions = () => {
       const matchesType = !filters.type || 
         transaction.transaction_type === filters.type;
 
-    const matchesCategory = !filters.category || 
-      transaction.transaction_type === filters.category;
+      const matchesCategory = !filters.category || 
+        transaction.transaction_type === filters.category;
+
+      const matchesYear = !filters.year || 
+        new Date(transaction.transaction_date).getFullYear().toString() === filters.year;
 
       return matchesSearch && matchesDateFrom && matchesDateTo && 
-             matchesAmountMin && matchesAmountMax && matchesType && matchesCategory;
+             matchesAmountMin && matchesAmountMax && matchesType && matchesCategory && matchesYear;
     })
     .sort((a, b) => {
       let aValue = a[sortField];
@@ -318,6 +322,31 @@ const Transactions = () => {
     // Combine and deduplicate
     const allTypes = [...new Set([...transactionTypes, ...commonTypes])];
     return allTypes.sort();
+  };
+
+  const getYearOptions = () => {
+    const years = [...new Set(transactions.map(t => new Date(t.transaction_date).getFullYear()))];
+    return years.sort((a, b) => b - a); // Most recent first
+  };
+
+  const getActiveFilters = () => {
+    const activeFilters = [];
+    if (filters.search) activeFilters.push({ key: 'search', label: `Search: "${filters.search}"` });
+    if (filters.dateFrom) activeFilters.push({ key: 'dateFrom', label: `From: ${filters.dateFrom}` });
+    if (filters.dateTo) activeFilters.push({ key: 'dateTo', label: `To: ${filters.dateTo}` });
+    if (filters.amountMin) activeFilters.push({ key: 'amountMin', label: `Min: €${filters.amountMin}` });
+    if (filters.amountMax) activeFilters.push({ key: 'amountMax', label: `Max: €${filters.amountMax}` });
+    if (filters.type) activeFilters.push({ key: 'type', label: `Type: ${filters.type}` });
+    if (filters.category) activeFilters.push({ key: 'category', label: `Category: ${filters.category}` });
+    if (filters.year) activeFilters.push({ key: 'year', label: `Year: ${filters.year}` });
+    return activeFilters;
+  };
+
+  const removeFilter = (filterKey) => {
+    setFilters(prev => ({
+      ...prev,
+      [filterKey]: ''
+    }));
   };
 
   // CSV Import functions
@@ -427,109 +456,127 @@ const Transactions = () => {
           background-color: #6c757d !important;
           color: white;
         }
+        
+        /* Compact table styling */
+        .table th, .table td {
+          padding: 0.3rem 0.5rem;
+          vertical-align: middle;
+          line-height: 1.2;
+        }
+        .table th {
+          font-weight: 600;
+          font-size: 0.8rem;
+          background-color: #f8f9fa;
+          border-bottom: 2px solid #dee2e6;
+        }
+        .table td {
+          font-size: 0.8rem;
+        }
+        .badge {
+          font-size: 0.7em;
+          padding: 0.2em 0.4em;
+        }
+        .btn-sm {
+          padding: 0.2rem 0.4rem;
+          font-size: 0.8rem;
+        }
       `}</style>
-      <h1>Bank Transactions</h1>
-      
-      {/* Account Selection */}
-      <div className="card mb-4">
-        <h3>Select Bank Account</h3>
-        {error && <div className="alert alert-danger">{error}</div>}
-        <div className="form-group">
-          <label>Bank Account:</label>
-          {accountsLoading ? (
-            <div className="text-center">Loading bank accounts...</div>
-          ) : (
-            <select 
-              value={selectedAccount} 
-              onChange={handleAccountChange}
-              className="form-control"
-            >
-              <option value="">Select an account...</option>
-              {businessAccounts.map(account => (
-                <option key={account.id} value={account.id}>
-                  {account.account_name} - {account.company_name} ({account.account_number})
-                </option>
-              ))}
-            </select>
-          )}
-        </div>
-        
-        {selectedAccountData && (
-          <div className="row mt-3">
-            <div className="col-md-3">
-              <strong>Current Balance:</strong> {formatCurrency(selectedAccountData.balance || 0)}
-            </div>
-            <div className="col-md-3">
-              <strong>Account Number:</strong> {selectedAccountData.account_number}
-            </div>
-            <div className="col-md-3">
-              <strong>Bank:</strong> {selectedAccountData.bank_name}
-            </div>
-            <div className="col-md-3">
-              <strong>Last Refreshed:</strong> {selectedAccountData.last_refreshed ? 
-                new Date(selectedAccountData.last_refreshed).toLocaleString() : 'Never'}
-            </div>
-          </div>
-        )}
-        
-        {/* CSV Import and Refresh API buttons */}
-        {selectedAccount && (
-          <div className="row mt-3">
-            <div className="col-12">
-              <div className="d-flex gap-2">
-                <button 
-                  onClick={handleCsvImport}
-                  className="btn btn-success"
-                  disabled={importing}
-                >
-                  {importing ? '⏳ Importing...' : '📁 Import CSV'}
-                </button>
-                <button 
-                  onClick={handleRefreshTransactions}
-                  className="btn btn-info"
-                  disabled={refreshing}
-                >
-                  {refreshing ? '⏳ Refreshing...' : '🔄 Refresh API'}
-                </button>
-                <input
-                  type="file"
-                  ref={fileInputRef}
-                  onChange={handleFileSelect}
-                  accept=".csv"
-                  style={{ display: 'none' }}
-                />
+      <div className="mb-4">
+            <div className="d-flex justify-content-between align-items-center mb-3">
+              <h1>Bank Transactions</h1>
+              <div className="d-flex align-items-center gap-2">
+                <label className="mb-0 text-muted">Account:</label>
+                {accountsLoading ? (
+                  <div className="text-muted small">Loading accounts...</div>
+                ) : (
+                  <select 
+                    value={selectedAccount} 
+                    onChange={handleAccountChange}
+                    className="form-select"
+                    style={{ width: 'auto', minWidth: '200px' }}
+                  >
+                    <option value="">Select an account...</option>
+                    {businessAccounts.map(account => (
+                      <option key={account.id} value={account.id}>
+                        {account.company_name} ({account.account_number})
+                      </option>
+                    ))}
+                  </select>
+                )}
+                {selectedAccount && (
+                  <>
+                    <button 
+                      onClick={handleCsvImport}
+                      className="btn btn-success btn-sm"
+                      disabled={importing || !selectedAccount}
+                    >
+                      {importing ? '⏳ Importing...' : '📁 Import CSV'}
+                    </button>
+                    <button 
+                      onClick={handleRefreshTransactions}
+                      className="btn btn-info btn-sm"
+                      disabled={refreshing || !selectedAccount}
+                    >
+                      {refreshing ? '⏳ Refreshing...' : '🔄 Refresh API'}
+                    </button>
+                    <button 
+                      onClick={handlePageRefresh}
+                      className="btn btn-outline-secondary btn-sm"
+                      title="Refresh page while keeping current account selected"
+                    >
+                      🔄 Refresh Page
+                    </button>
+                  </>
+                )}
               </div>
             </div>
-          </div>
-        )}
+        
       </div>
 
-      {/* Filters Button */}
+      {error && <div className="alert alert-danger mb-4">{error}</div>}
+
+
+
+      {/* Transactions Header with Filter Chips and Buttons */}
       {selectedAccount && (
-        <div className="card mb-4">
-          <div className="d-flex justify-content-between align-items-center">
-            <h3>Transactions</h3>
-            <div>
-              <button 
-                onClick={handlePageRefresh}
-                className="btn btn-outline-secondary me-2"
-                title="Refresh page while keeping current account selected"
-              >
-                🔄 Refresh Page
-              </button>
-              <button 
-                onClick={openFiltersModal}
-                className="btn btn-primary me-2"
-              >
-                🔍 Filters
-              </button>
-              <button 
-                onClick={clearFilters}
-                className="btn btn-secondary"
-              >
-                Clear All
-              </button>
-            </div>
+        <div className="d-flex justify-content-between align-items-center mb-3">
+          <div className="d-flex align-items-center gap-3">
+            <h4>
+              {selectedAccountData && `${selectedAccountData.account_name} (${selectedAccountData.account_number})`}
+            </h4>
+            {/* Filter Chips - Left aligned */}
+            {getActiveFilters().length > 0 && (
+              <div className="d-flex align-items-center gap-2">
+                <span className="text-muted small">Active filters:</span>
+                {getActiveFilters().map(filter => (
+                  <span key={filter.key} className="badge bg-primary d-flex align-items-center gap-1">
+                    {filter.label}
+                    <button
+                      type="button"
+                      className="btn-close btn-close-white"
+                      style={{ fontSize: '0.7em' }}
+                      onClick={() => removeFilter(filter.key)}
+                      aria-label={`Remove ${filter.label} filter`}
+                    ></button>
+                  </span>
+                ))}
+                <button 
+                  onClick={clearFilters}
+                  className="btn btn-sm btn-outline-secondary"
+                >
+                  Clear All
+                </button>
+              </div>
+            )}
+          </div>
+          {/* Filter Button - Right aligned */}
+          <div className="d-flex gap-2">
+            <button 
+              onClick={openFiltersModal}
+              className="btn btn-primary"
+            >
+              🔍 Filters
+            </button>
           </div>
         </div>
       )}
@@ -537,40 +584,58 @@ const Transactions = () => {
       {/* Transactions Table */}
       {selectedAccount && (
         <div className="card">
-          <div className="d-flex justify-content-between align-items-center mb-3">
-            <h4>
-              Transactions{selectedAccountData && ` - ${selectedAccountData.account_name} (${selectedAccountData.account_number})`}
-            </h4>
-          </div>
+          <div className="card-body">
           
-          {/* Transaction Count Display */}
+          {/* Account Details and Pagination Controls */}
           {!loading && !error && (
             <div className="d-flex justify-content-between align-items-center mb-2">
-              <div className="d-flex align-items-center gap-3">
-                <div className="text-muted small">
-                  Rows per page:
+              {/* Account Details - Left Side */}
+              {selectedAccountData && (
+                <div className="d-flex align-items-center gap-4">
+                  <div className="text-muted small">
+                    <strong>Latest Balance:</strong> {selectedAccountData.balance_source === 'no_transactions' ? 'Unavailable' : `${formatCurrency(selectedAccountData.balance || 0)} on ${selectedAccountData.balance_date ? new Date(selectedAccountData.balance_date).toLocaleDateString() : 'Unknown Date'}`}
+                  </div>
+                  <div className="text-muted small">
+                    <strong>Account Number:</strong> {selectedAccountData.account_number}
+                  </div>
+                  <div className="text-muted small">
+                    <strong>Bank:</strong> {selectedAccountData.bank_name}
+                  </div>
+                  <div className="text-muted small">
+                    <strong>Last Refreshed:</strong> {selectedAccountData.last_refreshed ? 
+                      new Date(selectedAccountData.last_refreshed).toLocaleString() : 'Never'}
+                  </div>
                 </div>
-                <select 
-                  value={rowsPerPage} 
-                  onChange={(e) => {
-                    setRowsPerPage(parseInt(e.target.value));
-                    setCurrentPage(1);
-                  }}
-                  className="form-select form-select-sm"
-                  style={{ width: '80px' }}
-                >
-                  <option value={25}>25</option>
-                  <option value={50}>50</option>
-                  <option value={100}>100</option>
-                  <option value={200}>200</option>
-                </select>
-              </div>
+              )}
+              
+              {/* Pagination Controls - Right Side */}
               <div className="d-flex align-items-center gap-3">
-                <div className="text-muted small">
-                  Showing {startIndex + 1}-{Math.min(endIndex, totalFilteredTransactions)} of {totalFilteredTransactions} transactions
+                <div className="d-flex align-items-center gap-2">
+                  <div className="text-muted small">
+                    Rows per page:
+                  </div>
+                  <select 
+                    value={rowsPerPage} 
+                    onChange={(e) => {
+                      setRowsPerPage(parseInt(e.target.value));
+                      setCurrentPage(1);
+                    }}
+                    className="form-select form-select-sm"
+                    style={{ width: '80px' }}
+                  >
+                    <option value={25}>25</option>
+                    <option value={50}>50</option>
+                    <option value={100}>100</option>
+                    <option value={200}>200</option>
+                  </select>
                 </div>
-                <div className="text-muted small">
-                  Page {currentPage} of {totalPages}
+                <div className="d-flex align-items-center gap-3">
+                  <div className="text-muted small">
+                    Showing {startIndex + 1}-{Math.min(endIndex, totalFilteredTransactions)} of {totalFilteredTransactions} transactions
+                  </div>
+                  <div className="text-muted small">
+                    Page {currentPage} of {totalPages}
+                  </div>
                 </div>
               </div>
             </div>
@@ -581,13 +646,13 @@ const Transactions = () => {
           
           {!loading && !error && (
             <div className="table-responsive">
-              <table className="table table-striped">
+              <table className="table table-striped" style={{ tableLayout: 'fixed', width: '100%' }}>
                 <thead>
                   <tr>
                     <th 
                       className="sortable-header"
                       onClick={() => handleSort('transaction_date')}
-                      style={{ cursor: 'pointer', userSelect: 'none' }}
+                      style={{ cursor: 'pointer', userSelect: 'none', width: '8%' }}
                       title="Click to sort by date"
                     >
                       Date <span className="sort-icon">{getSortIcon('transaction_date')}</span>
@@ -595,7 +660,7 @@ const Transactions = () => {
                     <th 
                       className="sortable-header"
                       onClick={() => handleSort('description')}
-                      style={{ cursor: 'pointer', userSelect: 'none' }}
+                      style={{ cursor: 'pointer', userSelect: 'none', width: '35%' }}
                       title="Click to sort by description"
                     >
                       Description <span className="sort-icon">{getSortIcon('description')}</span>
@@ -603,7 +668,7 @@ const Transactions = () => {
                     <th 
                       className="sortable-header"
                       onClick={() => handleSort('payer')}
-                      style={{ cursor: 'pointer', userSelect: 'none' }}
+                      style={{ cursor: 'pointer', userSelect: 'none', width: '8%' }}
                       title="Click to sort by payer"
                     >
                       Payer <span className="sort-icon">{getSortIcon('payer')}</span>
@@ -611,15 +676,16 @@ const Transactions = () => {
                     <th 
                       className="sortable-header"
                       onClick={() => handleSort('amount')}
-                      style={{ cursor: 'pointer', userSelect: 'none' }}
+                      style={{ cursor: 'pointer', userSelect: 'none', width: '8%' }}
                       title="Click to sort by amount"
                     >
                       Amount <span className="sort-icon">{getSortIcon('amount')}</span>
                     </th>
+                    <th style={{ width: '8%' }}>Debit/Credit</th>
                     <th 
                       className="sortable-header"
                       onClick={() => handleSort('balance')}
-                      style={{ cursor: 'pointer', userSelect: 'none' }}
+                      style={{ cursor: 'pointer', userSelect: 'none', width: '8%' }}
                       title="Click to sort by balance"
                     >
                       Balance <span className="sort-icon">{getSortIcon('balance')}</span>
@@ -627,7 +693,7 @@ const Transactions = () => {
                     <th 
                       className="sortable-header"
                       onClick={() => handleSort('transaction_type')}
-                      style={{ cursor: 'pointer', userSelect: 'none' }}
+                      style={{ cursor: 'pointer', userSelect: 'none', width: '8%' }}
                       title="Click to sort by transaction type"
                     >
                       Type <span className="sort-icon">{getSortIcon('transaction_type')}</span>
@@ -635,19 +701,19 @@ const Transactions = () => {
                     <th 
                       className="sortable-header"
                       onClick={() => handleSort('reference')}
-                      style={{ cursor: 'pointer', userSelect: 'none' }}
+                      style={{ cursor: 'pointer', userSelect: 'none', width: '8%' }}
                       title="Click to sort by reference"
                     >
                       Reference <span className="sort-icon">{getSortIcon('reference')}</span>
                     </th>
-                    <th>Warnings</th>
-                    <th>Actions</th>
+                    <th style={{ width: '8%' }}>Warnings</th>
+                    <th style={{ width: '8%' }}>Actions</th>
                   </tr>
                 </thead>
                 <tbody>
                   {paginatedTransactions.length === 0 ? (
                     <tr>
-                      <td colSpan="9" className="text-center">
+                      <td colSpan="10" className="text-center">
                         {(Array.isArray(transactions) ? transactions.length : 0) === 0 ? 'No transactions found' : 'No transactions match the current filters'}
                       </td>
                     </tr>
@@ -655,10 +721,15 @@ const Transactions = () => {
                     paginatedTransactions.map(transaction => (
                       <tr key={transaction.id}>
                         <td>{formatDate(transaction.transaction_date)}</td>
-                        <td>{transaction.description}</td>
+                        <td style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }} title={transaction.description}>{transaction.description}</td>
                         <td>{transaction.payer || '-'}</td>
                         <td className={transaction.amount >= 0 ? 'text-success' : 'text-danger'}>
                           {formatCurrency(transaction.amount)}
+                        </td>
+                        <td>
+                          <span className={`badge ${transaction.amount >= 0 ? 'bg-success' : 'bg-danger'}`}>
+                            {transaction.amount >= 0 ? 'Credit' : 'Debit'}
+                          </span>
                         </td>
                         <td>{transaction.balance ? formatCurrency(transaction.balance) : '-'}</td>
                         <td>{transaction.transaction_type || '-'}</td>
@@ -701,6 +772,7 @@ const Transactions = () => {
               </table>
             </div>
           )}
+          </div>
         </div>
       )}
 
@@ -819,6 +891,25 @@ const Transactions = () => {
                   </div>
                 </div>
                 <div className="col-md-6">
+                  <div className="form-group">
+                    <label>Year:</label>
+                    <select
+                      name="year"
+                      value={filters.year}
+                      onChange={handleFilterChange}
+                      className="form-control"
+                    >
+                      <option value="">All Years</option>
+                      {getYearOptions().map(year => (
+                        <option key={year} value={year.toString()}>{year}</option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+              </div>
+
+              <div className="row">
+                <div className="col-12">
                   <div className="form-group">
                     <label>Active Filters:</label>
                     <div className="form-control" style={{ minHeight: '38px', padding: '6px 12px' }}>
@@ -1066,6 +1157,15 @@ const Transactions = () => {
           </div>
         </div>
       )}
+      
+      {/* Hidden file input for CSV import */}
+      <input
+        type="file"
+        ref={fileInputRef}
+        onChange={handleFileSelect}
+        accept=".csv"
+        style={{ display: 'none' }}
+      />
     </div>
   );
 };

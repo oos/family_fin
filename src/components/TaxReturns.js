@@ -8,7 +8,6 @@ const TaxReturns = () => {
   const [uploading, setUploading] = useState(false);
   const [selectedFile, setSelectedFile] = useState(null);
   const [showUploadModal, setShowUploadModal] = useState(false);
-  const [selectedYear, setSelectedYear] = useState(new Date().getFullYear().toString());
   const [filteredReturns, setFilteredReturns] = useState([]);
   const [showDataModal, setShowDataModal] = useState(false);
   const [selectedReturnData, setSelectedReturnData] = useState(null);
@@ -22,12 +21,9 @@ const TaxReturns = () => {
   }, []);
 
   useEffect(() => {
-    // Filter returns by selected year
-    const filtered = taxReturns.filter(returnItem => 
-      returnItem.year === selectedYear
-    );
-    setFilteredReturns(filtered);
-  }, [taxReturns, selectedYear]);
+    // Show all returns (no filtering by year)
+    setFilteredReturns(taxReturns);
+  }, [taxReturns]);
 
   const fetchTaxReturns = async () => {
     setLoading(true);
@@ -82,7 +78,7 @@ const TaxReturns = () => {
     try {
       const formData = new FormData();
       formData.append('file', selectedFile);
-      formData.append('year', selectedYear);
+      formData.append('year', new Date().getFullYear().toString());
 
       const token = localStorage.getItem('token');
       const response = await axios.post('/tax-returns/upload', formData, {
@@ -179,14 +175,6 @@ const TaxReturns = () => {
     return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
   };
 
-  const getYearOptions = () => {
-    const currentYear = new Date().getFullYear();
-    const years = [];
-    for (let year = currentYear; year >= 2020; year--) {
-      years.push(year.toString());
-    }
-    return years;
-  };
 
   return (
     <div className="container">
@@ -220,44 +208,14 @@ const TaxReturns = () => {
         }
       `}</style>
 
-      <h1>Tax Returns</h1>
-      
-      {/* Year Filter */}
-      <div className="card mb-4">
-        <div className="card-body">
-          <div className="row align-items-center">
-            <div className="col-md-6">
-              <h3>Tax Returns for {selectedYear}</h3>
-            </div>
-            <div className="col-md-6 text-end">
-              <select
-                value={selectedYear}
-                onChange={(e) => setSelectedYear(e.target.value)}
-                className="form-select d-inline-block"
-                style={{ width: 'auto' }}
-              >
-                {getYearOptions().map(year => (
-                  <option key={year} value={year}>{year}</option>
-                ))}
-              </select>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Upload Button */}
-      <div className="card mb-4">
-        <div className="card-body text-center">
-          <button
-            onClick={() => setShowUploadModal(true)}
-            className="btn btn-primary btn-lg"
-          >
-            📁 Upload Tax Return (CSV/Excel)
-          </button>
-          <p className="text-muted mt-2">
-            Upload your accountant's tax return file (CSV or Excel) to categorize transactions
-          </p>
-        </div>
+      <div className="d-flex justify-content-between align-items-center mb-4">
+        <h1>Tax Returns</h1>
+        <button
+          onClick={() => setShowUploadModal(true)}
+          className="btn btn-primary"
+        >
+          📁 Upload Tax Return
+        </button>
       </div>
 
       {/* Error Display */}
@@ -293,7 +251,8 @@ const TaxReturns = () => {
                 <div className="card tax-return-card h-100">
                   <div className="card-body">
                     <h5 className="card-title">
-                      Tax Return {taxReturn.year}
+                      <span className="badge bg-primary me-2">{taxReturn.year}</span>
+                      Tax Return
                     </h5>
                     <p className="card-text">
                       <strong>File:</strong> {taxReturn.filename}<br/>
@@ -365,15 +324,13 @@ const TaxReturns = () => {
             <div className="modal-body">
               <div className="mb-3">
                 <label className="form-label">Tax Year:</label>
-                <select
-                  value={selectedYear}
-                  onChange={(e) => setSelectedYear(e.target.value)}
-                  className="form-select"
-                >
-                  {getYearOptions().map(year => (
-                    <option key={year} value={year}>{year}</option>
-                  ))}
-                </select>
+                <input
+                  type="text"
+                  value={new Date().getFullYear()}
+                  className="form-control"
+                  disabled
+                />
+                <small className="form-text text-muted">Files will be uploaded for the current year ({new Date().getFullYear()})</small>
               </div>
               
               <div className="mb-3">
