@@ -58,7 +58,7 @@ const GLTransactions = () => {
         ...filters
       });
 
-      const response = await axios.get(`/api/gl-transactions?${params}`, {
+      const response = await axios.get(`/gl-transactions?${params}`, {
         headers: { Authorization: `Bearer ${token}` }
       });
 
@@ -84,7 +84,7 @@ const GLTransactions = () => {
       if (!token) return;
 
       // Fetch unique values for filter dropdowns
-      const response = await axios.get('/api/gl-transactions?per_page=1', {
+      const response = await axios.get('/gl-transactions?per_page=1', {
         headers: { Authorization: `Bearer ${token}` }
       });
 
@@ -154,6 +154,15 @@ const GLTransactions = () => {
       return { amount: transaction.credit, type: 'credit' };
     }
     return { amount: 0, type: 'none' };
+  };
+
+  const generateUID = (transaction, index) => {
+    // Create a unique ID based on transaction ID, tax return year, and index
+    const year = transaction.tax_return_year || '0000';
+    const transactionId = transaction.id || 0;
+    const paddedId = String(transactionId).padStart(6, '0');
+    const paddedIndex = String(index + 1).padStart(3, '0');
+    return `${year}-${paddedId}-${paddedIndex}`;
   };
 
   const handleTransactionClick = (transaction) => {
@@ -333,6 +342,7 @@ const GLTransactions = () => {
                 <table className="table table-hover">
                   <thead className="table-dark">
                     <tr>
+                      <th>ID</th>
                       <th 
                         className="cursor-pointer"
                         onClick={() => handleSort('date')}
@@ -361,7 +371,7 @@ const GLTransactions = () => {
                   <tbody>
                     {loading ? (
                       <tr>
-                        <td colSpan="8" className="text-center">
+                        <td colSpan="9" className="text-center">
                           <div className="spinner-border" role="status">
                             <span className="visually-hidden">Loading...</span>
                           </div>
@@ -369,19 +379,23 @@ const GLTransactions = () => {
                       </tr>
                     ) : transactions.length === 0 ? (
                       <tr>
-                        <td colSpan="8" className="text-center text-muted">
+                        <td colSpan="9" className="text-center text-muted">
                           No transactions found
                         </td>
                       </tr>
                     ) : (
                       transactions.map((transaction, index) => {
                         const { amount, type } = getTransactionAmount(transaction);
+                        const uid = generateUID(transaction, index);
                         return (
                           <tr 
                             key={`${transaction.id}-${index}`}
                             className="cursor-pointer"
                             onClick={() => handleTransactionClick(transaction)}
                           >
+                            <td>
+                              <code className="text-muted small">{uid}</code>
+                            </td>
                             <td>{formatDate(transaction.date)}</td>
                             <td>
                               <div className="fw-bold">{transaction.name}</div>
@@ -464,6 +478,10 @@ const GLTransactions = () => {
                     <h6>Transaction Information</h6>
                     <table className="table table-sm">
                       <tbody>
+                        <tr>
+                          <td><strong>ID:</strong></td>
+                          <td><code>{generateUID(selectedTransaction, 0)}</code></td>
+                        </tr>
                         <tr>
                           <td><strong>Date:</strong></td>
                           <td>{formatDate(selectedTransaction.date)}</td>
