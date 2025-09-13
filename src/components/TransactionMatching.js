@@ -17,9 +17,11 @@ const TransactionMatching = () => {
   const [skippedMatches, setSkippedMatches] = useState(new Set());
   const [expandedRows, setExpandedRows] = useState(new Set());
   const [visibleRows, setVisibleRows] = useState(100); // Show only first 100 rows initially
+  const [availableCategories, setAvailableCategories] = useState([]);
 
   useEffect(() => {
     fetchTaxReturns();
+    fetchAvailableCategories();
   }, []);
 
   const fetchTaxReturns = async () => {
@@ -36,6 +38,19 @@ const TransactionMatching = () => {
       setError(`Failed to load tax returns: ${err.response?.data?.message || err.message}`);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchAvailableCategories = async () => {
+    try {
+      const token = localStorage.getItem('token');
+      const response = await axios.get('/transaction-categories', {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      setAvailableCategories(response.data);
+    } catch (err) {
+      console.error('Error fetching categories:', err);
+      // Don't set error for categories as it's not critical
     }
   };
 
@@ -399,20 +414,41 @@ const TransactionMatching = () => {
                       <div className="mt-3">
                         <label htmlFor={`autoCategory${index}`} className="form-label">
                           <strong>Assign Accountant Category:</strong>
+                          {match.accountant_category && (
+                            <span className="text-success ms-2">
+                              💡 Suggested: {match.accountant_category}
+                            </span>
+                          )}
                         </label>
                         <div className="input-group">
-                          <input
-                            type="text"
-                            className="form-control"
+                          <select
+                            className="form-select"
                             id={`autoCategory${index}`}
-                            placeholder="e.g., Business Expense, Rental Income, Office Supplies"
-                          />
+                            defaultValue={match.accountant_category || ''}
+                          >
+                            <option value="">Select a category...</option>
+                            {availableCategories
+                              .sort((a, b) => a.category_name.localeCompare(b.category_name))
+                              .map((category) => (
+                                <option 
+                                  key={category.id} 
+                                  value={category.category_name}
+                                  style={{
+                                    fontWeight: category.category_name === match.accountant_category ? 'bold' : 'normal',
+                                    color: category.category_name === match.accountant_category ? '#198754' : 'inherit'
+                                  }}
+                                >
+                                  {category.category_name} ({category.category_type})
+                                  {category.usage_count > 0 && ` - Used ${category.usage_count} times`}
+                                </option>
+                              ))}
+                          </select>
                           <button
                             className="btn btn-success"
                             onClick={() => {
                               const category = document.getElementById(`autoCategory${index}`).value;
                               if (!category.trim()) {
-                                alert('Please enter a category');
+                                alert('Please select a category');
                                 return;
                               }
                               handleUpdateCategory(match.match_id, category.trim());

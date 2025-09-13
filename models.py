@@ -940,3 +940,110 @@ class ModelTrainingHistory(db.Model):
             'status': self.status,
             'error_message': self.error_message
         }
+
+class TransactionCategory(db.Model):
+    """Comprehensive list of transaction categories extracted from accountant's documents"""
+    __tablename__ = 'transaction_category'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.String(120), nullable=False)  # User email
+    
+    # Category information
+    category_name = db.Column(db.String(100), nullable=False)
+    category_type = db.Column(db.String(50), nullable=False)  # 'income', 'expense', 'asset', 'liability'
+    
+    # Matching patterns (comma-separated keywords)
+    description_keywords = db.Column(db.Text, nullable=True)  # Keywords found in descriptions
+    payer_keywords = db.Column(db.Text, nullable=True)  # Keywords found in payer names
+    reference_keywords = db.Column(db.Text, nullable=True)  # Keywords found in references
+    
+    # Statistical data
+    usage_count = db.Column(db.Integer, default=0)  # How many times this category was used
+    total_amount = db.Column(db.Float, default=0.0)  # Total amount for this category
+    average_amount = db.Column(db.Float, default=0.0)  # Average amount for this category
+    
+    # Source information
+    source_years = db.Column(db.String(100), nullable=True)  # Comma-separated years where this category was found
+    created_from_tax_return_id = db.Column(db.Integer, nullable=True)  # First tax return where this was found
+    
+    # Timestamps
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    last_used_at = db.Column(db.DateTime, nullable=True)
+    
+    # Relationships - removed due to foreign key constraint issues
+    # user = db.relationship('User', backref='transaction_categories')
+    
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'user_id': self.user_id,
+            'category_name': self.category_name,
+            'category_type': self.category_type,
+            'description_keywords': self.description_keywords,
+            'payer_keywords': self.payer_keywords,
+            'reference_keywords': self.reference_keywords,
+            'usage_count': self.usage_count,
+            'total_amount': self.total_amount,
+            'average_amount': self.average_amount,
+            'source_years': self.source_years,
+            'created_from_tax_return_id': self.created_from_tax_return_id,
+            'created_at': self.created_at.isoformat() if self.created_at else None,
+            'updated_at': self.updated_at.isoformat() if self.updated_at else None,
+            'last_used_at': self.last_used_at.isoformat() if self.last_used_at else None
+        }
+    
+    def get_all_keywords(self):
+        """Get all keywords as a list"""
+        keywords = []
+        if self.description_keywords:
+            keywords.extend([kw.strip() for kw in self.description_keywords.split(',') if kw.strip()])
+        if self.payer_keywords:
+            keywords.extend([kw.strip() for kw in self.payer_keywords.split(',') if kw.strip()])
+        if self.reference_keywords:
+            keywords.extend([kw.strip() for kw in self.reference_keywords.split(',') if kw.strip()])
+        return list(set(keywords))  # Remove duplicates
+    
+    def calculate_similarity_score(self, bank_transaction):
+        """Calculate similarity score between this category and a bank transaction"""
+        score = 0.0
+        matches = 0
+        
+        # Check description keywords
+        if self.description_keywords and bank_transaction.get('description'):
+            desc_lower = bank_transaction['description'].lower()
+            for keyword in self.description_keywords.split(','):
+                keyword = keyword.strip().lower()
+                if keyword in desc_lower:
+                    score += 1.0
+                    matches += 1
+        
+        # Check payer keywords
+        if self.payer_keywords and bank_transaction.get('payer'):
+            payer_lower = bank_transaction['payer'].lower()
+            for keyword in self.payer_keywords.split(','):
+                keyword = keyword.strip().lower()
+                if keyword in payer_lower:
+                    score += 1.0
+                    matches += 1
+        
+        # Check reference keywords
+        if self.reference_keywords and bank_transaction.get('reference'):
+            ref_lower = bank_transaction['reference'].lower()
+            for keyword in self.reference_keywords.split(','):
+                keyword = keyword.strip().lower()
+                if keyword in ref_lower:
+                    score += 0.5  # Lower weight for reference matches
+                    matches += 1
+        
+        # Normalize score by number of available fields
+        available_fields = sum([
+            1 if bank_transaction.get('description') else 0,
+            1 if bank_transaction.get('payer') else 0,
+            1 if bank_transaction.get('reference') else 0
+        ])
+        
+        if available_fields > 0:
+            score = score / available_fields
+        
+        return score, matches

@@ -62,7 +62,7 @@ app.config['JWT_SECRET_KEY'] = os.getenv('JWT_SECRET_KEY', 'jwt-secret-string')
 app.config['JWT_ACCESS_TOKEN_EXPIRES'] = timedelta(hours=24)
 
 # Import models and db
-from models import db, User, Person, Property, Income, Loan, Family, BusinessAccount, Pension, PensionAccount, LoanERC, LoanPayment, BankTransaction, AirbnbBooking, DashboardSettings, AccountBalance, TaxReturn, TaxReturnTransaction, TransactionMatch, TransactionLearningPattern, TransactionCategoryPrediction, ModelTrainingHistory
+from models import db, User, Person, Property, Income, Loan, Family, BusinessAccount, Pension, PensionAccount, LoanERC, LoanPayment, BankTransaction, AirbnbBooking, DashboardSettings, AccountBalance, TaxReturn, TaxReturnTransaction, TransactionMatch, TransactionLearningPattern, TransactionCategoryPrediction, ModelTrainingHistory, TransactionCategory
 
 # Initialize extensions
 db.init_app(app)
@@ -3875,14 +3875,21 @@ def get_potential_matches(tax_return_id):
         ]
         
         # Get all bank transactions for the user
-        # Note: BusinessAccount model may not have user_id field yet
+        # Note: BusinessAccount model may not have user_id field yet, or user_id might be null
         try:
             bank_transactions = BankTransaction.query.join(BusinessAccount).filter(
                 BusinessAccount.user_id == current_user_id
             ).all()
+            print(f"DEBUG: Found {len(bank_transactions)} bank transactions with user_id filter")
         except Exception as e:
             # Fallback: get all bank transactions if user_id field doesn't exist
             bank_transactions = BankTransaction.query.join(BusinessAccount).all()
+            print(f"DEBUG: Using fallback (exception) - found {len(bank_transactions)} bank transactions (no user_id filter)")
+        
+        # Additional fallback: if no transactions found with user_id filter, get all
+        if len(bank_transactions) == 0:
+            bank_transactions = BankTransaction.query.join(BusinessAccount).all()
+            print(f"DEBUG: No transactions with user_id filter, using all {len(bank_transactions)} bank transactions")
         
         # Get all already matched bank transaction IDs to avoid repeated queries
         matched_bank_transaction_ids = [
@@ -3940,12 +3947,15 @@ def get_potential_matches(tax_return_id):
         potential_matches = []
         auto_matched_count = 0
         
+        print(f"DEBUG: Processing {len(unmatched_tax_transactions)} tax transactions against {len(filtered_bank_transactions)} bank transactions")
+        
         for tax_transaction in unmatched_tax_transactions:
-            # Properly calculate tax amount: positive for debits, negative for credits
+            # Calculate tax amount to match bank transaction format
+            # Bank transactions are negative for money going out (debits), positive for money coming in (credits)
             if tax_transaction.debit > 0:
-                tax_amount = tax_transaction.debit  # Debit (expense) - positive
+                tax_amount = -tax_transaction.debit  # Debit (expense) - negative to match bank format
             elif tax_transaction.credit > 0:
-                tax_amount = -tax_transaction.credit  # Credit (income) - negative
+                tax_amount = tax_transaction.credit  # Credit (income) - positive to match bank format
             else:
                 tax_amount = 0
             
@@ -3958,6 +3968,7 @@ def get_potential_matches(tax_return_id):
             matches = []
             
             # SIMPLIFIED MATCHING: Only exact amount + date within 3 days
+            matches_found = 0
             for bank_transaction in filtered_bank_transactions:
                 # Check date is within 3 days
                 if bank_transaction.transaction_date:
@@ -3977,6 +3988,10 @@ def get_potential_matches(tax_return_id):
                         'description_similarity': 0.0,  # Not used in simplified matching
                         'reference_similarity': 0.0     # Not used in simplified matching
                     })
+                    matches_found += 1
+            
+            if matches_found > 0:
+                print(f"DEBUG: Tax transaction {tax_transaction.id} (€{tax_amount} on {tax_date}) found {matches_found} matches")
             
             # Sort by confidence and take top 3 (reduced from 5 to avoid overwhelming)
             matches.sort(key=lambda x: x['confidence'], reverse=True)
@@ -3987,6 +4002,27 @@ def get_potential_matches(tax_return_id):
             if matches and matches[0]['confidence'] >= 0.8:  # Simplified threshold for exact matches
                 best_match = matches[0]
                 try:
+                    # Get suggested category for this bank transaction
+                    suggested_category = None
+                    try:
+                        # Get categories and find best match for this bank transaction
+                        categories = TransactionCategory.query.filter_by(user_id=current_user_id).all()
+                        best_category = None
+                        best_score = 0.0
+                        
+                        for category in categories:
+                            score, matches = category.calculate_similarity_score(best_match['bank_transaction'])
+                            if score > best_score:
+                                best_score = score
+                                best_category = category
+                        
+                        if best_category and best_score > 0.3:  # Minimum threshold for category suggestion
+                            suggested_category = best_category.category_name
+                            print(f"DEBUG: Suggested category '{suggested_category}' (score: {best_score:.2f}) for bank transaction {best_match['bank_transaction']['id']}")
+                        
+                    except Exception as e:
+                        print(f"DEBUG: Error getting category suggestion: {e}")
+                    
                     # Auto-create match
                     match = TransactionMatch(
                         tax_return_transaction_id=tax_transaction.id,
@@ -3994,7 +4030,7 @@ def get_potential_matches(tax_return_id):
                         user_id=current_user_id,
                         confidence_score=best_match['confidence'],
                         match_method='auto_high_confidence',
-                        accountant_category=None  # Will be filled later
+                        accountant_category=suggested_category  # Auto-suggested category
                     )
                     db.session.add(match)
                     auto_matched = True
@@ -4003,9 +4039,35 @@ def get_potential_matches(tax_return_id):
                     print(f"Error auto-matching: {e}")
             
             if not auto_matched:
+                # Add category suggestions to potential matches
+                category_suggestions = []
+                try:
+                    if matches:
+                        # Use the first (best) potential match for category suggestions
+                        best_bank_txn = matches[0]['bank_transaction']
+                        categories = TransactionCategory.query.filter_by(user_id=current_user_id).all()
+                        
+                        for category in categories:
+                            score, matches_count = category.calculate_similarity_score(best_bank_txn)
+                            if score > 0.1:  # Lower threshold for suggestions
+                                category_suggestions.append({
+                                    'category_name': category.category_name,
+                                    'category_type': category.category_type,
+                                    'similarity_score': score,
+                                    'keyword_matches': matches_count
+                                })
+                        
+                        # Sort by similarity score
+                        category_suggestions.sort(key=lambda x: x['similarity_score'], reverse=True)
+                        category_suggestions = category_suggestions[:3]  # Top 3 suggestions
+                        
+                except Exception as e:
+                    print(f"DEBUG: Error getting category suggestions for potential matches: {e}")
+                
                 potential_matches.append({
                     'tax_transaction': tax_transaction.to_dict(),
-                    'potential_matches': matches[:5]
+                    'potential_matches': matches[:5],
+                    'category_suggestions': category_suggestions
                 })
         
         # Commit auto-matches
@@ -4017,6 +4079,230 @@ def get_potential_matches(tax_return_id):
             'total_unmatched': len(unmatched_tax_transactions),
             'auto_matched_count': auto_matched_count,
             'message': f'Automatically matched {auto_matched_count} high-confidence transactions' if auto_matched_count > 0 else None
+        })
+        
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/transaction-categories/extract', methods=['POST'])
+@jwt_required()
+def extract_transaction_categories():
+    """Extract all categories from tax return transactions and populate the category table"""
+    try:
+        current_user_id = get_jwt_identity()
+        
+        # Get all tax return transactions for the user
+        tax_transactions = TaxReturnTransaction.query.join(TaxReturn).filter(
+            TaxReturn.user_id == current_user_id
+        ).all()
+        
+        if not tax_transactions:
+            return jsonify({'message': 'No tax transactions found', 'categories_extracted': 0}), 200
+        
+        # Dictionary to store unique categories
+        categories_dict = {}
+        
+        for tx in tax_transactions:
+            # Extract category from transaction name (assuming it follows a pattern)
+            category_name = extract_category_from_transaction(tx)
+            category_type = determine_category_type(tx)
+            
+            if not category_name:
+                continue
+            
+            # Create unique key for this category
+            key = f"{category_name}_{category_type}"
+            
+            if key not in categories_dict:
+                categories_dict[key] = {
+                    'category_name': category_name,
+                    'category_type': category_type,
+                    'description_keywords': set(),
+                    'payer_keywords': set(),
+                    'reference_keywords': set(),
+                    'usage_count': 0,
+                    'total_amount': 0.0,
+                    'amounts': [],
+                    'years': set(),
+                    'tax_return_ids': set()
+                }
+            
+            category = categories_dict[key]
+            category['usage_count'] += 1
+            category['total_amount'] += abs(tx.debit or tx.credit or 0)
+            category['amounts'].append(tx.debit or tx.credit or 0)
+            category['years'].add(tx.tax_return.year if tx.tax_return else 'Unknown')
+            category['tax_return_ids'].add(tx.tax_return_id)
+            
+            # Extract keywords from transaction fields
+            if tx.name:
+                category['description_keywords'].update(extract_keywords(tx.name))
+            if tx.reference:
+                category['reference_keywords'].update(extract_keywords(tx.reference))
+            if tx.source:
+                category['payer_keywords'].update(extract_keywords(tx.source))
+        
+        # Save categories to database
+        categories_created = 0
+        for key, category_data in categories_dict.items():
+            # Check if category already exists
+            existing = TransactionCategory.query.filter_by(
+                user_id=current_user_id,
+                category_name=category_data['category_name'],
+                category_type=category_data['category_type']
+            ).first()
+            
+            if not existing:
+                # Calculate average amount
+                avg_amount = sum(category_data['amounts']) / len(category_data['amounts']) if category_data['amounts'] else 0.0
+                
+                new_category = TransactionCategory(
+                    user_id=current_user_id,
+                    category_name=category_data['category_name'],
+                    category_type=category_data['category_type'],
+                    description_keywords=','.join(category_data['description_keywords']) if category_data['description_keywords'] else None,
+                    payer_keywords=','.join(category_data['payer_keywords']) if category_data['payer_keywords'] else None,
+                    reference_keywords=','.join(category_data['reference_keywords']) if category_data['reference_keywords'] else None,
+                    usage_count=category_data['usage_count'],
+                    total_amount=category_data['total_amount'],
+                    average_amount=avg_amount,
+                    source_years=','.join(sorted(category_data['years'])),
+                    created_from_tax_return_id=min(category_data['tax_return_ids'])
+                )
+                
+                db.session.add(new_category)
+                categories_created += 1
+        
+        db.session.commit()
+        
+        return jsonify({
+            'message': f'Successfully extracted {categories_created} categories from {len(tax_transactions)} transactions',
+            'categories_extracted': categories_created,
+            'total_transactions_processed': len(tax_transactions),
+            'total_unique_categories': len(categories_dict)
+        })
+        
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': str(e)}), 500
+
+def extract_category_from_transaction(tx):
+    """Extract category name from transaction"""
+    if not tx.name:
+        return None
+    
+    # Simple category extraction - look for common patterns
+    name = tx.name.lower().strip()
+    
+    # Common accounting categories
+    category_mappings = {
+        'hosting': ['hosting', 'web hosting', 'server'],
+        'consultancy': ['consultancy', 'consulting', 'consultant'],
+        'rent': ['rent', 'rental', 'lease'],
+        'insurance': ['insurance', 'premium'],
+        'utilities': ['electricity', 'gas', 'water', 'utility'],
+        'office supplies': ['office', 'supplies', 'stationery'],
+        'travel': ['travel', 'mileage', 'transport'],
+        'professional fees': ['legal', 'accountant', 'audit', 'professional'],
+        'marketing': ['marketing', 'advertising', 'promotion'],
+        'software': ['software', 'license', 'subscription'],
+        'bank charges': ['bank', 'charge', 'fee'],
+        'tax': ['tax', 'vat', 'revenue'],
+        'salary': ['salary', 'wages', 'payroll'],
+        'pension': ['pension', 'retirement'],
+        'phone': ['phone', 'telephone', 'mobile'],
+        'internet': ['internet', 'broadband', 'wifi']
+    }
+    
+    for category, keywords in category_mappings.items():
+        if any(keyword in name for keyword in keywords):
+            return category.title()
+    
+    # If no specific category found, try to extract from the transaction name
+    # Look for patterns like "To [Person/Company]" or common business terms
+    if 'to ' in name:
+        return 'Payments'
+    elif 'from ' in name:
+        return 'Receipts'
+    elif 'posting' in name or 'summary' in name:
+        return 'Accounting Adjustments'
+    else:
+        return 'Other'
+
+def determine_category_type(tx):
+    """Determine if this is income, expense, asset, or liability"""
+    if tx.credit > 0:
+        return 'income'
+    elif tx.debit > 0:
+        return 'expense'
+    else:
+        return 'other'
+
+def extract_keywords(text):
+    """Extract meaningful keywords from text"""
+    if not text:
+        return set()
+    
+    # Remove common words and extract meaningful terms
+    common_words = {'to', 'from', 'the', 'a', 'an', 'and', 'or', 'but', 'in', 'on', 'at', 'by', 'for', 'with', 'of', 'payment', 'invoice', 'receipt'}
+    
+    words = text.lower().split()
+    keywords = [word.strip('.,!?()[]{}') for word in words if len(word) > 2 and word not in common_words]
+    
+    return set(keywords)
+
+@app.route('/api/transaction-categories', methods=['GET'])
+@jwt_required()
+def get_transaction_categories():
+    """Get all transaction categories for the user"""
+    try:
+        current_user_id = get_jwt_identity()
+        
+        categories = TransactionCategory.query.filter_by(user_id=current_user_id).order_by(
+            TransactionCategory.usage_count.desc(),
+            TransactionCategory.category_name
+        ).all()
+        
+        return jsonify([category.to_dict() for category in categories])
+        
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/transaction-categories/suggest', methods=['POST'])
+@jwt_required()
+def suggest_transaction_category():
+    """Suggest category for a bank transaction based on existing categories"""
+    try:
+        current_user_id = get_jwt_identity()
+        data = request.get_json()
+        
+        bank_transaction = data.get('bank_transaction')
+        if not bank_transaction:
+            return jsonify({'error': 'Bank transaction data required'}), 400
+        
+        # Get all categories for the user
+        categories = TransactionCategory.query.filter_by(user_id=current_user_id).all()
+        
+        if not categories:
+            return jsonify({'suggestions': [], 'message': 'No categories available. Please extract categories first.'})
+        
+        # Calculate similarity scores for each category
+        suggestions = []
+        for category in categories:
+            score, matches = category.calculate_similarity_score(bank_transaction)
+            if score > 0:
+                suggestions.append({
+                    'category': category.to_dict(),
+                    'similarity_score': score,
+                    'keyword_matches': matches
+                })
+        
+        # Sort by similarity score
+        suggestions.sort(key=lambda x: x['similarity_score'], reverse=True)
+        
+        return jsonify({
+            'suggestions': suggestions[:5],  # Top 5 suggestions
+            'total_categories_checked': len(categories)
         })
         
     except Exception as e:
@@ -4042,8 +4328,8 @@ def get_auto_matches(tax_return_id):
         auto_matches = TransactionMatch.query.join(TaxReturnTransaction).filter(
             TaxReturnTransaction.tax_return_id == tax_return_id,
             TransactionMatch.user_id == current_user_id,
-            TransactionMatch.match_method == 'auto_high_confidence',
-            TransactionMatch.accountant_category.is_(None)  # No category assigned yet
+            TransactionMatch.match_method == 'auto_high_confidence'
+            # Removed filter to see all auto-matches, including those with categories
         ).all()
         
         matches_data = []
@@ -4056,7 +4342,8 @@ def get_auto_matches(tax_return_id):
                 'tax_transaction': tax_transaction.to_dict(),
                 'bank_transaction': bank_transaction.to_dict(),
                 'confidence_score': match.confidence_score,
-                'match_method': match.match_method
+                'match_method': match.match_method,
+                'accountant_category': match.accountant_category
             })
         
         return jsonify({
@@ -4065,6 +4352,78 @@ def get_auto_matches(tax_return_id):
         })
         
     except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/tax-returns/<int:tax_return_id>/apply-category-suggestions', methods=['POST'])
+@jwt_required()
+def apply_category_suggestions_to_matches(tax_return_id):
+    """Apply category suggestions to existing auto-matches that don't have categories"""
+    try:
+        current_user_id = get_jwt_identity()
+        
+        # Verify tax return belongs to user
+        tax_return = TaxReturn.query.filter_by(
+            id=tax_return_id, 
+            user_id=current_user_id
+        ).first()
+        
+        if not tax_return:
+            return jsonify({'error': 'Tax return not found'}), 404
+        
+        # Get auto-matched transactions without categories
+        auto_matches = TransactionMatch.query.join(TaxReturnTransaction).filter(
+            TaxReturnTransaction.tax_return_id == tax_return_id,
+            TransactionMatch.user_id == current_user_id,
+            TransactionMatch.match_method == 'auto_high_confidence',
+            TransactionMatch.accountant_category.is_(None)
+        ).all()
+        
+        updated_count = 0
+        categories_applied = {}
+        
+        for match in auto_matches:
+            try:
+                bank_transaction = match.bank_transaction
+                
+                # Get categories and find best match for this bank transaction
+                categories = TransactionCategory.query.filter_by(user_id=current_user_id).all()
+                best_category = None
+                best_score = 0.0
+                
+                for category in categories:
+                    score, matches_count = category.calculate_similarity_score(bank_transaction.to_dict())
+                    if score > best_score:
+                        best_score = score
+                        best_category = category
+                
+                if best_category and best_score > 0.3:  # Minimum threshold for category suggestion
+                    match.accountant_category = best_category.category_name
+                    updated_count += 1
+                    
+                    # Track which categories were applied
+                    category_name = best_category.category_name
+                    if category_name not in categories_applied:
+                        categories_applied[category_name] = 0
+                    categories_applied[category_name] += 1
+                    
+                    print(f"DEBUG: Applied category '{category_name}' (score: {best_score:.2f}) to match {match.id}")
+                
+            except Exception as e:
+                print(f"DEBUG: Error applying category to match {match.id}: {e}")
+        
+        # Commit all updates
+        if updated_count > 0:
+            db.session.commit()
+        
+        return jsonify({
+            'message': f'Successfully applied categories to {updated_count} matches',
+            'updated_count': updated_count,
+            'total_matches_checked': len(auto_matches),
+            'categories_applied': categories_applied
+        })
+        
+    except Exception as e:
+        db.session.rollback()
         return jsonify({'error': str(e)}), 500
 
 @app.route('/api/transaction-matches', methods=['POST'])

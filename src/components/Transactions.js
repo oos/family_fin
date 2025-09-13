@@ -209,12 +209,64 @@ const Transactions = () => {
     return sortDirection === 'asc' ? '↑' : '↓';
   };
 
+  // Helper function to parse column-specific search terms
+  const parseSearchTerm = (searchTerm) => {
+    const columnMappings = {
+      'description': 'description',
+      'desc': 'description',
+      'payer': 'payer',
+      'reference': 'reference',
+      'ref': 'reference',
+      'amount': 'amount',
+      'type': 'transaction_type',
+      'date': 'transaction_date',
+      'id': 'id'
+    };
+
+    const lowerSearch = searchTerm.toLowerCase();
+    
+    // Check if it's a column-specific search (format: "column: search_term")
+    const columnMatch = lowerSearch.match(/^(\w+):\s*(.+)$/);
+    if (columnMatch) {
+      const [, columnName, searchValue] = columnMatch;
+      const mappedColumn = columnMappings[columnName] || columnName;
+      return { column: mappedColumn, value: searchValue.trim() };
+    }
+    
+    // Default to searching all columns
+    return { column: 'all', value: searchTerm };
+  };
+
   const filteredTransactions = (Array.isArray(transactions) ? transactions : [])
     .filter(transaction => {
-      const matchesSearch = !filters.search || 
-        transaction.description.toLowerCase().includes(filters.search.toLowerCase()) ||
-        (transaction.payer && transaction.payer.toLowerCase().includes(filters.search.toLowerCase())) ||
-        (transaction.reference && transaction.reference.toLowerCase().includes(filters.search.toLowerCase()));
+      let matchesSearch = true;
+      
+      if (filters.search) {
+        const { column, value } = parseSearchTerm(filters.search);
+        
+        if (column === 'all') {
+          // Search in all columns
+          matchesSearch = 
+            transaction.description.toLowerCase().includes(value.toLowerCase()) ||
+            (transaction.payer && transaction.payer.toLowerCase().includes(value.toLowerCase())) ||
+            (transaction.reference && transaction.reference.toLowerCase().includes(value.toLowerCase()));
+        } else if (column === 'amount') {
+          // Special handling for amount search
+          const searchAmount = parseFloat(value.replace(/[€,\s]/g, ''));
+          if (!isNaN(searchAmount)) {
+            matchesSearch = Math.abs(transaction.amount - searchAmount) < 0.01;
+          } else {
+            matchesSearch = false;
+          }
+        } else if (column === 'id') {
+          // Search by transaction ID
+          matchesSearch = transaction.id.toString().includes(value);
+        } else {
+          // Search in specific column
+          const fieldValue = transaction[column];
+          matchesSearch = fieldValue && fieldValue.toString().toLowerCase().includes(value.toLowerCase());
+        }
+      }
 
       const matchesDateFrom = !filters.dateFrom || 
         new Date(transaction.transaction_date) >= new Date(filters.dateFrom);
@@ -277,8 +329,8 @@ const Transactions = () => {
     return new Intl.NumberFormat('en-IE', {
       style: 'currency',
       currency: 'EUR',
-      minimumFractionDigits: 0,
-      maximumFractionDigits: 0
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2
     }).format(amount);
   };
 
@@ -582,8 +634,25 @@ const Transactions = () => {
               </div>
             )}
           </div>
-          {/* Filter Button - Right aligned */}
+          {/* Filter Button and Text Search - Right aligned */}
           <div className="d-flex gap-2">
+            <div className="input-group" style={{ width: '400px' }}>
+              <input
+                type="text"
+                className="form-control"
+                placeholder="Search all fields or use 'column: term' (e.g., 'description: Dwayne')"
+                value={filters.search}
+                onChange={(e) => setFilters(prev => ({ ...prev, search: e.target.value }))}
+              />
+              <button 
+                className="btn btn-outline-secondary"
+                type="button"
+                onClick={() => setFilters(prev => ({ ...prev, search: '' }))}
+                title="Clear search"
+              >
+                ✕
+              </button>
+            </div>
             <button 
               onClick={openFiltersModal}
               className="btn btn-primary"
@@ -662,6 +731,7 @@ const Transactions = () => {
               <table className="table table-striped" style={{ tableLayout: 'fixed', width: '100%' }}>
                 <thead>
                   <tr>
+                    <th style={{ width: '5%' }}>ID</th>
                     <th 
                       className="sortable-header"
                       onClick={() => handleSort('transaction_date')}
@@ -726,7 +796,7 @@ const Transactions = () => {
                 <tbody>
                   {paginatedTransactions.length === 0 ? (
                     <tr>
-                      <td colSpan="10" className="text-center">
+                      <td colSpan="11" className="text-center">
                         {(Array.isArray(transactions) ? transactions.length : 0) === 0 ? 'No transactions found' : 'No transactions match the current filters'}
                       </td>
                     </tr>
@@ -738,6 +808,7 @@ const Transactions = () => {
                         style={{ cursor: 'pointer' }}
                         className="transaction-row"
                       >
+                        <td>{transaction.id}</td>
                         <td>{formatDate(transaction.transaction_date)}</td>
                         <td style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }} title={transaction.description}>{transaction.description}</td>
                         <td style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }} title={transaction.payer || '-'}>{transaction.payer || '-'}</td>
