@@ -3936,7 +3936,7 @@ def get_potential_matches(tax_return_id):
         print(f"EFFICIENCY: Reduced bank transactions from {len(unmatched_bank_transactions)} to {len(filtered_bank_transactions)}")
         print(f"Date range: {search_start_date} to {search_end_date}")
         
-        # Create potential matches with improved algorithm
+        # Create potential matches with simplified algorithm (exact amount + date within 3 days)
         potential_matches = []
         auto_matched_count = 0
         
@@ -3957,38 +3957,25 @@ def get_potential_matches(tax_return_id):
             
             matches = []
             
-            # Now only compare against pre-filtered bank transactions
+            # SIMPLIFIED MATCHING: Only exact amount + date within 3 days
             for bank_transaction in filtered_bank_transactions:
-                # Double-check date filter (should be redundant but safe)
+                # Check date is within 3 days
                 if bank_transaction.transaction_date:
                     days_diff = abs((tax_date - bank_transaction.transaction_date).days)
                     if days_diff > 3:
                         continue  # Skip this bank transaction entirely
                 
-                # Calculate similarity scores
-                amount_similarity = calculate_amount_similarity(tax_amount, bank_transaction.amount)
-                date_similarity = calculate_date_similarity(tax_date, bank_transaction.transaction_date)
-                description_similarity = calculate_description_similarity(tax_transaction.name, bank_transaction.description)
-                reference_similarity = calculate_reference_similarity(tax_transaction.reference, bank_transaction.reference)
-                
-                # Weighted confidence score
-                confidence = (
-                    amount_similarity * 0.4 +      # Amount is most important
-                    date_similarity * 0.25 +       # Date proximity
-                    description_similarity * 0.25 + # Description keywords
-                    reference_similarity * 0.1     # Reference matching
-                )
-                
-                # EXACT AMOUNT MATCH REQUIRED + DATE FILTER
-                # Must have exact amount match (amount_similarity = 1.0) AND be within 3 days
-                if amount_similarity == 1.0 and date_similarity > 0.0:
+                # Check for exact amount match
+                if tax_amount == bank_transaction.amount:
+                    # Perfect match! Same amount and date within 3 days
+                    confidence = 1.0 - (days_diff * 0.05)  # Slight penalty for date difference
                     matches.append({
                         'bank_transaction': bank_transaction.to_dict(),
                         'confidence': confidence,
-                        'amount_similarity': amount_similarity,
-                        'date_similarity': date_similarity,
-                        'description_similarity': description_similarity,
-                        'reference_similarity': reference_similarity
+                        'amount_similarity': 1.0,
+                        'date_similarity': 1.0 - (days_diff * 0.05),
+                        'description_similarity': 0.0,  # Not used in simplified matching
+                        'reference_similarity': 0.0     # Not used in simplified matching
                     })
             
             # Sort by confidence and take top 3 (reduced from 5 to avoid overwhelming)
@@ -3997,7 +3984,7 @@ def get_potential_matches(tax_return_id):
             
             # Check if we should auto-match the top result
             auto_matched = False
-            if matches and matches[0]['confidence'] >= 0.85:  # High confidence threshold
+            if matches and matches[0]['confidence'] >= 0.8:  # Simplified threshold for exact matches
                 best_match = matches[0]
                 try:
                     # Auto-create match
