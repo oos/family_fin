@@ -21,7 +21,7 @@ def seed_data():
             email='omarosullivan@gmail.com',
             is_active=True
         )
-        admin_user.set_password('Gestalt,69')
+        admin_user.set_password('OmarDevFrog,1979')
         db.session.add(admin_user)
         
         # Create families

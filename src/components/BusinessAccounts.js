@@ -166,9 +166,9 @@ function BusinessAccounts() {
 
   return (
     <div>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+      <div className="d-flex justify-content-between align-items-center mb-3">
         <h1>Bank Accounts</h1>
-        <div style={{ display: 'flex', gap: '10px' }}>
+        <div className="d-flex gap-2">
           <button className="btn btn-primary" onClick={handleAddNew}>
             Add New Account
           </button>

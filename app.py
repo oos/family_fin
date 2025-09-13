@@ -3523,14 +3523,36 @@ def upload_tax_return():
         db.session.add(tax_return)
         db.session.flush()  # Get the tax_return.id before committing
         
-        # Save individual transactions to database
+        # Save individual transactions to database with proper category mapping
         saved_transactions = 0
+        current_category = None
+        current_category_name = None
+        
         for _, row in df.iterrows():
             if pd.notna(row['Name']) and str(row['Name']).strip() != '':
+                row_name = str(row['Name']).strip()
+                
+                # Check if this row is a category heading (e.g., "207C00 Hosting Fee's")
+                category_match = re.match(r'^(\d+[A-Z]\d+)\s*(.*)', row_name)
+                if category_match:
+                    # This is a category heading - update current category
+                    current_category = category_match.group(1)  # e.g., "207C00"
+                    current_category_name = row_name  # e.g., "207C00 Hosting Fee's"
+                    print(f"DEBUG: Found category heading: {current_category_name}")
+                    # Skip processing this row as it's just a category heading
+                    continue
+                else:
+                    # This is an individual transaction - use current category if available
+                    category_to_store = current_category_name if current_category_name else None
+                    if category_to_store:
+                        print(f"DEBUG: Storing transaction '{row_name}' under category '{category_to_store}'")                                                                                                         
+                    else:
+                        print(f"DEBUG: Storing transaction '{row_name}' without category")
+                
                 transaction = TaxReturnTransaction(
                     tax_return_id=tax_return.id,
                     user_id=current_user_id,
-                    name=str(row['Name']).strip(),
+                    name=row_name,
                     date=row['Date'] if pd.notna(row['Date']) else None,
                     number=str(row['Number']).strip() if pd.notna(row['Number']) else None,
                     reference=str(row['Reference']).strip() if pd.notna(row['Reference']) else None,
@@ -3538,7 +3560,8 @@ def upload_tax_return():
                     annotation=str(row['Annotation']).strip() if pd.notna(row['Annotation']) else None,
                     debit=float(row['Debit']) if pd.notna(row['Debit']) else 0.0,
                     credit=float(row['Credit']) if pd.notna(row['Credit']) else 0.0,
-                    balance=float(row['Balance']) if pd.notna(row['Balance']) else 0.0
+                    balance=float(row['Balance']) if pd.notna(row['Balance']) else 0.0,
+                    category_heading=category_to_store  # Store the category heading with each transaction
                 )
                 db.session.add(transaction)
                 saved_transactions += 1

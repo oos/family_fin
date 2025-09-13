@@ -743,6 +743,7 @@ class TaxReturnTransaction(db.Model):
     debit = db.Column(db.Float, default=0.0)  # Debit amount
     credit = db.Column(db.Float, default=0.0)  # Credit amount
     balance = db.Column(db.Float, default=0.0)  # Running balance
+    category_heading = db.Column(db.String(200), nullable=True)  # Category heading from GL (e.g., "207C00 Hosting Fee's")
     
     # Metadata
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
@@ -766,6 +767,7 @@ class TaxReturnTransaction(db.Model):
             'debit': self.debit,
             'credit': self.credit,
             'balance': self.balance,
+            'category_heading': self.category_heading,
             'created_at': self.created_at.isoformat() if self.created_at else None,
             'updated_at': self.updated_at.isoformat() if self.updated_at else None
         }

@@ -212,6 +212,7 @@ const TransactionMatching = () => {
               taxDate: taxTransaction.date,
               taxReference: taxTransaction.reference,
               taxSource: taxTransaction.source,
+              taxCategoryHeading: taxTransaction.category_heading,
               bankDescription: potentialMatch.bank_transaction.description,
               bankAmount: potentialMatch.bank_transaction.amount,
               bankType: potentialMatch.bank_transaction.transaction_type,
@@ -240,6 +241,7 @@ const TransactionMatching = () => {
           taxDate: taxTransaction.date,
           taxReference: taxTransaction.reference,
           taxSource: taxTransaction.source,
+          taxCategoryHeading: taxTransaction.category_heading,
           bankDescription: 'No potential matches found',
           bankAmount: null,
           bankType: null,
@@ -398,7 +400,29 @@ const TransactionMatching = () => {
                           <p className="mb-1">
                             <strong>Name:</strong> {match.tax_transaction.name}<br/>
                             <strong>Amount:</strong> {formatCurrency(match.tax_transaction.debit || -match.tax_transaction.credit)}<br/>
-                            <strong>Date:</strong> {match.tax_transaction.date ? formatDate(match.tax_transaction.date) : 'N/A'}
+                            <strong>Date:</strong> {match.tax_transaction.date ? formatDate(match.tax_transaction.date) : 'N/A'}<br/>
+                            {match.tax_transaction.source && (
+                              <>
+                                <strong>Source:</strong> {match.tax_transaction.source}<br/>
+                              </>
+                            )}
+                            {match.tax_transaction.reference && (
+                              <>
+                                <strong>Reference:</strong> {match.tax_transaction.reference}<br/>
+                              </>
+                            )}
+                            {match.tax_transaction.annotation && (
+                              <>
+                                <strong>Annotation:</strong> {match.tax_transaction.annotation}<br/>
+                              </>
+                            )}
+            <strong>Accountant Category:</strong> <span className="text-info">
+              {match.tax_transaction.category_heading || 
+               (match.tax_transaction.source === 'AJ' ? 'Sales Journal' : 
+                match.tax_transaction.source === 'PJ' ? 'Purchase Journal' :
+                match.tax_transaction.source ? `Source: ${match.tax_transaction.source}` : 
+                'Not specified')}
+            </span>
                           </p>
                         </div>
                         <div className="col-6">
@@ -550,6 +574,19 @@ const TransactionMatching = () => {
                               <span className={`badge ${row.taxType === 'Debit' ? 'bg-danger' : 'bg-success'} badge-sm`}>
                                 {row.taxType}
                               </span>
+                            </small><br/>
+            <small className="text-info">
+              <strong>Accountant Category:</strong><br/>
+              {row.taxCategoryHeading || 
+               (row.taxSource === 'AJ' ? 'Sales Journal' : 
+                row.taxSource === 'PJ' ? 'Purchase Journal' :
+                row.taxSource ? `Source: ${row.taxSource}` : 
+                'Not specified')}
+              {row.taxReference && (
+                <>
+                  <br/><strong>Ref:</strong> {row.taxReference}
+                </>
+              )}
                             </small>
                           </div>
                         </td>
@@ -634,7 +671,7 @@ const TransactionMatching = () => {
                                       <div><strong>Ref:</strong> {row.taxReference || 'N/A'}</div>
                                     </div>
                                   </div>
-                                </div>
+                                    </div>
                                 <div className="col-md-6">
                                   <div className="border rounded p-2 bg-white">
                                     <h6 className="text-info mb-2">🏦 Bank Transaction</h6>
@@ -654,7 +691,7 @@ const TransactionMatching = () => {
                                   <span className="badge bg-warning">Date: {Math.round(row.dateSimilarity * 100)}%</span>
                                   <span className="badge bg-warning">Desc: {Math.round(row.descriptionSimilarity * 100)}%</span>
                                 </div>
-                              </div>
+                          </div>
                             </td>
                           </tr>
                         )}
