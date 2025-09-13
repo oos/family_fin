@@ -15,6 +15,7 @@ import Pension from './components/Pension';
 import CompanyPensionCalculator from './components/CompanyPensionCalculator';
 import NetWorth from './components/NetWorth';
 import Transactions from './components/Transactions';
+import GLTransactions from './components/GLTransactions';
 import TaxReturns from './components/TaxReturns';
 import TransactionMatching from './components/TransactionMatching';
 import TransactionPredictions from './components/TransactionPredictions';
@@ -86,6 +87,7 @@ function Sidebar({ userRole, sidebarOpen, setSidebarOpen }) {
     { path: '/pension', icon: 'fas fa-piggy-bank', label: 'Pension' },
     { path: '/company-pension', icon: 'fas fa-building', label: 'Company Pension' },
         { path: '/transactions', icon: 'fas fa-exchange-alt', label: 'Transactions' },
+        { path: '/gl-transactions', icon: 'fas fa-book', label: 'GL Transactions' },
         { path: '/tax-returns', icon: 'fas fa-file-invoice', label: 'Tax Returns' },
         { path: '/transaction-matching', icon: 'fas fa-link', label: 'Transaction Matching' },
         { path: '/transaction-predictions', icon: 'fas fa-brain', label: 'ML Predictions' },
@@ -296,6 +298,11 @@ function App() {
               <Route path="/transactions" element={
                 <ProtectedRoute userRole={userRole} requiredRole="admin" fallbackPath="/user-dashboard">
                   <Transactions />
+                </ProtectedRoute>
+              } />
+              <Route path="/gl-transactions" element={
+                <ProtectedRoute userRole={userRole} requiredRole="admin" fallbackPath="/user-dashboard">
+                  <GLTransactions />
                 </ProtectedRoute>
               } />
         <Route path="/tax-returns" element={

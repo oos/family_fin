@@ -3715,6 +3715,133 @@ def get_tax_return_data(tax_return_id):
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
+@app.route('/api/gl-transactions', methods=['GET'])
+@jwt_required()
+def get_all_gl_transactions():
+    """Get all GL transactions from all tax returns with filtering and pagination"""
+    try:
+        current_user_id = get_jwt_identity()
+        
+        # Get query parameters
+        page = request.args.get('page', 1, type=int)
+        per_page = request.args.get('per_page', 100, type=int)
+        search = request.args.get('search', '', type=str)
+        date_from = request.args.get('date_from', '', type=str)
+        date_to = request.args.get('date_to', '', type=str)
+        amount_min = request.args.get('amount_min', '', type=str)
+        amount_max = request.args.get('amount_max', '', type=str)
+        source = request.args.get('source', '', type=str)
+        category_heading = request.args.get('category_heading', '', type=str)
+        year = request.args.get('year', '', type=str)
+        sort_field = request.args.get('sort_field', 'date', type=str)
+        sort_direction = request.args.get('sort_direction', 'desc', type=str)
+        
+        # Build query
+        query = TaxReturnTransaction.query.join(TaxReturn).filter(TaxReturn.user_id == current_user_id)
+        
+        # Apply filters
+        if search:
+            query = query.filter(
+                db.or_(
+                    TaxReturnTransaction.name.contains(search),
+                    TaxReturnTransaction.reference.contains(search),
+                    TaxReturnTransaction.annotation.contains(search)
+                )
+            )
+        
+        if date_from:
+            try:
+                from_date = datetime.strptime(date_from, '%Y-%m-%d')
+                query = query.filter(TaxReturnTransaction.date >= from_date)
+            except ValueError:
+                pass
+        
+        if date_to:
+            try:
+                to_date = datetime.strptime(date_to, '%Y-%m-%d')
+                query = query.filter(TaxReturnTransaction.date <= to_date)
+            except ValueError:
+                pass
+        
+        if amount_min:
+            try:
+                min_amount = float(amount_min)
+                query = query.filter(
+                    db.or_(
+                        TaxReturnTransaction.debit >= min_amount,
+                        TaxReturnTransaction.credit >= min_amount
+                    )
+                )
+            except ValueError:
+                pass
+        
+        if amount_max:
+            try:
+                max_amount = float(amount_max)
+                query = query.filter(
+                    db.or_(
+                        TaxReturnTransaction.debit <= max_amount,
+                        TaxReturnTransaction.credit <= max_amount
+                    )
+                )
+            except ValueError:
+                pass
+        
+        if source:
+            query = query.filter(TaxReturnTransaction.source.contains(source))
+        
+        if category_heading:
+            query = query.filter(TaxReturnTransaction.category_heading.contains(category_heading))
+        
+        if year:
+            query = query.filter(TaxReturn.year == year)
+        
+        # Apply sorting
+        valid_sort_fields = {
+            'date': TaxReturnTransaction.date,
+            'name': TaxReturnTransaction.name,
+            'amount': db.func.abs(TaxReturnTransaction.debit + TaxReturnTransaction.credit),
+            'source': TaxReturnTransaction.source,
+            'category_heading': TaxReturnTransaction.category_heading,
+            'tax_return_year': TaxReturn.year
+        }
+        
+        sort_column = valid_sort_fields.get(sort_field, TaxReturnTransaction.date)
+        if sort_direction == 'desc':
+            query = query.order_by(sort_column.desc())
+        else:
+            query = query.order_by(sort_column.asc())
+        
+        # Get paginated results
+        pagination = query.paginate(
+            page=page, 
+            per_page=per_page, 
+            error_out=False
+        )
+        
+        # Format transactions
+        transactions = []
+        for transaction in pagination.items:
+            transaction_data = transaction.to_dict()
+            transaction_data['tax_return_year'] = transaction.tax_return.year if transaction.tax_return else None
+            transaction_data['tax_return_filename'] = transaction.tax_return.filename if transaction.tax_return else None
+            transactions.append(transaction_data)
+        
+        return jsonify({
+            'transactions': transactions,
+            'pagination': {
+                'page': pagination.page,
+                'pages': pagination.pages,
+                'per_page': pagination.per_page,
+                'total': pagination.total,
+                'has_next': pagination.has_next,
+                'has_prev': pagination.has_prev
+            }
+        })
+        
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
 @app.route('/api/tax-returns/<int:tax_return_id>/transactions', methods=['GET'])
 @jwt_required()
 def get_tax_return_transactions(tax_return_id):
