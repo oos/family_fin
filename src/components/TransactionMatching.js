@@ -439,7 +439,7 @@ const TransactionMatching = () => {
             <div>
               <h5>Potential Matches for {selectedTaxReturn.filename}</h5>
               <small className="text-muted">
-                {getSortedMatches().length} total rows ({getTotalPotentialMatches()} potential matches across {potentialMatches.length} transactions)
+                {getSortedMatches.length} total rows ({getTotalPotentialMatches()} potential matches across {potentialMatches.length} transactions)
               </small>
             </div>
             <button
@@ -476,7 +476,7 @@ const TransactionMatching = () => {
                       </tr>
                     </thead>
                     <tbody>
-                    {getSortedMatches().slice(0, visibleRows).map((row, index) => (
+                    {getSortedMatches.slice(0, visibleRows).map((row, index) => (
                       <React.Fragment key={`${row.taxId}-${row.bankId}`}>
                         <tr 
                           style={{ cursor: 'pointer' }}
@@ -629,13 +629,13 @@ const TransactionMatching = () => {
               </div>
               
               {/* Show More Button */}
-              {getSortedMatches().length > visibleRows && (
+              {getSortedMatches.length > visibleRows && (
                 <div className="text-center mt-3">
                   <button
                     className="btn btn-outline-primary"
-                    onClick={() => setVisibleRows(prev => Math.min(prev + 100, getSortedMatches().length))}
+                    onClick={() => setVisibleRows(prev => Math.min(prev + 100, getSortedMatches.length))}
                   >
-                    Show More ({visibleRows} of {getSortedMatches().length} rows)
+                    Show More ({visibleRows} of {getSortedMatches.length} rows)
                   </button>
                 </div>
               )}
