@@ -69,7 +69,7 @@ db.init_app(app)
 jwt = JWTManager(app)
 migrate = Migrate(app, db)
 CORS(app, 
-     origins=['http://localhost:3001'],
+     origins=['http://localhost:3007'],
      methods=['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
      allow_headers=['Content-Type', 'Authorization'],
      supports_credentials=True)
