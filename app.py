@@ -3715,6 +3715,33 @@ def get_tax_return_data(tax_return_id):
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
+@app.route('/api/transactions', methods=['GET'])
+@jwt_required()
+def get_all_bank_transactions():
+    """Get all bank transactions for the current user for matching purposes"""
+    try:
+        current_user_id = get_jwt_identity()
+        
+        # Get all bank transactions for this user's business accounts
+        try:
+            # Try to get bank transactions with user_id filter if the field exists
+            transactions = BankTransaction.query.join(BusinessAccount).filter(
+                BusinessAccount.user_id == current_user_id
+            ).order_by(BankTransaction.transaction_date.desc()).all()
+        except:
+            # Fallback: get all bank transactions if user_id field doesn't exist
+            transactions = BankTransaction.query.join(BusinessAccount).order_by(
+                BankTransaction.transaction_date.desc()
+            ).all()
+        
+        return jsonify({
+            'transactions': [transaction.to_dict() for transaction in transactions]
+        }), 200
+        
+    except Exception as e:
+        print(f"Error fetching bank transactions: {e}")
+        return jsonify({'error': str(e)}), 500
+
 @app.route('/api/gl-transactions', methods=['GET'])
 @jwt_required()
 def get_all_gl_transactions():
@@ -3900,20 +3927,15 @@ def get_gl_transactions_filter_options():
         ).distinct().all()
         sources = [s[0] for s in sources if s[0]]
         
-        # Filter sources to only include meaningful values (PJ, AJ, and other non-date values)
+        # Filter sources to only include meaningful GL transaction types
         meaningful_sources = []
         for source in sources:
-            # Skip if it's just a date pattern (DD/MM/YYYY or DD/MM/YY)
-            if not re.match(r'^\d{1,2}/\d{1,2}/\d{2,4}$', source):
-                # Skip if it's just special characters or very short meaningless strings
-                if len(source) > 2 and not re.match(r'^[^a-zA-Z0-9]+$', source):
-                    # Skip if it's just a number or amount
-                    if not re.match(r'^[\d,\.]+$', source):
-                        # Skip if it's a date with text appended
-                        if not re.match(r'^\d{1,2}/\d{1,2}/\d{2,4}\w+$', source):
-                            # Only include if it contains letters or is a known meaningful code
-                            if re.search(r'[a-zA-Z]', source) or source in ['PJ', 'AJ', 'AP', 'LR', 'CC', 'C/C', 'AIB', 'Revolut', 'VAT', 'PAY', 'LEDGER']:
-                                meaningful_sources.append(source)
+            # Only include known GL transaction types
+            if source in ['PJ', 'AJ', 'AP', 'SE', 'CD', 'PL']:
+                meaningful_sources.append(source)
+            # Also include common bank/account identifiers
+            elif source in ['AIB', 'Revolut', 'Bank', 'Cash', 'Transfer']:
+                meaningful_sources.append(source)
         
         # Get unique category headings
         category_headings = db.session.query(TaxReturnTransaction.category_heading).join(TaxReturn).filter(

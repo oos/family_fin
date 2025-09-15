@@ -1,6 +1,18 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 
+// Distinct Color Scheme for Transaction Types (NO RED/GREEN to avoid confusion with Debit/Credit):
+// PJ (Payment Journal): bg-primary (blue)
+// AJ (Adjustment Journal): bg-info (light blue)
+// AP (Accounts Payable): bg-secondary (gray)
+// SE (Sales Entry): bg-warning text-dark (yellow)
+// CD (Cash Deposit): bg-dark (black)
+// PL (Profit & Loss): bg-light text-dark (light gray)
+// Unknown: bg-warning text-dark (yellow)
+// Opening: bg-info (light blue)
+// Change: bg-warning text-dark (yellow)
+// Closing: bg-dark (black)
+
 const GLTransactions = () => {
   const [transactions, setTransactions] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -8,6 +20,9 @@ const GLTransactions = () => {
   const [showFiltersModal, setShowFiltersModal] = useState(false);
   const [showTransactionModal, setShowTransactionModal] = useState(false);
   const [selectedTransaction, setSelectedTransaction] = useState(null);
+  const [showBankTransactionModal, setShowBankTransactionModal] = useState(false);
+  const [selectedBankTransaction, setSelectedBankTransaction] = useState(null);
+  const [bankTransactions, setBankTransactions] = useState([]);
   const [sortField, setSortField] = useState('date');
   const [sortDirection, setSortDirection] = useState('asc');
   
@@ -48,6 +63,13 @@ const GLTransactions = () => {
     other: 0
   });
 
+  // Match statistics
+  const [matchStats, setMatchStats] = useState({
+    totalPJ: 0,
+    matchedPJ: 0,
+    matchRate: 0
+  });
+
   // Account grouping state
   const [groupByAccount, setGroupByAccount] = useState(true);
   const [groupedTransactions, setGroupedTransactions] = useState({});
@@ -56,13 +78,23 @@ const GLTransactions = () => {
   // UI state for toggling panels
   const [showFilters, setShowFilters] = useState(false);
   const [showAnalytics, setShowAnalytics] = useState(false);
-  const [showSummaryPanel, setShowSummaryPanel] = useState(true);
+  const [showSummaryPanel, setShowSummaryPanel] = useState(false);
 
   useEffect(() => {
     fetchTransactions();
     fetchFilterOptions();
     fetchSummaryCounts();
+    fetchBankTransactions();
   }, [currentPage, rowsPerPage, sortField, sortDirection, filters]);
+
+  // Calculate match statistics when transactions or bank transactions change
+  useEffect(() => {
+    if (transactions.length > 0) {
+      const stats = calculateMatchStats(transactions);
+      setMatchStats(stats);
+      console.log('Match Statistics:', stats);
+    }
+  }, [transactions, bankTransactions]);
 
   // Separate useEffect for summary counts to avoid unnecessary refetches
   useEffect(() => {
@@ -126,6 +158,65 @@ const GLTransactions = () => {
     } catch (err) {
       console.error('Error fetching filter options:', err);
     }
+  };
+
+  // Fetch bank transactions for matching
+  const fetchBankTransactions = async () => {
+    try {
+      const token = localStorage.getItem('token');
+      if (!token) return;
+
+      const response = await axios.get('/api/transactions', {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      setBankTransactions(response.data.transactions || []);
+    } catch (error) {
+      console.error('Error fetching bank transactions:', error);
+    }
+  };
+
+  // Find matching bank transaction for a GL transaction
+  const findMatchingBankTransaction = (glTransaction) => {
+    if (glTransaction.source !== 'PJ') return null;
+    
+    // Match by amount and date
+    const glAmount = Math.abs(glTransaction.debit || glTransaction.credit || 0);
+    const glDate = glTransaction.date;
+    
+    return bankTransactions.find(bankTx => {
+      const bankAmount = Math.abs(bankTx.amount || 0);
+      const bankDate = bankTx.transaction_date || bankTx.date;
+      
+      // Match by amount (within 0.01 tolerance) and date
+      return Math.abs(glAmount - bankAmount) < 0.01 && 
+             glDate === bankDate;
+    });
+  };
+
+  // Calculate match statistics
+  const calculateMatchStats = (glTransactions) => {
+    const pjTransactions = glTransactions.filter(tx => tx.source === 'PJ');
+    const matchedPJ = pjTransactions.filter(tx => findMatchingBankTransaction(tx)).length;
+    
+    return {
+      totalPJ: pjTransactions.length,
+      matchedPJ: matchedPJ,
+      matchRate: pjTransactions.length > 0 ? (matchedPJ / pjTransactions.length) * 100 : 0
+    };
+  };
+
+  // Handle bank transaction click
+  const handleBankTransactionClick = (bankTransaction) => {
+    setSelectedBankTransaction(bankTransaction);
+    setShowBankTransactionModal(true);
+  };
+
+  // Navigate to transactions page with specific transaction
+  const viewInContext = (bankTransaction) => {
+    // Store the transaction ID in sessionStorage for the transactions page to find
+    sessionStorage.setItem('highlightTransactionId', bankTransaction.id);
+    // Navigate to transactions page
+    window.location.href = '/transactions';
   };
 
   // Fetch summary counts for all transactions
@@ -254,24 +345,29 @@ const GLTransactions = () => {
       SE: 0,
       CD: 0,
       PL: 0,
-      Other: 0
+      Unknown: 0
     };
 
-    // Filter out summary rows (Opening, Change, Closing) - these don't have actual transaction data
+    // Filter out summary rows (Opening, Change, Closing) and invalid transactions
     const actualTransactions = transactions.filter(transaction => 
-      transaction.source && 
-      transaction.source !== 'N/A' &&
       transaction.reference !== 'Opening' && 
       transaction.reference !== 'Change' && 
-      transaction.reference !== 'Close'
+      transaction.reference !== 'Close' &&
+      transaction.source !== 'N/A' &&
+      transaction.source !== null &&
+      transaction.source !== undefined
+      // Allow empty strings to be counted as Unknown
     );
 
     actualTransactions.forEach(transaction => {
       const source = transaction.source;
-      if (breakdown.hasOwnProperty(source)) {
+      // Handle empty strings, null, undefined as Unknown
+      if (!source || source === '') {
+        breakdown.Unknown++;
+      } else if (breakdown.hasOwnProperty(source)) {
         breakdown[source]++;
       } else {
-        breakdown.Other++;
+        breakdown.Unknown++;
       }
     });
 
@@ -576,7 +672,6 @@ const GLTransactions = () => {
                     value={filters.year}
                     onChange={(e) => handleFilterChange('year', e.target.value)}
                   >
-                    <option value="">All Years</option>
                     {filterOptions.years.map(year => (
                       <option key={year} value={year}>{year}</option>
                     ))}
@@ -610,80 +705,130 @@ const GLTransactions = () => {
                         </button>
                       </div>
                       <div className="card-body py-2">
-                        <div className="row text-center">
-                          <div className="col-md-3">
+                        <div className="d-flex align-items-center justify-content-between flex-wrap">
+                          <div>
                             <small className="text-muted">Total Transactions</small>
                             <div className="fw-bold">{summaryCounts.total}</div>
                           </div>
-                          <div className="col-md-3">
-                            <small className="text-muted">Bank Transactions (PJ)</small>
-                            <div className="fw-bold text-primary">
-                              {summaryCounts.pj}
+                          <div className="d-flex justify-content-between flex-wrap" style={{ flex: '1', maxWidth: '70%', gap: '8px' }}>
+                            <div className="text-center">
+                              <small className="badge bg-primary text-white px-2 py-1 fw-bold" style={{ fontSize: '0.75rem', borderRadius: '12px' }}>PJ</small>
+                              <div className="fw-bold text-primary mt-1" style={{ fontSize: '0.8rem' }}>
+                                {summaryCounts.pj}
+                              </div>
                             </div>
-                          </div>
-                          <div className="col-md-3">
-                            <small className="text-muted">Adjustments (AJ)</small>
-                            <div className="fw-bold text-info">
-                              {summaryCounts.aj}
+                            <div className="text-center">
+                              <small className="badge bg-info text-white px-2 py-1 fw-bold" style={{ fontSize: '0.75rem', borderRadius: '12px' }}>AJ</small>
+                              <div className="fw-bold text-info mt-1" style={{ fontSize: '0.8rem' }}>
+                                {summaryCounts.aj}
+                              </div>
                             </div>
-                          </div>
-                          <div className="col-md-3">
-                            <small className="text-muted">Other Types</small>
-                            <div className="fw-bold text-secondary">
-                              {summaryCounts.other}
+                            <div className="text-center">
+                              <small className="badge bg-secondary text-white px-2 py-1 fw-bold" style={{ fontSize: '0.75rem', borderRadius: '12px' }}>AP</small>
+                              <div className="fw-bold text-secondary mt-1" style={{ fontSize: '0.8rem' }}>
+                                {summaryCounts.ap || 0}
+                              </div>
+                            </div>
+                            <div className="text-center">
+                              <small className="badge bg-warning text-dark px-2 py-1 fw-bold" style={{ fontSize: '0.75rem', borderRadius: '12px' }}>SE</small>
+                              <div className="fw-bold text-warning mt-1" style={{ fontSize: '0.8rem' }}>
+                                {summaryCounts.se || 0}
+                              </div>
+                            </div>
+                            <div className="text-center">
+                              <small className="badge bg-dark text-white px-2 py-1 fw-bold" style={{ fontSize: '0.75rem', borderRadius: '12px' }}>CD</small>
+                              <div className="fw-bold text-dark mt-1" style={{ fontSize: '0.8rem' }}>
+                                {summaryCounts.cd || 0}
+                              </div>
+                            </div>
+                            <div className="text-center">
+                              <small className="badge bg-light text-dark px-2 py-1 fw-bold" style={{ fontSize: '0.75rem', borderRadius: '12px' }}>PL</small>
+                              <div className="fw-bold text-dark mt-1" style={{ fontSize: '0.8rem' }}>
+                                {summaryCounts.pl || 0}
+                              </div>
+                            </div>
+                            <div className="text-center">
+                              <small className="badge bg-warning text-dark px-2 py-1 fw-bold" style={{ fontSize: '0.75rem', borderRadius: '12px' }}>Unknown</small>
+                              <div className="fw-bold text-warning mt-1" style={{ fontSize: '0.8rem' }}>
+                                {summaryCounts.other || 0}
+                              </div>
                             </div>
                           </div>
                         </div>
                         
-                        {/* Other Types Breakdown */}
-                        {summaryCounts.other > 0 && (
-                          <div className="row mt-2">
-                            <div className="col-12">
-                              <small className="text-muted">Breakdown of {summaryCounts.other} Other Types:</small>
-                              <div className="mt-1">
-                                {(() => {
-                                  const apCount = summaryCounts.ap || 0;
-                                  const seCount = summaryCounts.se || 0;
-                                  const cdCount = summaryCounts.cd || 0;
-                                  const plCount = summaryCounts.pl || 0;
-                                  const remainingOther = summaryCounts.other - apCount - seCount - cdCount - plCount;
-                                  
-                                  return (
-                                    <>
-                                      <span className="badge bg-success me-1" title="AP - Accounts Payable: Money owed to suppliers/vendors">
-                                        AP: {apCount}
-                                      </span>
-                                      <span className="badge bg-primary me-1" title="SE - Sales Entry: Revenue from sales transactions">
-                                        SE: {seCount}
-                                      </span>
-                                      <span className="badge bg-info me-1" title="CD - Cash Deposit: Money deposited into accounts">
-                                        CD: {cdCount}
-                                      </span>
-                                      <span className="badge bg-secondary me-1" title="PL - Profit & Loss: Income statement adjustments">
-                                        PL: {plCount}
-                                      </span>
-                                      {remainingOther > 0 && (
-                                        <span className="badge bg-warning text-dark me-1" title="Other: Transactions with unknown or empty source types">
-                                          Unknown: {remainingOther}
-                                        </span>
-                                      )}
-                                    </>
-                                  );
-                                })()}
-                              </div>
-                              <div className="mt-1">
-                                <small className="text-muted">
-                                  <strong>Legend:</strong> AP=Accounts Payable, SE=Sales Entry, CD=Cash Deposit, PL=Profit & Loss
-                                </small>
+                        {/* Detailed Legend */}
+                        {/* Match Statistics */}
+                        <div className="row mt-3">
+                          <div className="col-12">
+                            <div className="border-top pt-2">
+                              <small className="text-muted fw-bold">PJ Transaction Matching:</small>
+                              <div className="row mt-2">
+                                <div className="col-md-4">
+                                  <div className="text-center">
+                                    <div className="h5 fw-bold text-primary">{matchStats.totalPJ}</div>
+                                    <small className="text-muted">Total PJ Transactions</small>
+                                  </div>
+                                </div>
+                                <div className="col-md-4">
+                                  <div className="text-center">
+                                    <div className="h5 fw-bold text-success">{matchStats.matchedPJ}</div>
+                                    <small className="text-muted">Successfully Matched</small>
+                                  </div>
+                                </div>
+                                <div className="col-md-4">
+                                  <div className="text-center">
+                                    <div className="h5 fw-bold text-info">{matchStats.matchRate.toFixed(1)}%</div>
+                                    <small className="text-muted">Match Rate</small>
+                                  </div>
+                                </div>
                               </div>
                             </div>
                           </div>
-                        )}
+                        </div>
+                        
+                        <div className="row mt-3">
+                          <div className="col-12">
+                            <div className="border-top pt-2">
+                              <small className="text-muted fw-bold">Transaction Type Legend:</small>
+                              <div className="row mt-2">
+                                <div className="col-md-4 mb-2">
+                                  <span className="badge bg-primary me-1">PJ</span>
+                                  <small className="text-muted">Payment Journal (Bank Transactions)</small>
+                                </div>
+                                <div className="col-md-4 mb-2">
+                                  <span className="badge bg-info me-1">AJ</span>
+                                  <small className="text-muted">Adjustment Journal (Non-cash)</small>
+                                </div>
+                                <div className="col-md-4 mb-2">
+                                  <span className="badge bg-secondary me-1">AP</span>
+                                  <small className="text-muted">Accounts Payable</small>
+                                </div>
+                                <div className="col-md-4 mb-2">
+                                  <span className="badge bg-warning text-dark me-1">SE</span>
+                                  <small className="text-muted">Sales Entry (Revenue)</small>
+                                </div>
+                                <div className="col-md-4 mb-2">
+                                  <span className="badge bg-dark me-1">CD</span>
+                                  <small className="text-muted">Cash Deposit</small>
+                                </div>
+                                <div className="col-md-4 mb-2">
+                                  <span className="badge bg-light text-dark me-1">PL</span>
+                                  <small className="text-muted">Profit & Loss</small>
+                                </div>
+                                <div className="col-md-4 mb-2">
+                                  <span className="badge bg-warning text-dark me-1">Unknown</span>
+                                  <small className="text-muted">Uncategorized transactions</small>
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
                       </div>
                     </div>
                   </div>
                 </div>
               )}
+
 
               {/* GL Summary Panel */}
               <div className="row mb-3">
@@ -930,29 +1075,31 @@ const GLTransactions = () => {
                     Object.entries(groupedTransactions).map(([accountKey, account]) => {
                       const isExpanded = expandedAccounts[accountKey];
                       const stats = calculateTransactionStats(account.transactions);
-                      // Calculate actual transaction count (excluding summary rows)
+                      // Calculate actual transaction count (excluding summary rows and invalid transactions)
                       const actualTransactions = account.transactions.filter(transaction => 
-                        transaction.source && 
-                        transaction.source !== 'N/A' &&
                         transaction.reference !== 'Opening' && 
                         transaction.reference !== 'Change' && 
-                        transaction.reference !== 'Close'
+                        transaction.reference !== 'Close' &&
+                        transaction.source !== 'N/A' &&
+                        transaction.source !== null &&
+                        transaction.source !== undefined
+                        // Allow empty strings to be counted as Unknown
                       );
                       const transactionCount = actualTransactions.length;
                       
                       return (
                         <div key={accountKey} className="account-group mb-3">
                           <div className="card shadow-lg" style={{ borderRadius: '12px', border: 'none' }}>
-        <div
-          className="card-header py-3 px-4 d-flex justify-content-between align-items-center"
-          onClick={() => toggleAccountExpansion(accountKey)}
-          style={{ 
-            cursor: 'pointer',
-            background: '#b3d9ff',
-            border: 'none',
-            borderRadius: '8px 8px 0 0'
-          }}
-        >
+                            <div
+                              className="card-header py-3 px-4 d-flex justify-content-between align-items-center"
+                              onClick={() => toggleAccountExpansion(accountKey)}
+                              style={{ 
+                                cursor: 'pointer',
+                                background: '#b3d9ff',
+                                border: 'none',
+                                borderRadius: '8px 8px 0 0'
+                              }}
+                            >
           <div className="d-flex align-items-center">
             <i className={`fas ${isExpanded ? 'fa-folder-open' : 'fa-folder'} me-3 text-primary`} style={{ fontSize: '1.1rem' }}></i>
             <h6 className="mb-0 text-dark fw-bold" style={{ fontSize: '1.1rem' }}>{account.accountName}</h6>
@@ -964,38 +1111,36 @@ const GLTransactions = () => {
                 // Add badges for each transaction type that has transactions
                 Object.entries(breakdown).forEach(([type, count]) => {
                   if (count > 0) {
-                    const badgeClass = type === 'PJ' ? 'bg-success' :
-                                     type === 'AJ' ? 'bg-warning text-dark' :
-                                     type === 'AP' ? 'bg-info' :
-                                     type === 'SE' ? 'bg-primary' :
-                                     type === 'CD' ? 'bg-secondary' :
-                                     type === 'PL' ? 'bg-dark' :
+                    const badgeClass = type === 'PJ' ? 'bg-primary text-white' :
+                                     type === 'AJ' ? 'bg-info text-white' :
+                                     type === 'AP' ? 'bg-secondary text-white' :
+                                     type === 'SE' ? 'bg-warning text-dark' :
+                                     type === 'CD' ? 'bg-dark text-white' :
+                                     type === 'PL' ? 'bg-light text-dark' :
+                                     type === 'Unknown' ? 'bg-warning text-dark' :
                                      'bg-light text-dark';
+                    
+                    const displayName = type === 'Unknown' ? 'Unknown' : type;
+                    const tooltip = type === 'AP' ? 'AP - Accounts Payable: Money owed to suppliers/vendors' :
+                                   type === 'SE' ? 'SE - Sales Entry: Revenue from sales transactions' :
+                                   type === 'CD' ? 'CD - Cash Deposit: Money deposited into accounts' :
+                                   type === 'PL' ? 'PL - Profit & Loss: Income statement adjustments' :
+                                   type === 'Unknown' ? 'Unknown: Transactions that don\'t fit standard categories' :
+                                   `${type}: ${count} transaction${count !== 1 ? 's' : ''}`;
                     
                     badges.push(
                       <span
                         key={type}
                         className={`badge ${badgeClass} px-2 py-1 fw-bold`}
                         style={{ fontSize: '0.7rem', borderRadius: '12px' }}
-                        title={`${type}: ${count} transaction${count !== 1 ? 's' : ''}`}
+                        title={tooltip}
                       >
-                        {type}: {count}
+                        {displayName}: {count}
                       </span>
                     );
                   }
                 });
                 
-                // Add N/A badge for summary rows (always 3: Opening, Change, Closing)
-                badges.push(
-                  <span
-                    key="N/A"
-                    className="badge bg-light text-dark px-2 py-1 fw-bold"
-                    style={{ fontSize: '0.7rem', borderRadius: '12px' }}
-                    title="N/A: 3 summary rows (Opening, Change, Closing)"
-                  >
-                    N/A: 3
-                  </span>
-                );
                 
                 return badges;
               })()}
@@ -1023,16 +1168,75 @@ const GLTransactions = () => {
                               <div className="card-body p-0" style={{ backgroundColor: '#f8f9fa' }}>
                                 <div className="table-responsive">
                                   <table className="table table-sm table-hover mb-0" style={{ backgroundColor: 'white' }}>
-                                    <thead style={{ backgroundColor: '#495057' }}>
+                                    <thead style={{ backgroundColor: '#212529' }}>
                                       <tr>
-                                        <th className="text-white fw-bold py-3">ID</th>
-                                        <th className="text-white fw-bold py-3">Date</th>
-                                        <th className="text-white fw-bold py-3">Description</th>
-                                        <th className="text-white fw-bold py-3">Reference</th>
-                                        <th className="text-white fw-bold py-3">Type</th>
-                                        <th className="text-white fw-bold py-3">Amount</th>
-                                        <th className="text-white fw-bold py-3">D/C</th>
-                                        <th className="text-white fw-bold py-3">Year</th>
+                                        <th style={{ 
+                                          color: '#ffffff !important', 
+                                          backgroundColor: '#212529 !important',
+                                          fontWeight: 'bold',
+                                          padding: '12px 8px',
+                                          fontSize: '14px'
+                                        }}>ID</th>
+                                        <th style={{ 
+                                          color: '#ffffff !important', 
+                                          backgroundColor: '#212529 !important',
+                                          fontWeight: 'bold',
+                                          padding: '12px 8px',
+                                          fontSize: '14px'
+                                        }}>Date</th>
+                                        <th style={{ 
+                                          color: '#ffffff !important', 
+                                          backgroundColor: '#212529 !important',
+                                          fontWeight: 'bold',
+                                          padding: '12px 8px',
+                                          fontSize: '14px'
+                                        }}>Description</th>
+                                        <th style={{ 
+                                          color: '#ffffff !important', 
+                                          backgroundColor: '#212529 !important',
+                                          fontWeight: 'bold',
+                                          padding: '12px 8px',
+                                          fontSize: '14px'
+                                        }}>Reference</th>
+                                        <th style={{ 
+                                          color: '#ffffff !important', 
+                                          backgroundColor: '#212529 !important',
+                                          fontWeight: 'bold',
+                                          padding: '12px 8px',
+                                          fontSize: '14px'
+                                        }}>Type</th>
+                                        <th style={{ 
+                                          color: '#ffffff !important', 
+                                          backgroundColor: '#212529 !important',
+                                          fontWeight: 'bold',
+                                          padding: '12px 8px',
+                                          fontSize: '14px'
+                                        }}>Amount</th>
+                                        <th style={{ 
+                                          color: '#ffffff !important', 
+                                          backgroundColor: '#212529 !important',
+                                          fontWeight: 'bold',
+                                          padding: '12px 8px',
+                                          fontSize: '14px'
+                                        }}>D/C</th>
+                                        <th style={{ 
+                                          color: '#ffffff !important', 
+                                          backgroundColor: '#212529 !important',
+                                          fontWeight: 'bold',
+                                          padding: '12px 8px',
+                                          fontSize: '14px'
+                                        }}>Year</th>
+                                        <th style={{ 
+                                          color: '#ffffff !important', 
+                                          backgroundColor: '#212529 !important',
+                                          fontWeight: 'bold',
+                                          padding: '12px 8px',
+                                          fontSize: '14px',
+                                          whiteSpace: 'nowrap',
+                                          overflow: 'hidden',
+                                          textOverflow: 'ellipsis',
+                                          maxWidth: '120px'
+                                        }} title="Bank Transaction ID">Bank Transaction ID</th>
                                       </tr>
                                     </thead>
                                     <tbody>
@@ -1043,12 +1247,12 @@ const GLTransactions = () => {
                                         <td style={{ backgroundColor: '#e9ecef' }}>
                                           <div className="fw-bold">{account.accountName}</div>
                                         </td>
-                                        <td style={{ backgroundColor: '#d1ecf1' }}>
-                                          <code className="small text-primary">Opening</code>
+                                        <td style={{ backgroundColor: '#e9ecef' }}>
+                                          <code className="small text-dark">Opening</code>
                                         </td>
                                         <td style={{ backgroundColor: '#e9ecef' }}>
-                                          <span className="badge bg-secondary text-white px-3 py-2 fw-bold" style={{ borderRadius: '15px', fontSize: '0.75rem' }}>
-                                            N/A
+                                          <span className="badge bg-info text-white px-3 py-2 fw-bold" style={{ borderRadius: '15px', fontSize: '0.75rem' }}>
+                                            Opening
                                           </span>
                                         </td>
                                         <td style={{ backgroundColor: '#e9ecef' }}>
@@ -1057,8 +1261,8 @@ const GLTransactions = () => {
                                           </span>
                                         </td>
                                         <td style={{ backgroundColor: '#e9ecef' }}>
-                                          <span className="badge bg-secondary text-white px-3 py-2 fw-bold" style={{ borderRadius: '15px', fontSize: '0.75rem' }}>
-                                            N/A
+                                          <span className="badge bg-info text-white px-3 py-2 fw-bold" style={{ borderRadius: '15px', fontSize: '0.75rem' }}>
+                                            Opening
                                           </span>
                                         </td>
                                         <td style={{ backgroundColor: '#e9ecef' }}>
@@ -1066,13 +1270,19 @@ const GLTransactions = () => {
                                             {filters.year || 'N/A'}
                                           </span>
                                         </td>
+                                        <td style={{ backgroundColor: '#e9ecef' }}>
+                                          <span className="text-muted small">-</span>
+                                        </td>
                                       </tr>
                                       
                                       {account.transactions
                                         .filter(transaction => 
                                           transaction.reference !== 'Opening' && 
                                           transaction.reference !== 'Change' && 
-                                          transaction.reference !== 'Close'
+                                          transaction.reference !== 'Close' &&
+                                          transaction.source !== 'N/A' &&
+                                          transaction.source !== null &&
+                                          transaction.source !== undefined
                                         )
                                         .map((transaction, index) => {
                                         const { amount, type } = getTransactionAmount(transaction);
@@ -1108,13 +1318,21 @@ const GLTransactions = () => {
                                             </td>
                                             <td>
                                               <span className={`badge px-3 py-2 fw-bold ${
-                                                transaction.source === 'AJ' ? 'bg-warning text-dark' :
-                                                transaction.source === 'PJ' ? 'bg-success text-white' :
-                                                'bg-secondary text-white'
+                                                transaction.source === 'AJ' ? 'bg-info text-white' :
+                                                transaction.source === 'PJ' ? 'bg-primary text-white' :
+                                                transaction.source === 'AP' ? 'bg-secondary text-white' :
+                                                transaction.source === 'SE' ? 'bg-warning text-dark' :
+                                                transaction.source === 'CD' ? 'bg-dark text-white' :
+                                                transaction.source === 'PL' ? 'bg-light text-dark' :
+                                                'bg-warning text-dark'
                                               }`} style={{ borderRadius: '15px', fontSize: '0.75rem' }}>
-                                                {transaction.source === 'AJ' ? 'AJ (Adjustment)' :
-                                                 transaction.source === 'PJ' ? 'PJ (Bank)' :
-                                                 transaction.source || 'N/A'}
+                                                {transaction.source === 'AJ' ? 'AJ' :
+                                                 transaction.source === 'PJ' ? 'PJ' :
+                                                 transaction.source === 'AP' ? 'AP' :
+                                                 transaction.source === 'SE' ? 'SE' :
+                                                 transaction.source === 'CD' ? 'CD' :
+                                                 transaction.source === 'PL' ? 'PL' :
+                                                 transaction.source || 'Unknown'}
                                               </span>
                                             </td>
                                             <td>
@@ -1123,7 +1341,7 @@ const GLTransactions = () => {
                                                 type === 'credit' ? 'text-success' : 
                                                 'text-muted'
                                               }`}>
-                                                {type === 'none' ? '' : (type === 'debit' ? '+' : '-')}{formatCurrency(amount)}
+                                                {type === 'none' ? '' : (type === 'debit' ? '-' : '+')}{formatCurrency(amount)}
                                               </span>
                                             </td>
                                             <td>
@@ -1140,6 +1358,23 @@ const GLTransactions = () => {
                                                 {transaction.tax_return_year || 'N/A'}
                                               </span>
                                             </td>
+                                            <td>
+                                              {(() => {
+                                                const matchingBankTx = findMatchingBankTransaction(transaction);
+                                                if (matchingBankTx) {
+                                                  return (
+                                                    <button
+                                                      className="btn btn-link btn-sm p-0 text-primary"
+                                                      onClick={() => handleBankTransactionClick(matchingBankTx)}
+                                                      style={{ textDecoration: 'underline', fontSize: '0.8rem' }}
+                                                    >
+                                                      {matchingBankTx.id}
+                                                    </button>
+                                                  );
+                                                }
+                                                return <span className="text-muted small">-</span>;
+                                              })()}
+                                            </td>
                                           </tr>
                                         );
                                       })}
@@ -1151,12 +1386,12 @@ const GLTransactions = () => {
                                         <td style={{ backgroundColor: '#e9ecef' }}>
                                           <div className="fw-bold">Change</div>
                                         </td>
-                                        <td style={{ backgroundColor: '#d1ecf1' }}>
-                                          <code className="small text-primary">Change</code>
+                                        <td style={{ backgroundColor: '#e9ecef' }}>
+                                          <code className="small text-dark">Change</code>
                                         </td>
                                         <td style={{ backgroundColor: '#e9ecef' }}>
-                                          <span className="badge bg-secondary text-white px-3 py-2 fw-bold" style={{ borderRadius: '15px', fontSize: '0.75rem' }}>
-                                            N/A
+                                          <span className="badge bg-warning text-dark px-3 py-2 fw-bold" style={{ borderRadius: '15px', fontSize: '0.75rem' }}>
+                                            Change
                                           </span>
                                         </td>
                                         <td style={{ backgroundColor: '#e9ecef' }}>
@@ -1167,14 +1402,17 @@ const GLTransactions = () => {
                                           </span>
                                         </td>
                                         <td style={{ backgroundColor: '#e9ecef' }}>
-                                          <span className="badge bg-secondary text-white px-3 py-2 fw-bold" style={{ borderRadius: '15px', fontSize: '0.75rem' }}>
-                                            N/A
+                                          <span className="badge bg-warning text-dark px-3 py-2 fw-bold" style={{ borderRadius: '15px', fontSize: '0.75rem' }}>
+                                            Change
                                           </span>
                                         </td>
                                         <td style={{ backgroundColor: '#e9ecef' }}>
                                           <span className="badge bg-primary text-white px-3 py-2 fw-bold" style={{ borderRadius: '15px', fontSize: '0.75rem' }}>
                                             {filters.year || 'N/A'}
                                           </span>
+                                        </td>
+                                        <td style={{ backgroundColor: '#e9ecef' }}>
+                                          <span className="text-muted small">-</span>
                                         </td>
                                       </tr>
                                       
@@ -1185,12 +1423,12 @@ const GLTransactions = () => {
                                         <td style={{ backgroundColor: '#e9ecef' }}>
                                           <div className="fw-bold">Close</div>
                                         </td>
-                                        <td style={{ backgroundColor: '#d1ecf1' }}>
-                                          <code className="small text-primary">Close</code>
+                                        <td style={{ backgroundColor: '#e9ecef' }}>
+                                          <code className="small text-dark">Close</code>
                                         </td>
                                         <td style={{ backgroundColor: '#e9ecef' }}>
-                                          <span className="badge bg-secondary text-white px-3 py-2 fw-bold" style={{ borderRadius: '15px', fontSize: '0.75rem' }}>
-                                            N/A
+                                          <span className="badge bg-dark text-white px-3 py-2 fw-bold" style={{ borderRadius: '15px', fontSize: '0.75rem' }}>
+                                            Closing
                                           </span>
                                         </td>
                                         <td style={{ backgroundColor: '#e9ecef' }}>
@@ -1199,14 +1437,17 @@ const GLTransactions = () => {
                                           </span>
                                         </td>
                                         <td style={{ backgroundColor: '#e9ecef' }}>
-                                          <span className="badge bg-secondary text-white px-3 py-2 fw-bold" style={{ borderRadius: '15px', fontSize: '0.75rem' }}>
-                                            N/A
+                                          <span className="badge bg-dark text-white px-3 py-2 fw-bold" style={{ borderRadius: '15px', fontSize: '0.75rem' }}>
+                                            Closing
                                           </span>
                                         </td>
                                         <td style={{ backgroundColor: '#e9ecef' }}>
                                           <span className="badge bg-primary text-white px-3 py-2 fw-bold" style={{ borderRadius: '15px', fontSize: '0.75rem' }}>
                                             {filters.year || 'N/A'}
                                           </span>
+                                        </td>
+                                        <td style={{ backgroundColor: '#e9ecef' }}>
+                                          <span className="text-muted small">-</span>
                                         </td>
                                       </tr>
                                     </tbody>
@@ -1249,13 +1490,14 @@ const GLTransactions = () => {
                         </th>
                         <th>D/C</th>
                         <th>Year</th>
+                        <th style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '120px' }} title="Bank Transaction ID">Bank Transaction ID</th>
                         <th>File</th>
                       </tr>
                     </thead>
                     <tbody>
                       {loading ? (
                         <tr>
-                          <td colSpan="10" className="text-center">
+                          <td colSpan="11" className="text-center">
                             <div className="spinner-border" role="status">
                               <span className="visually-hidden">Loading...</span>
                             </div>
@@ -1263,7 +1505,7 @@ const GLTransactions = () => {
                         </tr>
                       ) : transactions.length === 0 ? (
                         <tr>
-                          <td colSpan="10" className="text-center text-muted">
+                          <td colSpan="11" className="text-center text-muted">
                             No transactions found
                           </td>
                         </tr>
@@ -1290,17 +1532,25 @@ const GLTransactions = () => {
                               <td>{transaction.reference || 'N/A'}</td>
                               <td>
                                 <span className={`badge ${
-                                  transaction.source === 'AJ' ? 'bg-info' :
-                                  transaction.source === 'PJ' ? 'bg-primary' :
-                                  'bg-light text-dark'
+                                  transaction.source === 'AJ' ? 'bg-info text-white' :
+                                  transaction.source === 'PJ' ? 'bg-primary text-white' :
+                                  transaction.source === 'AP' ? 'bg-secondary text-white' :
+                                  transaction.source === 'SE' ? 'bg-warning text-dark' :
+                                  transaction.source === 'CD' ? 'bg-dark text-white' :
+                                  transaction.source === 'PL' ? 'bg-light text-dark' :
+                                  'bg-warning text-dark'
                                 }`} title={
-                                  transaction.source === 'AJ' ? 'Adjustment Journal (Non-cash)' :
-                                  transaction.source === 'PJ' ? 'Payment Journal (Bank Transaction)' :
+                                  transaction.source === 'AJ' ? 'Adjustment Journal' :
+                                  transaction.source === 'PJ' ? 'Payment Journal' :
                                   'Unknown Type'
                                 }>
-                                  {transaction.source === 'AJ' ? 'AJ (Adjustment)' :
-                                   transaction.source === 'PJ' ? 'PJ (Bank)' :
-                                   transaction.source || 'N/A'}
+                                  {transaction.source === 'AJ' ? 'AJ' :
+                                   transaction.source === 'PJ' ? 'PJ' :
+                                   transaction.source === 'AP' ? 'AP' :
+                                   transaction.source === 'SE' ? 'SE' :
+                                   transaction.source === 'CD' ? 'CD' :
+                                   transaction.source === 'PL' ? 'PL' :
+                                   transaction.source || 'Unknown'}
                                 </span>
                               </td>
                               <td>
@@ -1318,7 +1568,7 @@ const GLTransactions = () => {
                                   type === 'credit' ? 'text-success' : 
                                   'text-muted'
                                 }`}>
-                                  {type === 'none' ? '' : (type === 'debit' ? '+' : '-')}{formatCurrency(amount)}
+                                  {type === 'none' ? '' : (type === 'debit' ? '-' : '+')}{formatCurrency(amount)}
                                 </span>
                               </td>
                               <td>
@@ -1331,6 +1581,23 @@ const GLTransactions = () => {
                                 </span>
                               </td>
                               <td>{transaction.tax_return_year || 'N/A'}</td>
+                              <td>
+                                {(() => {
+                                  const matchingBankTx = findMatchingBankTransaction(transaction);
+                                  if (matchingBankTx) {
+                                    return (
+                                      <button
+                                        className="btn btn-link btn-sm p-0 text-primary"
+                                        onClick={() => handleBankTransactionClick(matchingBankTx)}
+                                        style={{ textDecoration: 'underline', fontSize: '0.8rem' }}
+                                      >
+                                        {matchingBankTx.id}
+                                      </button>
+                                    );
+                                  }
+                                  return <span className="text-muted small">-</span>;
+                                })()}
+                              </td>
                               <td>
                                 <small className="text-muted">
                                   {transaction.tax_return_filename ? 
@@ -1622,6 +1889,108 @@ const GLTransactions = () => {
                   type="button"
                   className="btn btn-secondary"
                   onClick={() => setShowTransactionModal(false)}
+                >
+                  Close
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Bank Transaction Modal */}
+      {showBankTransactionModal && selectedBankTransaction && (
+        <div className="modal show d-block" style={{ backgroundColor: 'rgba(0,0,0,0.5)' }}>
+          <div className="modal-dialog modal-lg">
+            <div className="modal-content">
+              <div className="modal-header">
+                <h5 className="modal-title">
+                  <i className="fas fa-university me-2"></i>
+                  Bank Transaction Details
+                </h5>
+                <button
+                  type="button"
+                  className="btn-close"
+                  onClick={() => setShowBankTransactionModal(false)}
+                ></button>
+              </div>
+              <div className="modal-body">
+                <div className="table-responsive">
+                  <table className="table table-sm">
+                    <tbody>
+                      <tr>
+                        <td className="text-muted fw-bold">Transaction ID:</td>
+                        <td><code>{selectedBankTransaction.id}</code></td>
+                      </tr>
+                      <tr>
+                        <td className="text-muted fw-bold">Date:</td>
+                        <td>{selectedBankTransaction.transaction_date || selectedBankTransaction.date || 'N/A'}</td>
+                      </tr>
+                      <tr>
+                        <td className="text-muted fw-bold">Description:</td>
+                        <td>{selectedBankTransaction.description || 'N/A'}</td>
+                      </tr>
+                      <tr>
+                        <td className="text-muted fw-bold">Amount:</td>
+                        <td>
+                          <span className={`fw-bold ${
+                            selectedBankTransaction.amount < 0 ? 'text-danger' : 'text-success'
+                          }`}>
+                            {selectedBankTransaction.amount ? 
+                              new Intl.NumberFormat('en-EU', {
+                                style: 'currency',
+                                currency: 'EUR'
+                              }).format(selectedBankTransaction.amount) : 'N/A'
+                            }
+                          </span>
+                        </td>
+                      </tr>
+                      <tr>
+                        <td className="text-muted fw-bold">Balance:</td>
+                        <td>
+                          {selectedBankTransaction.balance ? 
+                            new Intl.NumberFormat('en-EU', {
+                              style: 'currency',
+                              currency: 'EUR'
+                            }).format(selectedBankTransaction.balance) : 'N/A'
+                          }
+                        </td>
+                      </tr>
+                      <tr>
+                        <td className="text-muted fw-bold">Type:</td>
+                        <td>
+                          <span className={`badge ${
+                            selectedBankTransaction.amount < 0 ? 'bg-danger' : 'bg-success'
+                          } text-white`}>
+                            {selectedBankTransaction.amount < 0 ? 'DEBIT' : 'CREDIT'}
+                          </span>
+                        </td>
+                      </tr>
+                      <tr>
+                        <td className="text-muted fw-bold">Reference:</td>
+                        <td>{selectedBankTransaction.reference || 'N/A'}</td>
+                      </tr>
+                      <tr>
+                        <td className="text-muted fw-bold">Category:</td>
+                        <td>{selectedBankTransaction.category || 'N/A'}</td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+              <div className="modal-footer">
+                <button
+                  type="button"
+                  className="btn btn-primary"
+                  onClick={() => viewInContext(selectedBankTransaction)}
+                >
+                  <i className="fas fa-external-link-alt me-2"></i>
+                  View in Context
+                </button>
+                <button
+                  type="button"
+                  className="btn btn-secondary"
+                  onClick={() => setShowBankTransactionModal(false)}
                 >
                   Close
                 </button>
