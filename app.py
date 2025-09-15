@@ -3849,12 +3849,20 @@ def get_all_gl_transactions():
 @app.route('/api/gl-transactions/summary-counts', methods=['GET'])
 @jwt_required()
 def get_gl_transactions_summary_counts():
-    """Get summary counts for GL transactions by type"""
+    """Get summary counts for GL transactions by type with optional year filtering"""
     try:
         current_user_id = get_jwt_identity()
         
+        # Get query parameters for filtering
+        year = request.args.get('year', '', type=str)
+        
         # Get all transactions for this user
         query = TaxReturnTransaction.query.join(TaxReturn).filter(TaxReturn.user_id == current_user_id)
+        
+        # Apply year filter if specified
+        if year:
+            query = query.filter(TaxReturn.year == int(year))
+        
         all_transactions = query.all()
         
         # Count by source type

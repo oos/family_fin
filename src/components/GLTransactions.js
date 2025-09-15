@@ -26,7 +26,7 @@ const GLTransactions = () => {
     amountMax: '',
     source: '',
     categoryHeading: '',
-    year: '',
+    year: '2024', // Default to 2024
     transactionType: '' // New: PJ vs AJ filtering
   });
 
@@ -57,6 +57,11 @@ const GLTransactions = () => {
     fetchFilterOptions();
     fetchSummaryCounts();
   }, [currentPage, rowsPerPage, sortField, sortDirection, filters]);
+
+  // Separate useEffect for summary counts to avoid unnecessary refetches
+  useEffect(() => {
+    fetchSummaryCounts();
+  }, [filters.year]);
 
   const fetchTransactions = async () => {
     setLoading(true);
@@ -123,7 +128,13 @@ const GLTransactions = () => {
       const token = localStorage.getItem('token');
       if (!token) return;
 
-      const response = await axios.get('/gl-transactions/summary-counts', {
+      // Build query parameters including year filter
+      const params = new URLSearchParams();
+      if (filters.year) {
+        params.append('year', filters.year);
+      }
+
+      const response = await axios.get(`/gl-transactions/summary-counts?${params.toString()}`, {
         headers: { Authorization: `Bearer ${token}` }
       });
       
@@ -161,7 +172,7 @@ const GLTransactions = () => {
       amountMax: '',
       source: '',
       categoryHeading: '',
-      year: '',
+      year: '2024', // Reset to 2024 instead of empty
       transactionType: ''
     });
     setCurrentPage(1);
