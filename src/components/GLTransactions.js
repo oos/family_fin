@@ -991,6 +991,38 @@ const GLTransactions = () => {
                                       </tr>
                                     </thead>
                                     <tbody>
+                                      {/* Opening Row */}
+                                      <tr style={{ backgroundColor: '#e9ecef' }}>
+                                        <td><code className="text-muted small">-</code></td>
+                                        <td>N/A</td>
+                                        <td>
+                                          <div className="fw-bold">{account.accountName}</div>
+                                        </td>
+                                        <td>
+                                          <code className="small text-primary">Opening</code>
+                                        </td>
+                                        <td>
+                                          <span className="badge bg-secondary text-white px-3 py-2 fw-bold" style={{ borderRadius: '15px', fontSize: '0.75rem' }}>
+                                            N/A
+                                          </span>
+                                        </td>
+                                        <td>
+                                          <span className="fw-bold text-muted">
+                                            {formatCurrency(account.openingBalance)}
+                                          </span>
+                                        </td>
+                                        <td>
+                                          <span className="badge bg-secondary text-white px-3 py-2 fw-bold" style={{ borderRadius: '15px', fontSize: '0.75rem' }}>
+                                            N/A
+                                          </span>
+                                        </td>
+                                        <td>
+                                          <span className="badge bg-primary text-white px-3 py-2 fw-bold" style={{ borderRadius: '15px', fontSize: '0.75rem' }}>
+                                            {filters.year || 'N/A'}
+                                          </span>
+                                        </td>
+                                      </tr>
+                                      
                                       {account.transactions.map((transaction, index) => {
                                         const { amount, type } = getTransactionAmount(transaction);
                                         const uid = generateUID(transaction, index);
@@ -1060,25 +1092,71 @@ const GLTransactions = () => {
                                           </tr>
                                         );
                                       })}
-                                      {/* Total Row */}
-                                      <tr style={{ backgroundColor: '#343a40' }}>
-                                        <td colSpan="2" className="text-white fw-bold py-3">TOTAL</td>
-                                        <td className="py-3"></td>
-                                        <td className="py-3"></td>
-                                        <td className="py-3"></td>
-                                        <td className="text-end py-3">
+                                      
+                                      {/* Change Row */}
+                                      <tr style={{ backgroundColor: '#e9ecef' }}>
+                                        <td><code className="text-muted small">-</code></td>
+                                        <td>N/A</td>
+                                        <td>
+                                          <div className="fw-bold">Change</div>
+                                        </td>
+                                        <td>
+                                          <code className="small text-primary">Change</code>
+                                        </td>
+                                        <td>
+                                          <span className="badge bg-secondary text-white px-3 py-2 fw-bold" style={{ borderRadius: '15px', fontSize: '0.75rem' }}>
+                                            N/A
+                                          </span>
+                                        </td>
+                                        <td>
                                           <span className={`fw-bold ${
                                             account.netChange >= 0 ? 'text-success' : 'text-danger'
-                                          }`} style={{ fontSize: '1.1rem' }}>
+                                          }`}>
                                             {account.netChange >= 0 ? '+' : ''}{formatCurrency(account.netChange)}
                                           </span>
                                         </td>
-                                        <td className="py-3">
-                                          <span className="badge bg-white text-dark px-3 py-2 fw-bold" style={{ borderRadius: '15px', fontSize: '0.75rem' }}>
-                                            {account.totalDebits > account.totalCredits ? 'Debit' : 'Credit'}
+                                        <td>
+                                          <span className="badge bg-secondary text-white px-3 py-2 fw-bold" style={{ borderRadius: '15px', fontSize: '0.75rem' }}>
+                                            N/A
                                           </span>
                                         </td>
-                                        <td className="py-3"></td>
+                                        <td>
+                                          <span className="badge bg-primary text-white px-3 py-2 fw-bold" style={{ borderRadius: '15px', fontSize: '0.75rem' }}>
+                                            {filters.year || 'N/A'}
+                                          </span>
+                                        </td>
+                                      </tr>
+                                      
+                                      {/* Closing Row */}
+                                      <tr style={{ backgroundColor: '#e9ecef' }}>
+                                        <td><code className="text-muted small">-</code></td>
+                                        <td>N/A</td>
+                                        <td>
+                                          <div className="fw-bold">Close</div>
+                                        </td>
+                                        <td>
+                                          <code className="small text-primary">Close</code>
+                                        </td>
+                                        <td>
+                                          <span className="badge bg-secondary text-white px-3 py-2 fw-bold" style={{ borderRadius: '15px', fontSize: '0.75rem' }}>
+                                            N/A
+                                          </span>
+                                        </td>
+                                        <td>
+                                          <span className="fw-bold text-muted">
+                                            {formatCurrency(account.closingBalance)}
+                                          </span>
+                                        </td>
+                                        <td>
+                                          <span className="badge bg-secondary text-white px-3 py-2 fw-bold" style={{ borderRadius: '15px', fontSize: '0.75rem' }}>
+                                            N/A
+                                          </span>
+                                        </td>
+                                        <td>
+                                          <span className="badge bg-primary text-white px-3 py-2 fw-bold" style={{ borderRadius: '15px', fontSize: '0.75rem' }}>
+                                            {filters.year || 'N/A'}
+                                          </span>
+                                        </td>
                                       </tr>
                                     </tbody>
                                   </table>
