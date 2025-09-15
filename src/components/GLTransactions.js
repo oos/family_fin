@@ -205,6 +205,46 @@ const GLTransactions = () => {
     return new Date(dateString).toLocaleDateString();
   };
 
+  // Get active filters for display as chips
+  const getActiveFilters = () => {
+    const activeFilters = [];
+    
+    if (filters.year && filters.year !== '') {
+      activeFilters.push({ key: 'year', label: `Year: ${filters.year}`, value: filters.year });
+    }
+    if (filters.source && filters.source !== '') {
+      activeFilters.push({ key: 'source', label: `Source: ${filters.source}`, value: filters.source });
+    }
+    if (filters.transactionType && filters.transactionType !== '') {
+      const typeLabel = filters.transactionType === 'PJ' ? 'PJ (Bank)' : 
+                       filters.transactionType === 'AJ' ? 'AJ (Adjustment)' : 
+                       filters.transactionType;
+      activeFilters.push({ key: 'transactionType', label: `Type: ${typeLabel}`, value: filters.transactionType });
+    }
+    if (filters.categoryHeading && filters.categoryHeading !== '') {
+      activeFilters.push({ key: 'categoryHeading', label: `Account: ${filters.categoryHeading}`, value: filters.categoryHeading });
+    }
+    if (filters.dateFrom && filters.dateFrom !== '') {
+      activeFilters.push({ key: 'dateFrom', label: `From: ${filters.dateFrom}`, value: filters.dateFrom });
+    }
+    if (filters.dateTo && filters.dateTo !== '') {
+      activeFilters.push({ key: 'dateTo', label: `To: ${filters.dateTo}`, value: filters.dateTo });
+    }
+    if (filters.amountMin && filters.amountMin !== '') {
+      activeFilters.push({ key: 'amountMin', label: `Min: ${formatCurrency(filters.amountMin)}`, value: filters.amountMin });
+    }
+    if (filters.amountMax && filters.amountMax !== '') {
+      activeFilters.push({ key: 'amountMax', label: `Max: ${formatCurrency(filters.amountMax)}`, value: filters.amountMax });
+    }
+    
+    return activeFilters;
+  };
+
+  // Remove a specific filter
+  const removeFilter = (filterKey) => {
+    handleFilterChange(filterKey, '');
+  };
+
   // Group transactions by account and calculate totals
   const groupTransactionsByAccount = (transactions) => {
     const grouped = {};
@@ -625,16 +665,35 @@ const GLTransactions = () => {
                       <i className={`fas ${groupByAccount ? 'fa-layer-group' : 'fa-list'}`}></i> 
                       {groupByAccount ? 'Grouped by Account' : 'Group by Account'}
                     </button>
-                    <div className="d-flex align-items-center gap-2">
-                      <i className="fas fa-search text-muted"></i>
-                      <input
-                        type="text"
-                        className="form-control form-control-sm"
-                        placeholder="Search transactions..."
-                        value={filters.search}
-                        onChange={(e) => handleFilterChange('search', e.target.value)}
-                        style={{ width: '200px' }}
-                      />
+                    <div className="d-flex align-items-center gap-2 flex-wrap">
+                      <div className="d-flex align-items-center gap-2">
+                        <i className="fas fa-search text-muted"></i>
+                        <input
+                          type="text"
+                          className="form-control form-control-sm"
+                          placeholder="Search transactions..."
+                          value={filters.search}
+                          onChange={(e) => handleFilterChange('search', e.target.value)}
+                          style={{ width: '200px' }}
+                        />
+                      </div>
+                      {/* Filter Chips */}
+                      {getActiveFilters().map((filter) => (
+                        <span
+                          key={filter.key}
+                          className="badge bg-primary text-white d-flex align-items-center gap-1 px-3 py-2"
+                          style={{ fontSize: '0.75rem', borderRadius: '15px' }}
+                        >
+                          {filter.label}
+                          <button
+                            type="button"
+                            className="btn-close btn-close-white"
+                            style={{ fontSize: '0.6rem', padding: '0' }}
+                            onClick={() => removeFilter(filter.key)}
+                            title={`Remove ${filter.label}`}
+                          ></button>
+                        </span>
+                      ))}
                     </div>
                   </div>
                   <div className="d-flex align-items-center gap-3">
