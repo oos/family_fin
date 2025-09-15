@@ -818,10 +818,10 @@ const GLTransactions = () => {
                                 .sort(([_, a], [__, b]) => b.totalCredits - a.totalCredits)
                                 .map(([accountName, account]) => (
                                   <div key={accountName} className="d-flex justify-content-between align-items-center py-1 border-bottom">
-                                    <span className="text-truncate me-2" style={{ maxWidth: '200px' }} title={accountName}>
+                                    <span className="me-2 flex-grow-1" style={{ minWidth: '0' }}>
                                       {accountName}
                                     </span>
-                                    <span className="text-success fw-bold">
+                                    <span className="text-success fw-bold flex-shrink-0">
                                       {formatCurrency(account.totalCredits)}
                                     </span>
                                   </div>
@@ -839,10 +839,10 @@ const GLTransactions = () => {
                                 .sort(([_, a], [__, b]) => b.totalDebits - a.totalDebits)
                                 .map(([accountName, account]) => (
                                   <div key={accountName} className="d-flex justify-content-between align-items-center py-1 border-bottom">
-                                    <span className="text-truncate me-2" style={{ maxWidth: '200px' }} title={accountName}>
+                                    <span className="me-2 flex-grow-1" style={{ minWidth: '0' }}>
                                       {accountName}
                                     </span>
-                                    <span className="text-danger fw-bold">
+                                    <span className="text-danger fw-bold flex-shrink-0">
                                       {formatCurrency(account.totalDebits)}
                                     </span>
                                   </div>
