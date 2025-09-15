@@ -1775,7 +1775,6 @@ const GLTransactions = () => {
           </div>
         </div>
       )}
-      </div>
     </>
   );
 };
