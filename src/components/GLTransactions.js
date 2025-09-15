@@ -9,7 +9,7 @@ const GLTransactions = () => {
   const [showTransactionModal, setShowTransactionModal] = useState(false);
   const [selectedTransaction, setSelectedTransaction] = useState(null);
   const [sortField, setSortField] = useState('date');
-  const [sortDirection, setSortDirection] = useState('desc');
+  const [sortDirection, setSortDirection] = useState('asc');
   
   // Pagination states
   const [currentPage, setCurrentPage] = useState(1);
@@ -234,9 +234,17 @@ const GLTransactions = () => {
       grouped[accountKey].netChange += (debit - credit);
     });
     
-    // Calculate opening and closing balances
+    // Calculate opening and closing balances and sort transactions
     Object.keys(grouped).forEach(accountKey => {
       const account = grouped[accountKey];
+      
+      // Sort transactions by date in ascending order (oldest first) to match original document
+      account.transactions.sort((a, b) => {
+        const dateA = new Date(a.date || '1900-01-01');
+        const dateB = new Date(b.date || '1900-01-01');
+        return dateA - dateB;
+      });
+      
       // For now, we'll set opening to 0 and closing to net change
       // In a real GL, opening would come from previous year's closing
       account.openingBalance = 0;
@@ -663,23 +671,23 @@ const GLTransactions = () => {
                       return (
                         <div key={accountKey} className="account-group mb-2">
                           <div className="card">
-                            <div 
-                              className="card-header bg-dark text-white py-2 px-3 d-flex justify-content-between align-items-center"
-                              onClick={() => toggleAccountExpansion(accountKey)}
-                              style={{ cursor: 'pointer' }}
-                            >
-                              <div className="d-flex align-items-center">
-                                <i className={`fas ${isExpanded ? 'fa-folder-open' : 'fa-folder'} me-2`}></i>
-                                <h6 className="mb-0 text-white">{account.accountName}</h6>
-                                <span className="badge bg-light text-dark ms-2 small">
-                                  {transactionCount} Transactions
-                                </span>
-                                <div className="d-flex align-items-center gap-2 small ms-3">
-                                  <span className="text-white">Max: {formatCurrency(stats.max)}</span>
-                                  <span className="text-white">Avg: {formatCurrency(stats.avg)}</span>
-                                  <span className="text-white">Min: {formatCurrency(stats.min)}</span>
-                                </div>
-                              </div>
+        <div
+          className="card-header bg-light py-2 px-3 d-flex justify-content-between align-items-center"
+          onClick={() => toggleAccountExpansion(accountKey)}
+          style={{ cursor: 'pointer' }}
+        >
+          <div className="d-flex align-items-center">
+            <i className={`fas ${isExpanded ? 'fa-folder-open' : 'fa-folder'} me-2`}></i>
+            <h6 className="mb-0">{account.accountName}</h6>
+            <span className="badge bg-light text-dark ms-2 small">
+              {transactionCount} Transactions
+            </span>
+            <div className="d-flex align-items-center gap-2 small ms-3">
+              <span>Max: {formatCurrency(stats.max)}</span>
+              <span>Avg: {formatCurrency(stats.avg)}</span>
+              <span>Min: {formatCurrency(stats.min)}</span>
+            </div>
+          </div>
                               <div className="d-flex align-items-center">
                                 <div className="text-end small">
                                   <div>Opening: {formatCurrency(account.openingBalance)}</div>

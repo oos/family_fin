@@ -3735,7 +3735,7 @@ def get_all_gl_transactions():
         year = request.args.get('year', '', type=str)
         transaction_type = request.args.get('transaction_type', '', type=str)
         sort_field = request.args.get('sort_field', 'date', type=str)
-        sort_direction = request.args.get('sort_direction', 'desc', type=str)
+        sort_direction = request.args.get('sort_direction', 'asc', type=str)
         
         # Build query
         query = TaxReturnTransaction.query.join(TaxReturn).filter(TaxReturn.user_id == current_user_id)
