@@ -887,19 +887,126 @@ const GLTransactions = () => {
                   </div>
                 )}
                 
-                {/* Debug Section - Show ALL available fields */}
-                {selectedTransaction && (
-                  <div className="mt-4">
-                    <h6>All Available Data (Debug)</h6>
-                    <div className="card bg-light">
-                      <div className="card-body">
-                        <pre className="small mb-0" style={{maxHeight: '200px', overflow: 'auto'}}>
-                          {JSON.stringify(selectedTransaction, null, 2)}
-                        </pre>
-                      </div>
-                    </div>
-                  </div>
-                )}
+           {/* Complete Transaction Details */}
+           {selectedTransaction && (
+             <div className="mt-4">
+               <h6>Complete Transaction Details</h6>
+               <div className="row">
+                 <div className="col-md-6">
+                   <h6 className="text-muted">System Information</h6>
+                   <table className="table table-sm table-borderless">
+                     <tbody>
+                       <tr>
+                         <td className="text-muted">Database ID:</td>
+                         <td><code>{selectedTransaction.id || 'N/A'}</code></td>
+                       </tr>
+                       <tr>
+                         <td className="text-muted">Balance:</td>
+                         <td className="fw-bold">{formatCurrency(selectedTransaction.balance || 0)}</td>
+                       </tr>
+                       <tr>
+                         <td className="text-muted">Created:</td>
+                         <td>{selectedTransaction.created_at ? formatDate(selectedTransaction.created_at) : 'N/A'}</td>
+                       </tr>
+                       <tr>
+                         <td className="text-muted">Updated:</td>
+                         <td>{selectedTransaction.updated_at ? formatDate(selectedTransaction.updated_at) : 'N/A'}</td>
+                       </tr>
+                     </tbody>
+                   </table>
+                 </div>
+                 <div className="col-md-6">
+                   <h6 className="text-muted">Additional Details</h6>
+                   <table className="table table-sm table-borderless">
+                     <tbody>
+                       <tr>
+                         <td className="text-muted">Annotation:</td>
+                         <td>{selectedTransaction.annotation || <span className="text-muted">None</span>}</td>
+                       </tr>
+                       <tr>
+                         <td className="text-muted">Category Code:</td>
+                         <td>
+                           <span className="badge bg-info">
+                             {selectedTransaction.category_heading || 'N/A'}
+                           </span>
+                         </td>
+                       </tr>
+                       <tr>
+                         <td className="text-muted">Transaction Type:</td>
+                         <td>
+                           <span className={`badge ${
+                             selectedTransaction.source === 'AJ' ? 'bg-warning' :
+                             selectedTransaction.source === 'PJ' ? 'bg-success' :
+                             selectedTransaction.source === 'AP' ? 'bg-primary' :
+                             selectedTransaction.source === 'SE' ? 'bg-info' :
+                             selectedTransaction.source === 'CD' ? 'bg-secondary' :
+                             selectedTransaction.source === 'PL' ? 'bg-dark' :
+                             'bg-light text-dark'
+                           }`}>
+                             {selectedTransaction.source || 'N/A'}
+                           </span>
+                         </td>
+                       </tr>
+                       <tr>
+                         <td className="text-muted">File Source:</td>
+                         <td>
+                           <small className="text-muted">
+                             {selectedTransaction.tax_return_filename || 'N/A'}
+                           </small>
+                         </td>
+                       </tr>
+                     </tbody>
+                   </table>
+                 </div>
+               </div>
+               
+               {/* Financial Summary */}
+               <div className="mt-3">
+                 <h6 className="text-muted">Financial Summary</h6>
+                 <div className="row">
+                   <div className="col-md-4">
+                     <div className="card bg-light">
+                       <div className="card-body text-center py-2">
+                         <small className="text-muted">Debit Amount</small>
+                         <div className="fw-bold text-danger">
+                           {selectedTransaction.debit > 0 ? formatCurrency(selectedTransaction.debit) : 'N/A'}
+                         </div>
+                       </div>
+                     </div>
+                   </div>
+                   <div className="col-md-4">
+                     <div className="card bg-light">
+                       <div className="card-body text-center py-2">
+                         <small className="text-muted">Credit Amount</small>
+                         <div className="fw-bold text-success">
+                           {selectedTransaction.credit > 0 ? formatCurrency(selectedTransaction.credit) : 'N/A'}
+                         </div>
+                       </div>
+                     </div>
+                   </div>
+                   <div className="col-md-4">
+                     <div className="card bg-light">
+                       <div className="card-body text-center py-2">
+                         <small className="text-muted">Net Effect</small>
+                         <div className="fw-bold">
+                           {(() => {
+                             const debit = parseFloat(selectedTransaction.debit) || 0;
+                             const credit = parseFloat(selectedTransaction.credit) || 0;
+                             const net = debit - credit;
+                             return (
+                               <span className={net >= 0 ? 'text-danger' : 'text-success'}>
+                                 {net >= 0 ? '-' : '+'}{formatCurrency(Math.abs(net))}
+                               </span>
+                             );
+                           })()}
+                         </div>
+                       </div>
+                     </div>
+                   </div>
+                 </div>
+               </div>
+             </div>
+           )}
               </div>
               <div className="modal-footer">
                 <button
