@@ -245,12 +245,33 @@ const GLTransactions = () => {
     return grouped;
   };
 
-  // Update grouped transactions when transactions change
-  useEffect(() => {
-    if (groupByAccount && transactions.length > 0) {
-      setGroupedTransactions(groupTransactionsByAccount(transactions));
+  // Fetch all transactions for grouping (separate from paginated view)
+  const fetchAllTransactionsForGrouping = async () => {
+    try {
+      const token = localStorage.getItem('token');
+      if (!token) return;
+
+      const response = await axios.get('/gl-transactions?per_page=10000', {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      
+      return response.data.transactions;
+    } catch (error) {
+      console.error('Error fetching all transactions for grouping:', error);
+      return [];
     }
-  }, [transactions, groupByAccount]);
+  };
+
+  // Update grouped transactions when groupByAccount changes
+  useEffect(() => {
+    if (groupByAccount) {
+      fetchAllTransactionsForGrouping().then(allTransactions => {
+        setGroupedTransactions(groupTransactionsByAccount(allTransactions));
+      });
+    } else {
+      setGroupedTransactions({});
+    }
+  }, [groupByAccount]);
 
   const handleTransactionClick = (transaction) => {
     setSelectedTransaction(transaction);
