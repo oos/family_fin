@@ -522,13 +522,24 @@ const GLTransactions = () => {
                         {summaryCounts.other > 0 && (
                           <div className="row mt-2">
                             <div className="col-12">
-                              <small className="text-muted">Other Types (AP, SE, CD, PL, etc.):</small>
+                              <small className="text-muted">Other Types Breakdown:</small>
                               <div className="mt-1">
-                                <span className="badge bg-primary me-1">AP: {summaryCounts.ap || 0}</span>
-                                <span className="badge bg-info me-1">SE: {summaryCounts.se || 0}</span>
-                                <span className="badge bg-secondary me-1">CD: {summaryCounts.cd || 0}</span>
-                                <span className="badge bg-dark me-1">PL: {summaryCounts.pl || 0}</span>
-                                <span className="badge bg-light text-dark me-1">Other: {summaryCounts.other - (summaryCounts.ap || 0) - (summaryCounts.se || 0) - (summaryCounts.cd || 0) - (summaryCounts.pl || 0)}</span>
+                                <span className="badge bg-primary me-1" title="AP - Accounts Payable: Money owed to suppliers/vendors">AP: {summaryCounts.ap || 0}</span>
+                                <span className="badge bg-info me-1" title="SE - Sales Entry: Revenue from sales transactions">SE: {summaryCounts.se || 0}</span>
+                                <span className="badge bg-secondary me-1" title="CD - Cash Deposit: Money deposited into accounts">CD: {summaryCounts.cd || 0}</span>
+                                <span className="badge bg-dark me-1" title="PL - Profit & Loss: Income statement adjustments">PL: {summaryCounts.pl || 0}</span>
+                                {(() => {
+                                  const remainingOther = summaryCounts.other - (summaryCounts.ap || 0) - (summaryCounts.se || 0) - (summaryCounts.cd || 0) - (summaryCounts.pl || 0);
+                                  if (remainingOther > 0) {
+                                    return <span className="badge bg-light text-dark me-1" title="Other: Transactions with unknown or empty source types">Other: {remainingOther}</span>;
+                                  }
+                                  return null;
+                                })()}
+                              </div>
+                              <div className="mt-1">
+                                <small className="text-muted">
+                                  <strong>Legend:</strong> AP=Accounts Payable, SE=Sales Entry, CD=Cash Deposit, PL=Profit & Loss
+                                </small>
                               </div>
                             </div>
                           </div>
