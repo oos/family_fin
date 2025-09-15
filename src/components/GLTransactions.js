@@ -51,6 +51,7 @@ const GLTransactions = () => {
   // Account grouping state
   const [groupByAccount, setGroupByAccount] = useState(false);
   const [groupedTransactions, setGroupedTransactions] = useState({});
+  const [expandedAccounts, setExpandedAccounts] = useState({});
   
   // UI state for toggling panels
   const [showFilters, setShowFilters] = useState(true);
@@ -294,6 +295,30 @@ const GLTransactions = () => {
     const paddedId = String(transactionId).padStart(6, '0');
     const paddedIndex = String(index + 1).padStart(3, '0');
     return `${year}-${paddedId}-${paddedIndex}`;
+  };
+
+  const toggleAccountExpansion = (accountKey) => {
+    setExpandedAccounts(prev => ({
+      ...prev,
+      [accountKey]: !prev[accountKey]
+    }));
+  };
+
+  const calculateTransactionStats = (transactions) => {
+    if (transactions.length === 0) return { max: 0, min: 0, avg: 0 };
+    
+    const amounts = transactions.map(t => {
+      const amount = getTransactionAmount(t);
+      return Math.abs(amount.amount);
+    }).filter(amount => amount > 0);
+    
+    if (amounts.length === 0) return { max: 0, min: 0, avg: 0 };
+    
+    return {
+      max: Math.max(...amounts),
+      min: Math.min(...amounts),
+      avg: amounts.reduce((sum, amount) => sum + amount, 0) / amounts.length
+    };
   };
 
   const renderPagination = () => {
@@ -619,137 +644,162 @@ const GLTransactions = () => {
                       No transactions found
                     </div>
                   ) : (
-                    Object.entries(groupedTransactions).map(([accountKey, account]) => (
-                      <div key={accountKey} className="account-group mb-4">
-                        <div className="card">
-                          <div className="card-header bg-primary text-white">
-                            <div className="row align-items-center">
-                              <div className="col-md-6">
-                                <h5 className="mb-0">
-                                  <i className="fas fa-folder me-2"></i>
-                                  {account.accountName}
-                                </h5>
+                    Object.entries(groupedTransactions).map(([accountKey, account]) => {
+                      const isExpanded = expandedAccounts[accountKey];
+                      const stats = calculateTransactionStats(account.transactions);
+                      const transactionCount = account.transactions.length;
+                      
+                      return (
+                        <div key={accountKey} className="account-group mb-3">
+                          <div className="card">
+                            <div 
+                              className="card-header bg-primary text-white d-flex justify-content-between align-items-center"
+                              onClick={() => toggleAccountExpansion(accountKey)}
+                              style={{ cursor: 'pointer' }}
+                            >
+                              <div className="d-flex align-items-center">
+                                <i className={`fas ${isExpanded ? 'fa-folder-open' : 'fa-folder'} me-2`}></i>
+                                <h5 className="mb-0">{account.accountName}</h5>
+                                <span className="badge bg-light text-dark ms-2">
+                                  {transactionCount} transaction{transactionCount !== 1 ? 's' : ''}
+                                </span>
                               </div>
-                              <div className="col-md-6 text-end">
-                                <div className="row text-center">
-                                  <div className="col-4">
-                                    <small>Opening</small>
-                                    <div className="fw-bold">{formatCurrency(account.openingBalance)}</div>
-                                  </div>
-                                  <div className="col-4">
-                                    <small>Change</small>
-                                    <div className={`fw-bold ${account.netChange >= 0 ? 'text-success' : 'text-danger'}`}>
-                                      {account.netChange >= 0 ? '+' : ''}{formatCurrency(account.netChange)}
-                                    </div>
-                                  </div>
-                                  <div className="col-4">
-                                    <small>Closing</small>
-                                    <div className="fw-bold">{formatCurrency(account.closingBalance)}</div>
-                                  </div>
+                              <div className="text-end">
+                                <div className="small">
+                                  <div>Opening: {formatCurrency(account.openingBalance)}</div>
+                                  <div>Change: <span className={account.netChange >= 0 ? 'text-success' : 'text-danger'}>
+                                    {account.netChange >= 0 ? '+' : ''}{formatCurrency(account.netChange)}
+                                  </span></div>
+                                  <div>Closing: {formatCurrency(account.closingBalance)}</div>
+                                </div>
+                                <div className="mt-1">
+                                  <i className={`fas fa-chevron-${isExpanded ? 'up' : 'down'}`}></i>
                                 </div>
                               </div>
                             </div>
-                          </div>
-                          <div className="card-body p-0">
-                            <div className="table-responsive">
-                              <table className="table table-sm table-hover mb-0">
-                                <thead className="table-light">
-                                  <tr>
-                                    <th>ID</th>
-                                    <th>Date</th>
-                                    <th>Description</th>
-                                    <th>Reference</th>
-                                    <th>Type</th>
-                                    <th>Amount</th>
-                                    <th>D/C</th>
-                                    <th>Year</th>
-                                  </tr>
-                                </thead>
-                                <tbody>
-                                  {account.transactions.map((transaction, index) => {
-                                    const { amount, type } = getTransactionAmount(transaction);
-                                    const uid = generateUID(transaction, index);
-                                    return (
-                                      <tr 
-                                        key={transaction.id} 
-                                        className="cursor-pointer"
-                                        onClick={() => handleTransactionClick(transaction)}
-                                      >
-                                        <td><code className="text-muted small">{uid}</code></td>
-                                        <td>{formatDate(transaction.date)}</td>
-                                        <td>
-                                          <div className="fw-bold">{transaction.name}</div>
-                                          {transaction.annotation && (
-                                            <small className="text-muted">{transaction.annotation}</small>
-                                          )}
-                                        </td>
-                                        <td>
-                                          <code className="small">{transaction.reference || 'N/A'}</code>
-                                        </td>
-                                        <td>
-                                          <span className={`badge ${
-                                            transaction.source === 'AJ' ? 'bg-info' :
-                                            transaction.source === 'PJ' ? 'bg-primary' :
-                                            'bg-light text-dark'
-                                          }`}>
-                                            {transaction.source === 'AJ' ? 'AJ (Adjustment)' :
-                                             transaction.source === 'PJ' ? 'PJ (Bank)' :
-                                             transaction.source || 'N/A'}
-                                          </span>
-                                        </td>
-                                        <td>
-                                          <span className={`fw-bold ${
-                                            type === 'debit' ? 'text-danger' : 
-                                            type === 'credit' ? 'text-success' : 
-                                            'text-muted'
-                                          }`}>
-                                            {type === 'debit' ? '-' : '+'}{formatCurrency(amount)}
-                                          </span>
-                                        </td>
-                                        <td>
-                                          <span className={`badge ${
-                                            type === 'debit' ? 'bg-danger' : 
-                                            type === 'credit' ? 'bg-success' : 
-                                            'bg-secondary'
-                                          }`}>
-                                            {type === 'debit' ? 'Debit' : type === 'credit' ? 'Credit' : 'N/A'}
-                                          </span>
-                                        </td>
-                                        <td>
-                                          <span className="badge bg-secondary">
-                                            {transaction.tax_return_year || 'N/A'}
-                                          </span>
-                                        </td>
-                                      </tr>
-                                    );
-                                  })}
-                                  {/* Total Row */}
-                                  <tr className="table-dark fw-bold">
-                                    <td colSpan="2">TOTAL</td>
-                                    <td></td>
-                                    <td></td>
-                                    <td></td>
-                                    <td className="text-end">
-                                      <span className={`${
-                                        account.netChange >= 0 ? 'text-success' : 'text-danger'
-                                      }`}>
-                                        {account.netChange >= 0 ? '+' : ''}{formatCurrency(account.netChange)}
-                                      </span>
-                                    </td>
-                                    <td>
-                                      <span className="badge bg-light text-dark">
-                                        {account.totalDebits > account.totalCredits ? 'Debit' : 'Credit'}
-                                      </span>
-                                    </td>
-                                    <td></td>
-                                  </tr>
-                                </tbody>
-                              </table>
+                            
+                            {/* Transaction Statistics */}
+                            <div className="card-body py-2 px-3 bg-light">
+                              <div className="row text-center">
+                                <div className="col-4">
+                                  <small className="text-muted">Max Amount</small>
+                                  <div className="fw-bold text-primary">{formatCurrency(stats.max)}</div>
+                                </div>
+                                <div className="col-4">
+                                  <small className="text-muted">Min Amount</small>
+                                  <div className="fw-bold text-info">{formatCurrency(stats.min)}</div>
+                                </div>
+                                <div className="col-4">
+                                  <small className="text-muted">Avg Amount</small>
+                                  <div className="fw-bold text-success">{formatCurrency(stats.avg)}</div>
+                                </div>
+                              </div>
                             </div>
+                            
+                            {/* Expandable Transaction Table */}
+                            {isExpanded && (
+                              <div className="card-body p-0">
+                                <div className="table-responsive">
+                                  <table className="table table-sm table-hover mb-0">
+                                    <thead className="table-light">
+                                      <tr>
+                                        <th>ID</th>
+                                        <th>Date</th>
+                                        <th>Description</th>
+                                        <th>Reference</th>
+                                        <th>Type</th>
+                                        <th>Amount</th>
+                                        <th>D/C</th>
+                                        <th>Year</th>
+                                      </tr>
+                                    </thead>
+                                    <tbody>
+                                      {account.transactions.map((transaction, index) => {
+                                        const { amount, type } = getTransactionAmount(transaction);
+                                        const uid = generateUID(transaction, index);
+                                        return (
+                                          <tr 
+                                            key={transaction.id} 
+                                            className="cursor-pointer"
+                                            onClick={() => handleTransactionClick(transaction)}
+                                          >
+                                            <td><code className="text-muted small">{uid}</code></td>
+                                            <td>{formatDate(transaction.date)}</td>
+                                            <td>
+                                              <div className="fw-bold">{transaction.name}</div>
+                                              {transaction.annotation && (
+                                                <small className="text-muted">{transaction.annotation}</small>
+                                              )}
+                                            </td>
+                                            <td>
+                                              <code className="small">{transaction.reference || 'N/A'}</code>
+                                            </td>
+                                            <td>
+                                              <span className={`badge ${
+                                                transaction.source === 'AJ' ? 'bg-info' :
+                                                transaction.source === 'PJ' ? 'bg-primary' :
+                                                'bg-light text-dark'
+                                              }`}>
+                                                {transaction.source === 'AJ' ? 'AJ (Adjustment)' :
+                                                 transaction.source === 'PJ' ? 'PJ (Bank)' :
+                                                 transaction.source || 'N/A'}
+                                              </span>
+                                            </td>
+                                            <td>
+                                              <span className={`fw-bold ${
+                                                type === 'debit' ? 'text-danger' : 
+                                                type === 'credit' ? 'text-success' : 
+                                                'text-muted'
+                                              }`}>
+                                                {type === 'debit' ? '-' : '+'}{formatCurrency(amount)}
+                                              </span>
+                                            </td>
+                                            <td>
+                                              <span className={`badge ${
+                                                type === 'debit' ? 'bg-danger' : 
+                                                type === 'credit' ? 'bg-success' : 
+                                                'bg-secondary'
+                                              }`}>
+                                                {type === 'debit' ? 'Debit' : type === 'credit' ? 'Credit' : 'N/A'}
+                                              </span>
+                                            </td>
+                                            <td>
+                                              <span className="badge bg-secondary">
+                                                {transaction.tax_return_year || 'N/A'}
+                                              </span>
+                                            </td>
+                                          </tr>
+                                        );
+                                      })}
+                                      {/* Total Row */}
+                                      <tr className="table-dark fw-bold">
+                                        <td colSpan="2">TOTAL</td>
+                                        <td></td>
+                                        <td></td>
+                                        <td></td>
+                                        <td className="text-end">
+                                          <span className={`${
+                                            account.netChange >= 0 ? 'text-success' : 'text-danger'
+                                          }`}>
+                                            {account.netChange >= 0 ? '+' : ''}{formatCurrency(account.netChange)}
+                                          </span>
+                                        </td>
+                                        <td>
+                                          <span className="badge bg-light text-dark">
+                                            {account.totalDebits > account.totalCredits ? 'Debit' : 'Credit'}
+                                          </span>
+                                        </td>
+                                        <td></td>
+                                      </tr>
+                                    </tbody>
+                                  </table>
+                                </div>
+                              </div>
+                            )}
                           </div>
                         </div>
-                      </div>
-                    ))
+                      );
+                    })
                   )}
                 </div>
               ) : (
