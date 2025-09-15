@@ -222,11 +222,6 @@ const GLTransactions = () => {
     return `${year}-${paddedId}-${paddedIndex}`;
   };
 
-  const handleTransactionClick = (transaction) => {
-    setSelectedTransaction(transaction);
-    setShowTransactionModal(true);
-  };
-
   const renderPagination = () => {
     const pages = [];
     const maxVisiblePages = 5;
