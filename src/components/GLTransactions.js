@@ -455,18 +455,6 @@ const GLTransactions = () => {
                     ))}
                   </select>
                 </div>
-                <div className="col-md-2">
-                  <select
-                    className="form-select"
-                    value={rowsPerPage}
-                    onChange={(e) => setRowsPerPage(Number(e.target.value))}
-                  >
-                    <option value={50}>50 per page</option>
-                    <option value={100}>100 per page</option>
-                    <option value={200}>200 per page</option>
-                    <option value={500}>500 per page</option>
-                  </select>
-                </div>
                 <div className="col-md-1">
                   <button
                     className="btn btn-outline-secondary"
@@ -560,15 +548,31 @@ const GLTransactions = () => {
               )}
 
               {/* Pagination Info */}
-              {summaryCounts.total > transactions.length && (
-                <div className="row mb-2">
-                  <div className="col-12 text-end">
+              <div className="row mb-2">
+                <div className="col-12 d-flex justify-content-between align-items-center">
+                  <div></div>
+                  <div className="d-flex align-items-center gap-3">
                     <small className="text-muted">
                       Showing {transactions.length} of {summaryCounts.total} transactions on this page
                     </small>
+                    <div className="d-flex align-items-center gap-2">
+                      <label htmlFor="rowsPerPage" className="form-label mb-0 small">Rows:</label>
+                      <select
+                        id="rowsPerPage"
+                        className="form-select form-select-sm"
+                        style={{width: 'auto'}}
+                        value={rowsPerPage}
+                        onChange={(e) => setRowsPerPage(Number(e.target.value))}
+                      >
+                        <option value={50}>50</option>
+                        <option value={100}>100</option>
+                        <option value={200}>200</option>
+                        <option value={500}>500</option>
+                      </select>
+                    </div>
                   </div>
                 </div>
-              )}
+              </div>
 
               {/* Transactions Table or Grouped View */}
               {groupByAccount ? (
