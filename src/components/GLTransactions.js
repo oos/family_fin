@@ -842,14 +842,36 @@ const GLTransactions = () => {
                     <div className="d-flex align-items-center gap-2 flex-wrap">
                       <div className="d-flex align-items-center gap-2">
                         <i className="fas fa-search text-muted"></i>
-                        <input
-                          type="text"
-                          className="form-control form-control-sm"
-                          placeholder="Search transactions..."
-                          value={filters.search}
-                          onChange={(e) => handleFilterChange('search', e.target.value)}
-                          style={{ width: '200px' }}
-                        />
+                        <div className="position-relative" style={{ width: '200px' }}>
+                          <input
+                            type="text"
+                            className="form-control form-control-sm"
+                            placeholder="Search transactions..."
+                            value={filters.search}
+                            onChange={(e) => handleFilterChange('search', e.target.value)}
+                            style={{ paddingRight: '30px' }}
+                          />
+                          {filters.search && (
+                            <button
+                              type="button"
+                              className="btn btn-sm position-absolute"
+                              style={{
+                                right: '5px',
+                                top: '50%',
+                                transform: 'translateY(-50%)',
+                                padding: '2px 6px',
+                                border: 'none',
+                                background: 'transparent',
+                                color: '#6c757d',
+                                fontSize: '12px'
+                              }}
+                              onClick={() => handleFilterChange('search', '')}
+                              title="Clear search"
+                            >
+                              <i className="fas fa-times"></i>
+                            </button>
+                          )}
+                        </div>
                       </div>
                       {/* Filter Chips */}
                       {getActiveFilters().map((filter) => (
