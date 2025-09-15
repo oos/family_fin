@@ -674,13 +674,13 @@ const GLTransactions = () => {
                                 <span className="badge bg-light text-dark ms-2 small">
                                   {transactionCount} Transactions
                                 </span>
-                              </div>
-                              <div className="d-flex align-items-center gap-3">
-                                <div className="d-flex align-items-center gap-2 small">
+                                <div className="d-flex align-items-center gap-2 small ms-3">
                                   <span className="text-primary">Max: {formatCurrency(stats.max)}</span>
-                                  <span className="text-info">Min: {formatCurrency(stats.min)}</span>
                                   <span className="text-success">Avg: {formatCurrency(stats.avg)}</span>
+                                  <span className="text-info">Min: {formatCurrency(stats.min)}</span>
                                 </div>
+                              </div>
+                              <div className="d-flex align-items-center">
                                 <div className="text-end small">
                                   <div>Opening: {formatCurrency(account.openingBalance)}</div>
                                   <div>Change: <span className={`fw-bold ${account.netChange >= 0 ? 'text-success' : 'text-warning'}`}>
@@ -688,7 +688,7 @@ const GLTransactions = () => {
                                   </span></div>
                                   <div>Closing: {formatCurrency(account.closingBalance)}</div>
                                 </div>
-                                <i className={`fas fa-chevron-${isExpanded ? 'up' : 'down'}`}></i>
+                                <i className={`fas fa-chevron-${isExpanded ? 'up' : 'down'} ms-3`}></i>
                               </div>
                             </div>
                             
