@@ -3846,6 +3846,51 @@ def get_all_gl_transactions():
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
+@app.route('/api/gl-transactions/filter-options', methods=['GET'])
+@jwt_required()
+def get_gl_transactions_filter_options():
+    """Get filter options for GL transactions"""
+    try:
+        current_user_id = get_jwt_identity()
+        
+        # Get all unique values for filtering
+        query = TaxReturnTransaction.query.join(TaxReturn).filter(TaxReturn.user_id == current_user_id)
+        
+        # Get unique sources
+        sources = db.session.query(TaxReturnTransaction.source).join(TaxReturn).filter(
+            TaxReturn.user_id == current_user_id,
+            TaxReturnTransaction.source.isnot(None),
+            TaxReturnTransaction.source != ''
+        ).distinct().all()
+        sources = [s[0] for s in sources if s[0]]
+        
+        # Get unique category headings
+        category_headings = db.session.query(TaxReturnTransaction.category_heading).join(TaxReturn).filter(
+            TaxReturn.user_id == current_user_id,
+            TaxReturnTransaction.category_heading.isnot(None),
+            TaxReturnTransaction.category_heading != ''
+        ).distinct().all()
+        category_headings = [c[0] for c in category_headings if c[0]]
+        
+        # Get unique years
+        years = db.session.query(TaxReturn.year).filter(
+            TaxReturn.user_id == current_user_id
+        ).distinct().all()
+        years = [str(y[0]) for y in years if y[0]]
+        
+        # Get unique transaction types (sources that are PJ or AJ)
+        transaction_types = [t for t in sources if t in ['PJ', 'AJ']]
+        
+        return jsonify({
+            'sources': sorted(sources),
+            'category_headings': sorted(category_headings),
+            'years': sorted(years),
+            'transaction_types': sorted(transaction_types)
+        })
+        
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
 @app.route('/api/tax-returns/<int:tax_return_id>/transactions', methods=['GET'])
 @jwt_required()
 def get_tax_return_transactions(tax_return_id):

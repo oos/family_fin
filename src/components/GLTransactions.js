@@ -34,7 +34,8 @@ const GLTransactions = () => {
   const [filterOptions, setFilterOptions] = useState({
     sources: [],
     categoryHeadings: [],
-    years: []
+    years: [],
+    transactionTypes: []
   });
 
   useEffect(() => {
@@ -84,21 +85,17 @@ const GLTransactions = () => {
       const token = localStorage.getItem('token');
       if (!token) return;
 
-      // Fetch unique values for filter dropdowns
-      const response = await axios.get('/gl-transactions?per_page=1', {
+      // Fetch filter options from dedicated endpoint
+      const response = await axios.get('/gl-transactions/filter-options', {
         headers: { Authorization: `Bearer ${token}` }
       });
 
-      // For now, we'll populate these from the first page of data
-      // In a real implementation, you might want separate endpoints for filter options
-      const sources = [...new Set(transactions.map(t => t.source).filter(Boolean))];
-      const categoryHeadings = [...new Set(transactions.map(t => t.category_heading).filter(Boolean))];
-      const years = [...new Set(transactions.map(t => t.tax_return_year).filter(Boolean))];
-
+      const data = response.data;
       setFilterOptions({
-        sources: sources.sort(),
-        categoryHeadings: categoryHeadings.sort(),
-        years: years.sort()
+        sources: data.sources || [],
+        categoryHeadings: data.category_headings || [],
+        years: data.years || [],
+        transactionTypes: data.transaction_types || []
       });
     } catch (err) {
       console.error('Error fetching filter options:', err);
@@ -122,7 +119,8 @@ const GLTransactions = () => {
       amountMax: '',
       source: '',
       categoryHeading: '',
-      year: ''
+      year: '',
+      transactionType: ''
     });
     setCurrentPage(1);
   };
@@ -298,8 +296,11 @@ const GLTransactions = () => {
                     onChange={(e) => handleFilterChange('transactionType', e.target.value)}
                   >
                     <option value="">All Types</option>
-                    <option value="PJ">PJ (Bank Transactions)</option>
-                    <option value="AJ">AJ (Adjustments)</option>
+                    {filterOptions.transactionTypes.map(type => (
+                      <option key={type} value={type}>
+                        {type} {type === 'PJ' ? '(Bank Transactions)' : type === 'AJ' ? '(Adjustments)' : ''}
+                      </option>
+                    ))}
                   </select>
                 </div>
                 <div className="col-md-2">
