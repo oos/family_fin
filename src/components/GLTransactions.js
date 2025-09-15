@@ -508,15 +508,6 @@ const GLTransactions = () => {
                             </div>
                           </div>
                         </div>
-                        {summaryCounts.total > transactions.length && (
-                          <div className="row mt-2">
-                            <div className="col-12 text-center">
-                              <small className="text-muted">
-                                Showing {transactions.length} of {summaryCounts.total} transactions on this page
-                              </small>
-                            </div>
-                          </div>
-                        )}
                         
                         {/* Other Types Breakdown */}
                         {summaryCounts.other > 0 && (
@@ -564,6 +555,17 @@ const GLTransactions = () => {
                         )}
                       </div>
                     </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Pagination Info */}
+              {summaryCounts.total > transactions.length && (
+                <div className="row mb-2">
+                  <div className="col-12 text-end">
+                    <small className="text-muted">
+                      Showing {transactions.length} of {summaryCounts.total} transactions on this page
+                    </small>
                   </div>
                 </div>
               )}
