@@ -245,6 +245,30 @@ const GLTransactions = () => {
     handleFilterChange(filterKey, '');
   };
 
+  // Get transaction type breakdown for an account
+  const getTransactionTypeBreakdown = (transactions) => {
+    const breakdown = {
+      PJ: 0,
+      AJ: 0,
+      AP: 0,
+      SE: 0,
+      CD: 0,
+      PL: 0,
+      Other: 0
+    };
+
+    transactions.forEach(transaction => {
+      const source = transaction.source;
+      if (breakdown.hasOwnProperty(source)) {
+        breakdown[source]++;
+      } else {
+        breakdown.Other++;
+      }
+    });
+
+    return breakdown;
+  };
+
   // Group transactions by account and calculate totals
   const groupTransactionsByAccount = (transactions) => {
     const grouped = {};
@@ -851,9 +875,38 @@ const GLTransactions = () => {
           <div className="d-flex align-items-center">
             <i className={`fas ${isExpanded ? 'fa-folder-open' : 'fa-folder'} me-3 text-primary`} style={{ fontSize: '1.1rem' }}></i>
             <h6 className="mb-0 text-dark fw-bold" style={{ fontSize: '1.1rem' }}>{account.accountName}</h6>
-            <span className="badge bg-primary text-white ms-3 px-3 py-2 fw-bold" style={{ borderRadius: '20px', fontSize: '0.8rem' }}>
-              {transactionCount} Transactions
-            </span>
+            <div className="d-flex align-items-center gap-1 ms-3 flex-wrap">
+              {(() => {
+                const breakdown = getTransactionTypeBreakdown(account.transactions);
+                const badges = [];
+                
+                // Add badges for each transaction type that has transactions
+                Object.entries(breakdown).forEach(([type, count]) => {
+                  if (count > 0) {
+                    const badgeClass = type === 'PJ' ? 'bg-success' :
+                                     type === 'AJ' ? 'bg-warning text-dark' :
+                                     type === 'AP' ? 'bg-info' :
+                                     type === 'SE' ? 'bg-primary' :
+                                     type === 'CD' ? 'bg-secondary' :
+                                     type === 'PL' ? 'bg-dark' :
+                                     'bg-light text-dark';
+                    
+                    badges.push(
+                      <span
+                        key={type}
+                        className={`badge ${badgeClass} px-2 py-1 fw-bold`}
+                        style={{ fontSize: '0.7rem', borderRadius: '12px' }}
+                        title={`${type}: ${count} transaction${count !== 1 ? 's' : ''}`}
+                      >
+                        {type}: {count}
+                      </span>
+                    );
+                  }
+                });
+                
+                return badges;
+              })()}
+            </div>
             <div className="d-flex align-items-center gap-3 small ms-4">
               <span className="text-muted fw-medium">Max: <span className="text-dark fw-bold">{formatCurrency(stats.max)}</span></span>
               <span className="text-muted fw-medium">Avg: <span className="text-dark fw-bold">{formatCurrency(stats.avg)}</span></span>
