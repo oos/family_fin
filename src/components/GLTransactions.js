@@ -56,7 +56,7 @@ const GLTransactions = () => {
   // UI state for toggling panels
   const [showFilters, setShowFilters] = useState(false);
   const [showAnalytics, setShowAnalytics] = useState(false);
-  const [showBalance, setShowBalance] = useState(false);
+  const [showSummaryPanel, setShowSummaryPanel] = useState(true);
 
   useEffect(() => {
     fetchTransactions();
@@ -514,12 +514,6 @@ const GLTransactions = () => {
                   <i className="fas fa-chart-bar"></i> Analytics
                 </button>
                 <button
-                  className={`btn me-2 ${showBalance ? 'btn-info' : 'btn-outline-info'}`}
-                  onClick={() => setShowBalance(!showBalance)}
-                >
-                  <i className="fas fa-calculator"></i> Balance
-                </button>
-                <button
                   className="btn btn-outline-secondary"
                   onClick={fetchTransactions}
                   disabled={loading}
@@ -756,23 +750,25 @@ const GLTransactions = () => {
               </div>
 
               {/* GL Summary Panel */}
-              {showBalance && (
-                <div className="row mb-3">
-                  <div className="col-12">
-                    <div className="card shadow">
-                      <div className="card-header d-flex justify-content-between align-items-center py-2" style={{ backgroundColor: '#b3d9ff' }}>
-                        <h6 className="mb-0 text-dark fw-bold">
-                          <i className="fas fa-calculator me-2"></i>
-                          General Ledger Summary
-                        </h6>
-                        <button
-                          className="btn btn-sm btn-outline-secondary"
-                          onClick={() => setShowBalance(false)}
-                          title="Close Balance Panel"
-                        >
-                          <i className="fas fa-times"></i>
-                        </button>
-                      </div>
+              <div className="row mb-3">
+                <div className="col-12">
+                  <div className="card shadow">
+                    <div 
+                      className="card-header d-flex justify-content-between align-items-center py-2" 
+                      style={{ 
+                        backgroundColor: '#1e3a8a', 
+                        cursor: 'pointer',
+                        userSelect: 'none'
+                      }}
+                      onClick={() => setShowSummaryPanel(!showSummaryPanel)}
+                    >
+                      <h6 className="mb-0 text-white fw-bold">
+                        <i className="fas fa-calculator me-2"></i>
+                        General Ledger Summary
+                      </h6>
+                      <i className={`fas fa-chevron-${showSummaryPanel ? 'up' : 'down'} text-white`}></i>
+                    </div>
+                    {showSummaryPanel && (
                       <div className="card-body">
                         <div className="row">
                           <div className="col-md-4">
@@ -894,10 +890,10 @@ const GLTransactions = () => {
                           </div>
                         </div>
                       </div>
-                    </div>
+                    )}
                   </div>
                 </div>
-              )}
+              </div>
 
               {/* Transactions Table or Grouped View */}
               {groupByAccount ? (
