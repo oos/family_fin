@@ -259,7 +259,11 @@ const GLTransactions = () => {
 
     // Filter out summary rows (Opening, Change, Closing) - these don't have actual transaction data
     const actualTransactions = transactions.filter(transaction => 
-      transaction.source && transaction.source !== 'N/A'
+      transaction.source && 
+      transaction.source !== 'N/A' &&
+      transaction.reference !== 'Opening' && 
+      transaction.reference !== 'Change' && 
+      transaction.reference !== 'Close'
     );
 
     actualTransactions.forEach(transaction => {
@@ -908,7 +912,11 @@ const GLTransactions = () => {
                       const stats = calculateTransactionStats(account.transactions);
                       // Calculate actual transaction count (excluding summary rows)
                       const actualTransactions = account.transactions.filter(transaction => 
-                        transaction.source && transaction.source !== 'N/A'
+                        transaction.source && 
+                        transaction.source !== 'N/A' &&
+                        transaction.reference !== 'Opening' && 
+                        transaction.reference !== 'Change' && 
+                        transaction.reference !== 'Close'
                       );
                       const transactionCount = actualTransactions.length;
                       
@@ -1042,7 +1050,13 @@ const GLTransactions = () => {
                                         </td>
                                       </tr>
                                       
-                                      {account.transactions.map((transaction, index) => {
+                                      {account.transactions
+                                        .filter(transaction => 
+                                          transaction.reference !== 'Opening' && 
+                                          transaction.reference !== 'Change' && 
+                                          transaction.reference !== 'Close'
+                                        )
+                                        .map((transaction, index) => {
                                         const { amount, type } = getTransactionAmount(transaction);
                                         const uid = generateUID(transaction, index);
                                         return (
