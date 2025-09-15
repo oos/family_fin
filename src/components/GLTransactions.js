@@ -1040,7 +1040,7 @@ const GLTransactions = () => {
                                                 type === 'credit' ? 'text-success' : 
                                                 'text-muted'
                                               }`}>
-                                                {type === 'debit' ? '-' : '+'}{formatCurrency(amount)}
+                                                {type === 'none' ? '' : (type === 'debit' ? '+' : '-')}{formatCurrency(amount)}
                                               </span>
                                             </td>
                                             <td>
@@ -1189,7 +1189,7 @@ const GLTransactions = () => {
                                   type === 'credit' ? 'text-success' : 
                                   'text-muted'
                                 }`}>
-                                  {type === 'debit' ? '-' : '+'}{formatCurrency(amount)}
+                                  {type === 'none' ? '' : (type === 'debit' ? '+' : '-')}{formatCurrency(amount)}
                                 </span>
                               </td>
                               <td>
