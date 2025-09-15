@@ -375,20 +375,20 @@ const GLTransactions = () => {
               <h4 className="mb-0">General Ledger Transactions</h4>
               <div>
                 <button
-                  className={`btn me-2 ${groupByAccount ? 'btn-success' : 'btn-outline-success'}`}
+                  className={`btn me-2 ${groupByAccount ? 'btn-dark' : 'btn-outline-dark'}`}
                   onClick={() => setGroupByAccount(!groupByAccount)}
                 >
                   <i className={`fas ${groupByAccount ? 'fa-layer-group' : 'fa-list'}`}></i> 
                   {groupByAccount ? 'Grouped by Account' : 'Group by Account'}
                 </button>
                 <button
-                  className={`btn me-2 ${showFilters ? 'btn-primary' : 'btn-outline-primary'}`}
+                  className={`btn me-2 ${showFilters ? 'btn-secondary' : 'btn-outline-secondary'}`}
                   onClick={() => setShowFilters(!showFilters)}
                 >
                   <i className="fas fa-filter"></i> Filters
                 </button>
                 <button
-                  className={`btn me-2 ${showAnalytics ? 'btn-info' : 'btn-outline-info'}`}
+                  className={`btn me-2 ${showAnalytics ? 'btn-warning' : 'btn-outline-warning'}`}
                   onClick={() => setShowAnalytics(!showAnalytics)}
                 >
                   <i className="fas fa-chart-bar"></i> Analytics
@@ -491,13 +491,13 @@ const GLTransactions = () => {
                           </div>
                           <div className="col-md-3">
                             <small className="text-muted">Bank Transactions (PJ)</small>
-                            <div className="fw-bold text-success">
+                            <div className="fw-bold text-primary">
                               {summaryCounts.pj}
                             </div>
                           </div>
                           <div className="col-md-3">
                             <small className="text-muted">Adjustments (AJ)</small>
-                            <div className="fw-bold text-warning">
+                            <div className="fw-bold text-info">
                               {summaryCounts.aj}
                             </div>
                           </div>
@@ -524,16 +524,16 @@ const GLTransactions = () => {
                                   
                                   return (
                                     <>
-                                      <span className="badge bg-primary me-1" title="AP - Accounts Payable: Money owed to suppliers/vendors">
+                                      <span className="badge bg-success me-1" title="AP - Accounts Payable: Money owed to suppliers/vendors">
                                         AP: {apCount}
                                       </span>
-                                      <span className="badge bg-info me-1" title="SE - Sales Entry: Revenue from sales transactions">
+                                      <span className="badge bg-primary me-1" title="SE - Sales Entry: Revenue from sales transactions">
                                         SE: {seCount}
                                       </span>
-                                      <span className="badge bg-secondary me-1" title="CD - Cash Deposit: Money deposited into accounts">
+                                      <span className="badge bg-info me-1" title="CD - Cash Deposit: Money deposited into accounts">
                                         CD: {cdCount}
                                       </span>
-                                      <span className="badge bg-dark me-1" title="PL - Profit & Loss: Income statement adjustments">
+                                      <span className="badge bg-secondary me-1" title="PL - Profit & Loss: Income statement adjustments">
                                         PL: {plCount}
                                       </span>
                                       {remainingOther > 0 && (
@@ -666,9 +666,9 @@ const GLTransactions = () => {
                                         </td>
                                         <td>
                                           <span className={`badge ${
-                                            transaction.source === 'AJ' ? 'bg-warning' :
-                                            transaction.source === 'PJ' ? 'bg-success' :
-                                            'bg-secondary'
+                                            transaction.source === 'AJ' ? 'bg-info' :
+                                            transaction.source === 'PJ' ? 'bg-primary' :
+                                            'bg-light text-dark'
                                           }`}>
                                             {transaction.source === 'AJ' ? 'AJ (Adjustment)' :
                                              transaction.source === 'PJ' ? 'PJ (Bank)' :
@@ -770,9 +770,9 @@ const GLTransactions = () => {
                               <td>{transaction.reference || 'N/A'}</td>
                               <td>
                                 <span className={`badge ${
-                                  transaction.source === 'AJ' ? 'bg-warning' :
-                                  transaction.source === 'PJ' ? 'bg-success' :
-                                  'bg-secondary'
+                                  transaction.source === 'AJ' ? 'bg-info' :
+                                  transaction.source === 'PJ' ? 'bg-primary' :
+                                  'bg-light text-dark'
                                 }`} title={
                                   transaction.source === 'AJ' ? 'Adjustment Journal (Non-cash)' :
                                   transaction.source === 'PJ' ? 'Payment Journal (Bank Transaction)' :
