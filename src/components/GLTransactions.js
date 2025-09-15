@@ -553,7 +553,10 @@ const GLTransactions = () => {
                   <div></div>
                   <div className="d-flex align-items-center gap-3">
                     <small className="text-muted">
-                      Showing {transactions.length} of {summaryCounts.total} transactions on this page
+                      {rowsPerPage >= 10000 ? 
+                        `Showing all ${summaryCounts.total} transactions` : 
+                        `Showing ${transactions.length} of ${summaryCounts.total} transactions on this page`
+                      }
                     </small>
                     <div className="d-flex align-items-center gap-2">
                       <label htmlFor="rowsPerPage" className="form-label mb-0 small">Rows:</label>
@@ -561,13 +564,14 @@ const GLTransactions = () => {
                         id="rowsPerPage"
                         className="form-select form-select-sm"
                         style={{width: 'auto'}}
-                        value={rowsPerPage}
-                        onChange={(e) => setRowsPerPage(Number(e.target.value))}
+                        value={rowsPerPage >= 10000 ? 'all' : rowsPerPage}
+                        onChange={(e) => setRowsPerPage(e.target.value === 'all' ? 10000 : Number(e.target.value))}
                       >
                         <option value={50}>50</option>
                         <option value={100}>100</option>
                         <option value={200}>200</option>
                         <option value={500}>500</option>
+                        <option value="all">All</option>
                       </select>
                     </div>
                   </div>
