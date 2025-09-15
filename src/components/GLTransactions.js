@@ -609,7 +609,7 @@ const GLTransactions = () => {
               )}
 
               {/* Pagination Info */}
-              <div className="row mb-2">
+              <div className="row mb-1">
                 <div className="col-12 d-flex justify-content-between align-items-center">
                   <div className="d-flex align-items-center gap-3">
                     <button
@@ -651,7 +651,7 @@ const GLTransactions = () => {
               {groupByAccount ? (
                 <div className="grouped-view">
                   {Object.keys(groupedTransactions).length === 0 ? (
-                    <div className="text-center text-muted py-4">
+                    <div className="text-center text-muted py-3">
                       No transactions found
                     </div>
                   ) : (
@@ -661,49 +661,34 @@ const GLTransactions = () => {
                       const transactionCount = account.transactions.length;
                       
                       return (
-                        <div key={accountKey} className="account-group mb-3">
+                        <div key={accountKey} className="account-group mb-2">
                           <div className="card">
                             <div 
-                              className="card-header bg-dark text-white d-flex justify-content-between align-items-center"
+                              className="card-header bg-dark text-white py-2 px-3 d-flex justify-content-between align-items-center"
                               onClick={() => toggleAccountExpansion(accountKey)}
                               style={{ cursor: 'pointer' }}
                             >
                               <div className="d-flex align-items-center">
                                 <i className={`fas ${isExpanded ? 'fa-folder-open' : 'fa-folder'} me-2`}></i>
-                                <h5 className="mb-0">{account.accountName}</h5>
-                                <span className="badge bg-light text-dark ms-2">
-                                  {transactionCount} transaction{transactionCount !== 1 ? 's' : ''}
+                                <h6 className="mb-0">{account.accountName}</h6>
+                                <span className="badge bg-light text-dark ms-2 small">
+                                  {transactionCount}
                                 </span>
                               </div>
-                              <div className="text-end">
-                                <div className="small">
-                                  <div>Opening: {formatCurrency(account.openingBalance)}</div>
-                                  <div>Change: <span className={`fw-bold ${account.netChange >= 0 ? 'text-success' : 'text-warning'}`}>
+                              <div className="d-flex align-items-center gap-3">
+                                <div className="text-end small">
+                                  <div>O: {formatCurrency(account.openingBalance)}</div>
+                                  <div>C: <span className={`fw-bold ${account.netChange >= 0 ? 'text-success' : 'text-warning'}`}>
                                     {account.netChange >= 0 ? '+' : ''}{formatCurrency(account.netChange)}
                                   </span></div>
-                                  <div>Closing: {formatCurrency(account.closingBalance)}</div>
+                                  <div>Cl: {formatCurrency(account.closingBalance)}</div>
                                 </div>
-                                <div className="mt-1">
-                                  <i className={`fas fa-chevron-${isExpanded ? 'up' : 'down'}`}></i>
+                                <div className="d-flex align-items-center gap-2 small">
+                                  <span className="text-primary">Max: {formatCurrency(stats.max)}</span>
+                                  <span className="text-info">Min: {formatCurrency(stats.min)}</span>
+                                  <span className="text-success">Avg: {formatCurrency(stats.avg)}</span>
                                 </div>
-                              </div>
-                            </div>
-                            
-                            {/* Transaction Statistics */}
-                            <div className="card-body py-2 px-3 bg-light">
-                              <div className="row text-center">
-                                <div className="col-4">
-                                  <small className="text-muted">Max Amount</small>
-                                  <div className="fw-bold text-primary">{formatCurrency(stats.max)}</div>
-                                </div>
-                                <div className="col-4">
-                                  <small className="text-muted">Min Amount</small>
-                                  <div className="fw-bold text-info">{formatCurrency(stats.min)}</div>
-                                </div>
-                                <div className="col-4">
-                                  <small className="text-muted">Avg Amount</small>
-                                  <div className="fw-bold text-success">{formatCurrency(stats.avg)}</div>
-                                </div>
+                                <i className={`fas fa-chevron-${isExpanded ? 'up' : 'down'}`}></i>
                               </div>
                             </div>
                             
