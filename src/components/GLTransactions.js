@@ -702,6 +702,26 @@ const GLTransactions = () => {
                                       </tr>
                                     );
                                   })}
+                                  {/* Total Row */}
+                                  <tr className="table-dark fw-bold">
+                                    <td colSpan="2">TOTAL</td>
+                                    <td></td>
+                                    <td></td>
+                                    <td></td>
+                                    <td className="text-end">
+                                      <span className={`${
+                                        account.netChange >= 0 ? 'text-success' : 'text-danger'
+                                      }`}>
+                                        {account.netChange >= 0 ? '+' : ''}{formatCurrency(account.netChange)}
+                                      </span>
+                                    </td>
+                                    <td>
+                                      <span className="badge bg-light text-dark">
+                                        {account.totalDebits > account.totalCredits ? 'Debit' : 'Credit'}
+                                      </span>
+                                    </td>
+                                    <td></td>
+                                  </tr>
                                 </tbody>
                               </table>
                             </div>
