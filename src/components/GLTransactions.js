@@ -1502,6 +1502,7 @@ const GLTransactions = () => {
             </div>
           </div>
         </div>
+      </div>
 
       {/* Transaction Detail Modal */}
       {showTransactionModal && selectedTransaction && (
