@@ -672,7 +672,7 @@ const GLTransactions = () => {
                                 <i className={`fas ${isExpanded ? 'fa-folder-open' : 'fa-folder'} me-2`}></i>
                                 <h6 className="mb-0">{account.accountName}</h6>
                                 <span className="badge bg-light text-dark ms-2 small">
-                                  {transactionCount}
+                                  {transactionCount} Transactions
                                 </span>
                               </div>
                               <div className="d-flex align-items-center gap-3">
