@@ -245,7 +245,7 @@ const GLTransactions = () => {
     handleFilterChange(filterKey, '');
   };
 
-  // Get transaction type breakdown for an account
+  // Get transaction type breakdown for an account (excluding summary rows)
   const getTransactionTypeBreakdown = (transactions) => {
     const breakdown = {
       PJ: 0,
@@ -257,7 +257,12 @@ const GLTransactions = () => {
       Other: 0
     };
 
-    transactions.forEach(transaction => {
+    // Filter out summary rows (Opening, Change, Closing) - these don't have actual transaction data
+    const actualTransactions = transactions.filter(transaction => 
+      transaction.source && transaction.source !== 'N/A'
+    );
+
+    actualTransactions.forEach(transaction => {
       const source = transaction.source;
       if (breakdown.hasOwnProperty(source)) {
         breakdown[source]++;
@@ -905,7 +910,11 @@ const GLTransactions = () => {
                     Object.entries(groupedTransactions).map(([accountKey, account]) => {
                       const isExpanded = expandedAccounts[accountKey];
                       const stats = calculateTransactionStats(account.transactions);
-                      const transactionCount = account.transactions.length;
+                      // Calculate actual transaction count (excluding summary rows)
+                      const actualTransactions = account.transactions.filter(transaction => 
+                        transaction.source && transaction.source !== 'N/A'
+                      );
+                      const transactionCount = actualTransactions.length;
                       
                       return (
                         <div key={accountKey} className="account-group mb-3">
@@ -951,6 +960,20 @@ const GLTransactions = () => {
                     );
                   }
                 });
+                
+                // Add N/A badge with transaction count
+                if (transactionCount > 0) {
+                  badges.push(
+                    <span
+                      key="N/A"
+                      className="badge bg-light text-dark px-2 py-1 fw-bold"
+                      style={{ fontSize: '0.7rem', borderRadius: '12px' }}
+                      title={`N/A: ${transactionCount} transaction${transactionCount !== 1 ? 's' : ''}`}
+                    >
+                      N/A: {transactionCount}
+                    </span>
+                  );
+                }
                 
                 return badges;
               })()}
