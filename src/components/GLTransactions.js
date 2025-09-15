@@ -567,7 +567,7 @@ const GLTransactions = () => {
                                   
                                   if (remainingOther > 0) {
                                     components.push(
-                                      <span key="other" className="badge bg-light text-dark me-1" title="Other: Transactions with unknown or empty source types">
+                                      <span key="other" className="badge bg-warning text-dark me-1" title="Other: Transactions with unknown or empty source types">
                                         Unknown: {remainingOther}
                                       </span>
                                     );
