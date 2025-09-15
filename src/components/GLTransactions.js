@@ -51,6 +51,10 @@ const GLTransactions = () => {
   // Account grouping state
   const [groupByAccount, setGroupByAccount] = useState(false);
   const [groupedTransactions, setGroupedTransactions] = useState({});
+  
+  // UI state for toggling panels
+  const [showFilters, setShowFilters] = useState(true);
+  const [showAnalytics, setShowAnalytics] = useState(true);
 
   useEffect(() => {
     fetchTransactions();
@@ -378,10 +382,16 @@ const GLTransactions = () => {
                   {groupByAccount ? 'Grouped by Account' : 'Group by Account'}
                 </button>
                 <button
-                  className="btn btn-outline-primary me-2"
-                  onClick={() => setShowFiltersModal(true)}
+                  className={`btn me-2 ${showFilters ? 'btn-primary' : 'btn-outline-primary'}`}
+                  onClick={() => setShowFilters(!showFilters)}
                 >
                   <i className="fas fa-filter"></i> Filters
+                </button>
+                <button
+                  className={`btn me-2 ${showAnalytics ? 'btn-info' : 'btn-outline-info'}`}
+                  onClick={() => setShowAnalytics(!showAnalytics)}
+                >
+                  <i className="fas fa-chart-bar"></i> Analytics
                 </button>
                 <button
                   className="btn btn-outline-secondary"
@@ -395,7 +405,8 @@ const GLTransactions = () => {
 
             <div className="card-body">
               {/* Quick Filters */}
-              <div className="row mb-3">
+              {showFilters && (
+                <div className="row mb-3">
                 <div className="col-md-3">
                   <input
                     type="text"
@@ -465,9 +476,10 @@ const GLTransactions = () => {
                   </button>
                 </div>
               </div>
+              )}
 
               {/* Transaction Summary */}
-              {transactions.length > 0 && (
+              {showAnalytics && transactions.length > 0 && (
                 <div className="row mb-3">
                   <div className="col-12">
                     <div className="card bg-light">
