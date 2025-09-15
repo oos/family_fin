@@ -640,6 +640,7 @@ const GLTransactions = () => {
                                     <th>Reference</th>
                                     <th>Type</th>
                                     <th>Amount</th>
+                                    <th>D/C</th>
                                     <th>Year</th>
                                   </tr>
                                 </thead>
@@ -682,6 +683,15 @@ const GLTransactions = () => {
                                             'text-muted'
                                           }`}>
                                             {type === 'debit' ? '-' : '+'}{formatCurrency(amount)}
+                                          </span>
+                                        </td>
+                                        <td>
+                                          <span className={`badge ${
+                                            type === 'debit' ? 'bg-danger' : 
+                                            type === 'credit' ? 'bg-success' : 
+                                            'bg-secondary'
+                                          }`}>
+                                            {type === 'debit' ? 'D' : type === 'credit' ? 'C' : 'N/A'}
                                           </span>
                                         </td>
                                         <td>
@@ -728,6 +738,7 @@ const GLTransactions = () => {
                         >
                           Amount {sortField === 'amount' && (sortDirection === 'asc' ? '↑' : '↓')}
                         </th>
+                        <th>D/C</th>
                         <th>Year</th>
                         <th>File</th>
                       </tr>
@@ -735,7 +746,7 @@ const GLTransactions = () => {
                     <tbody>
                       {loading ? (
                         <tr>
-                          <td colSpan="9" className="text-center">
+                          <td colSpan="10" className="text-center">
                             <div className="spinner-border" role="status">
                               <span className="visually-hidden">Loading...</span>
                             </div>
@@ -743,7 +754,7 @@ const GLTransactions = () => {
                         </tr>
                       ) : transactions.length === 0 ? (
                         <tr>
-                          <td colSpan="9" className="text-center text-muted">
+                          <td colSpan="10" className="text-center text-muted">
                             No transactions found
                           </td>
                         </tr>
@@ -799,6 +810,15 @@ const GLTransactions = () => {
                                   'text-muted'
                                 }`}>
                                   {type === 'debit' ? '-' : '+'}{formatCurrency(amount)}
+                                </span>
+                              </td>
+                              <td>
+                                <span className={`badge ${
+                                  type === 'debit' ? 'bg-danger' : 
+                                  type === 'credit' ? 'bg-success' : 
+                                  'bg-secondary'
+                                }`}>
+                                  {type === 'debit' ? 'D' : type === 'credit' ? 'C' : 'N/A'}
                                 </span>
                               </td>
                               <td>{transaction.tax_return_year || 'N/A'}</td>
