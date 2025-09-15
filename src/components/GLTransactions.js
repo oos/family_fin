@@ -663,7 +663,7 @@ const GLTransactions = () => {
                         <div key={accountKey} className="account-group mb-3">
                           <div className="card">
                             <div 
-                              className="card-header bg-primary text-white d-flex justify-content-between align-items-center"
+                              className="card-header bg-dark text-white d-flex justify-content-between align-items-center"
                               onClick={() => toggleAccountExpansion(accountKey)}
                               style={{ cursor: 'pointer' }}
                             >
@@ -677,7 +677,7 @@ const GLTransactions = () => {
                               <div className="text-end">
                                 <div className="small">
                                   <div>Opening: {formatCurrency(account.openingBalance)}</div>
-                                  <div>Change: <span className={account.netChange >= 0 ? 'text-success' : 'text-danger'}>
+                                  <div>Change: <span className={`fw-bold ${account.netChange >= 0 ? 'text-success' : 'text-warning'}`}>
                                     {account.netChange >= 0 ? '+' : ''}{formatCurrency(account.netChange)}
                                   </span></div>
                                   <div>Closing: {formatCurrency(account.closingBalance)}</div>
