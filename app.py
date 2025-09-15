@@ -3856,13 +3856,28 @@ def get_gl_transactions_filter_options():
         # Get all unique values for filtering
         query = TaxReturnTransaction.query.join(TaxReturn).filter(TaxReturn.user_id == current_user_id)
         
-        # Get unique sources
+        # Get unique sources - filter out dates and meaningless values
         sources = db.session.query(TaxReturnTransaction.source).join(TaxReturn).filter(
             TaxReturn.user_id == current_user_id,
             TaxReturnTransaction.source.isnot(None),
             TaxReturnTransaction.source != ''
         ).distinct().all()
         sources = [s[0] for s in sources if s[0]]
+        
+        # Filter sources to only include meaningful values (PJ, AJ, and other non-date values)
+        meaningful_sources = []
+        for source in sources:
+            # Skip if it's just a date pattern (DD/MM/YYYY or DD/MM/YY)
+            if not re.match(r'^\d{1,2}/\d{1,2}/\d{2,4}$', source):
+                # Skip if it's just special characters or very short meaningless strings
+                if len(source) > 2 and not re.match(r'^[^a-zA-Z0-9]+$', source):
+                    # Skip if it's just a number or amount
+                    if not re.match(r'^[\d,\.]+$', source):
+                        # Skip if it's a date with text appended
+                        if not re.match(r'^\d{1,2}/\d{1,2}/\d{2,4}\w+$', source):
+                            # Only include if it contains letters or is a known meaningful code
+                            if re.search(r'[a-zA-Z]', source) or source in ['PJ', 'AJ', 'AP', 'LR', 'CC', 'C/C', 'AIB', 'Revolut', 'VAT', 'PAY', 'LEDGER']:
+                                meaningful_sources.append(source)
         
         # Get unique category headings
         category_headings = db.session.query(TaxReturnTransaction.category_heading).join(TaxReturn).filter(
@@ -3871,6 +3886,23 @@ def get_gl_transactions_filter_options():
             TaxReturnTransaction.category_heading != ''
         ).distinct().all()
         category_headings = [c[0] for c in category_headings if c[0]]
+        
+        # Filter category headings to remove duplicates (keep only those with descriptions)
+        meaningful_categories = []
+        seen_codes = set()
+        
+        for category in category_headings:
+            # Extract the code part (before the first space)
+            code_part = category.split(' ')[0] if ' ' in category else category
+            
+            # If this is a code with description, add it and mark the code as seen
+            if ' ' in category and len(category) > len(code_part) + 1:
+                meaningful_categories.append(category)
+                seen_codes.add(code_part)
+            # If this is just a code and we haven't seen it with a description, add it
+            elif code_part not in seen_codes and ' ' not in category:
+                meaningful_categories.append(category)
+                seen_codes.add(code_part)
         
         # Get unique years
         years = db.session.query(TaxReturn.year).filter(
@@ -3882,8 +3914,8 @@ def get_gl_transactions_filter_options():
         transaction_types = [t for t in sources if t in ['PJ', 'AJ']]
         
         return jsonify({
-            'sources': sorted(sources),
-            'category_headings': sorted(category_headings),
+            'sources': sorted(meaningful_sources),
+            'category_headings': sorted(meaningful_categories),
             'years': sorted(years),
             'transaction_types': sorted(transaction_types)
         })
