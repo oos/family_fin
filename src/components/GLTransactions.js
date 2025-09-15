@@ -41,6 +41,10 @@ const GLTransactions = () => {
     total: 0,
     pj: 0,
     aj: 0,
+    ap: 0,
+    se: 0,
+    cd: 0,
+    pl: 0,
     other: 0
   });
 
@@ -119,20 +123,22 @@ const GLTransactions = () => {
       const token = localStorage.getItem('token');
       if (!token) return;
 
-      const response = await axios.get('/gl-transactions?per_page=10000', {
+      const response = await axios.get('/gl-transactions/summary-counts', {
         headers: { Authorization: `Bearer ${token}` }
       });
       
-      const allTransactions = response.data.transactions;
+      const counts = response.data;
       
-      const counts = {
-        total: allTransactions.length,
-        pj: allTransactions.filter(t => t.source === 'PJ').length,
-        aj: allTransactions.filter(t => t.source === 'AJ').length,
-        other: allTransactions.filter(t => t.source !== 'PJ' && t.source !== 'AJ').length
-      };
-      
-      setSummaryCounts(counts);
+      setSummaryCounts({
+        total: counts.total,
+        pj: counts.pj,
+        aj: counts.aj,
+        ap: counts.ap,
+        se: counts.se,
+        cd: counts.cd,
+        pl: counts.pl,
+        other: counts.other
+      });
     } catch (error) {
       console.error('Error fetching summary counts:', error);
     }
@@ -502,31 +508,20 @@ const GLTransactions = () => {
                         )}
                         
                         {/* Other Types Breakdown */}
-                        {(() => {
-                          const otherTypes = transactions.filter(t => t.source !== 'PJ' && t.source !== 'AJ');
-                          const otherTypesGrouped = otherTypes.reduce((acc, t) => {
-                            acc[t.source] = (acc[t.source] || 0) + 1;
-                            return acc;
-                          }, {});
-                          
-                          if (Object.keys(otherTypesGrouped).length > 0) {
-                            return (
-                              <div className="row mt-2">
-                                <div className="col-12">
-                                  <small className="text-muted">Other Types on this page:</small>
-                                  <div className="mt-1">
-                                    {Object.entries(otherTypesGrouped).map(([source, count]) => (
-                                      <span key={source} className="badge bg-secondary me-1">
-                                        {source}: {count}
-                                      </span>
-                                    ))}
-                                  </div>
-                                </div>
+                        {summaryCounts.other > 0 && (
+                          <div className="row mt-2">
+                            <div className="col-12">
+                              <small className="text-muted">Other Types (AP, SE, CD, PL, etc.):</small>
+                              <div className="mt-1">
+                                <span className="badge bg-primary me-1">AP: {summaryCounts.ap || 0}</span>
+                                <span className="badge bg-info me-1">SE: {summaryCounts.se || 0}</span>
+                                <span className="badge bg-secondary me-1">CD: {summaryCounts.cd || 0}</span>
+                                <span className="badge bg-dark me-1">PL: {summaryCounts.pl || 0}</span>
+                                <span className="badge bg-light text-dark me-1">Other: {summaryCounts.other - (summaryCounts.ap || 0) - (summaryCounts.se || 0) - (summaryCounts.cd || 0) - (summaryCounts.pl || 0)}</span>
                               </div>
-                            );
-                          }
-                          return null;
-                        })()}
+                            </div>
+                          </div>
+                        )}
                       </div>
                     </div>
                   </div>

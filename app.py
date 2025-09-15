@@ -3846,6 +3846,34 @@ def get_all_gl_transactions():
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
+@app.route('/api/gl-transactions/summary-counts', methods=['GET'])
+@jwt_required()
+def get_gl_transactions_summary_counts():
+    """Get summary counts for GL transactions by type"""
+    try:
+        current_user_id = get_jwt_identity()
+        
+        # Get all transactions for this user
+        query = TaxReturnTransaction.query.join(TaxReturn).filter(TaxReturn.user_id == current_user_id)
+        all_transactions = query.all()
+        
+        # Count by source type
+        counts = {
+            'total': len(all_transactions),
+            'pj': len([t for t in all_transactions if t.source == 'PJ']),
+            'aj': len([t for t in all_transactions if t.source == 'AJ']),
+            'ap': len([t for t in all_transactions if t.source == 'AP']),
+            'se': len([t for t in all_transactions if t.source == 'SE']),
+            'cd': len([t for t in all_transactions if t.source == 'CD']),
+            'pl': len([t for t in all_transactions if t.source == 'PL']),
+            'other': len([t for t in all_transactions if t.source not in ['PJ', 'AJ', 'AP', 'SE', 'CD', 'PL']])
+        }
+        
+        return jsonify(counts)
+        
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
 @app.route('/api/gl-transactions/filter-options', methods=['GET'])
 @jwt_required()
 def get_gl_transactions_filter_options():
