@@ -54,8 +54,8 @@ const GLTransactions = () => {
   const [expandedAccounts, setExpandedAccounts] = useState({});
   
   // UI state for toggling panels
-  const [showFilters, setShowFilters] = useState(true);
-  const [showAnalytics, setShowAnalytics] = useState(true);
+  const [showFilters, setShowFilters] = useState(false);
+  const [showAnalytics, setShowAnalytics] = useState(false);
 
   useEffect(() => {
     fetchTransactions();
@@ -455,15 +455,6 @@ const GLTransactions = () => {
               {showFilters && (
                 <div className="row mb-3">
                 <div className="col-md-3">
-                  <input
-                    type="text"
-                    className="form-control"
-                    placeholder="Search transactions..."
-                    value={filters.search}
-                    onChange={(e) => handleFilterChange('search', e.target.value)}
-                  />
-                </div>
-                <div className="col-md-2">
                   <select
                     className="form-select"
                     value={filters.source}
@@ -475,7 +466,7 @@ const GLTransactions = () => {
                     ))}
                   </select>
                 </div>
-                <div className="col-md-2">
+                <div className="col-md-3">
                   <select
                     className="form-select"
                     value={filters.transactionType}
@@ -489,7 +480,7 @@ const GLTransactions = () => {
                     ))}
                   </select>
                 </div>
-                <div className="col-md-2">
+                <div className="col-md-3">
                   <select
                     className="form-select"
                     value={filters.categoryHeading}
@@ -627,6 +618,17 @@ const GLTransactions = () => {
                       <i className={`fas ${groupByAccount ? 'fa-layer-group' : 'fa-list'}`}></i> 
                       {groupByAccount ? 'Grouped by Account' : 'Group by Account'}
                     </button>
+                    <div className="d-flex align-items-center gap-2">
+                      <i className="fas fa-search text-muted"></i>
+                      <input
+                        type="text"
+                        className="form-control form-control-sm"
+                        placeholder="Search transactions..."
+                        value={filters.search}
+                        onChange={(e) => handleFilterChange('search', e.target.value)}
+                        style={{ width: '200px' }}
+                      />
+                    </div>
                   </div>
                   <div className="d-flex align-items-center gap-3">
                     <small className="text-muted">
@@ -669,52 +671,57 @@ const GLTransactions = () => {
                       const transactionCount = account.transactions.length;
                       
                       return (
-                        <div key={accountKey} className="account-group mb-2">
-                          <div className="card">
+                        <div key={accountKey} className="account-group mb-3">
+                          <div className="card shadow-lg" style={{ borderRadius: '12px', border: 'none' }}>
         <div
-          className="card-header bg-light py-2 px-3 d-flex justify-content-between align-items-center"
+          className="card-header py-3 px-4 d-flex justify-content-between align-items-center"
           onClick={() => toggleAccountExpansion(accountKey)}
-          style={{ cursor: 'pointer' }}
+          style={{ 
+            cursor: 'pointer',
+            background: '#b3d9ff',
+            border: 'none',
+            borderRadius: '8px 8px 0 0'
+          }}
         >
           <div className="d-flex align-items-center">
-            <i className={`fas ${isExpanded ? 'fa-folder-open' : 'fa-folder'} me-2`}></i>
-            <h6 className="mb-0">{account.accountName}</h6>
-            <span className="badge bg-light text-dark ms-2 small">
+            <i className={`fas ${isExpanded ? 'fa-folder-open' : 'fa-folder'} me-3 text-primary`} style={{ fontSize: '1.1rem' }}></i>
+            <h6 className="mb-0 text-dark fw-bold" style={{ fontSize: '1.1rem' }}>{account.accountName}</h6>
+            <span className="badge bg-primary text-white ms-3 px-3 py-2 fw-bold" style={{ borderRadius: '20px', fontSize: '0.8rem' }}>
               {transactionCount} Transactions
             </span>
-            <div className="d-flex align-items-center gap-2 small ms-3">
-              <span>Max: {formatCurrency(stats.max)}</span>
-              <span>Avg: {formatCurrency(stats.avg)}</span>
-              <span>Min: {formatCurrency(stats.min)}</span>
+            <div className="d-flex align-items-center gap-3 small ms-4">
+              <span className="text-muted fw-medium">Max: <span className="text-dark fw-bold">{formatCurrency(stats.max)}</span></span>
+              <span className="text-muted fw-medium">Avg: <span className="text-dark fw-bold">{formatCurrency(stats.avg)}</span></span>
+              <span className="text-muted fw-medium">Min: <span className="text-dark fw-bold">{formatCurrency(stats.min)}</span></span>
             </div>
           </div>
                               <div className="d-flex align-items-center">
-                                <div className="text-end small">
-                                  <div>Opening: {formatCurrency(account.openingBalance)}</div>
-                                  <div>Change: <span className={`fw-bold ${account.netChange >= 0 ? 'text-success' : 'text-warning'}`}>
+                                <div className="text-end small me-4">
+                                  <div className="text-muted fw-medium mb-1">Opening: <span className="text-dark fw-bold">{formatCurrency(account.openingBalance)}</span></div>
+                                  <div className="text-muted fw-medium mb-1">Change: <span className={`fw-bold ${account.netChange >= 0 ? 'text-success' : 'text-danger'}`} style={{ fontSize: '1rem' }}>
                                     {account.netChange >= 0 ? '+' : ''}{formatCurrency(account.netChange)}
                                   </span></div>
-                                  <div>Closing: {formatCurrency(account.closingBalance)}</div>
+                                  <div className="text-muted fw-medium">Closing: <span className="text-dark fw-bold">{formatCurrency(account.closingBalance)}</span></div>
                                 </div>
-                                <i className={`fas fa-chevron-${isExpanded ? 'up' : 'down'} ms-3`}></i>
+                                <i className={`fas fa-chevron-${isExpanded ? 'up' : 'down'} text-primary`} style={{ fontSize: '1.2rem' }}></i>
                               </div>
                             </div>
                             
                             {/* Expandable Transaction Table */}
                             {isExpanded && (
-                              <div className="card-body p-0">
+                              <div className="card-body p-0" style={{ backgroundColor: '#f8f9fa' }}>
                                 <div className="table-responsive">
-                                  <table className="table table-sm table-hover mb-0">
-                                    <thead className="table-light">
+                                  <table className="table table-sm table-hover mb-0" style={{ backgroundColor: 'white' }}>
+                                    <thead style={{ backgroundColor: '#495057' }}>
                                       <tr>
-                                        <th>ID</th>
-                                        <th>Date</th>
-                                        <th>Description</th>
-                                        <th>Reference</th>
-                                        <th>Type</th>
-                                        <th>Amount</th>
-                                        <th>D/C</th>
-                                        <th>Year</th>
+                                        <th className="text-white fw-bold py-3">ID</th>
+                                        <th className="text-white fw-bold py-3">Date</th>
+                                        <th className="text-white fw-bold py-3">Description</th>
+                                        <th className="text-white fw-bold py-3">Reference</th>
+                                        <th className="text-white fw-bold py-3">Type</th>
+                                        <th className="text-white fw-bold py-3">Amount</th>
+                                        <th className="text-white fw-bold py-3">D/C</th>
+                                        <th className="text-white fw-bold py-3">Year</th>
                                       </tr>
                                     </thead>
                                     <tbody>
@@ -726,6 +733,18 @@ const GLTransactions = () => {
                                             key={transaction.id} 
                                             className="cursor-pointer"
                                             onClick={() => handleTransactionClick(transaction)}
+                                            style={{ 
+                                              transition: 'all 0.2s ease',
+                                              borderLeft: '4px solid transparent'
+                                            }}
+                                            onMouseEnter={(e) => {
+                                              e.currentTarget.style.backgroundColor = '#f8f9fa';
+                                              e.currentTarget.style.borderLeftColor = '#667eea';
+                                            }}
+                                            onMouseLeave={(e) => {
+                                              e.currentTarget.style.backgroundColor = 'white';
+                                              e.currentTarget.style.borderLeftColor = 'transparent';
+                                            }}
                                           >
                                             <td><code className="text-muted small">{uid}</code></td>
                                             <td>{formatDate(transaction.date)}</td>
@@ -739,11 +758,11 @@ const GLTransactions = () => {
                                               <code className="small">{transaction.reference || 'N/A'}</code>
                                             </td>
                                             <td>
-                                              <span className={`badge ${
-                                                transaction.source === 'AJ' ? 'bg-info' :
-                                                transaction.source === 'PJ' ? 'bg-primary' :
-                                                'bg-light text-dark'
-                                              }`}>
+                                              <span className={`badge px-3 py-2 fw-bold ${
+                                                transaction.source === 'AJ' ? 'bg-warning text-dark' :
+                                                transaction.source === 'PJ' ? 'bg-success text-white' :
+                                                'bg-secondary text-white'
+                                              }`} style={{ borderRadius: '15px', fontSize: '0.75rem' }}>
                                                 {transaction.source === 'AJ' ? 'AJ (Adjustment)' :
                                                  transaction.source === 'PJ' ? 'PJ (Bank)' :
                                                  transaction.source || 'N/A'}
@@ -759,16 +778,16 @@ const GLTransactions = () => {
                                               </span>
                                             </td>
                                             <td>
-                                              <span className={`badge ${
-                                                type === 'debit' ? 'bg-danger' : 
-                                                type === 'credit' ? 'bg-success' : 
-                                                'bg-secondary'
-                                              }`}>
+                                              <span className={`badge px-3 py-2 fw-bold ${
+                                                type === 'debit' ? 'bg-danger text-white' : 
+                                                type === 'credit' ? 'bg-success text-white' : 
+                                                'bg-secondary text-white'
+                                              }`} style={{ borderRadius: '15px', fontSize: '0.75rem' }}>
                                                 {type === 'debit' ? 'Debit' : type === 'credit' ? 'Credit' : 'N/A'}
                                               </span>
                                             </td>
                                             <td>
-                                              <span className="badge bg-secondary">
+                                              <span className="badge bg-primary text-white px-3 py-2 fw-bold" style={{ borderRadius: '15px', fontSize: '0.75rem' }}>
                                                 {transaction.tax_return_year || 'N/A'}
                                               </span>
                                             </td>
@@ -776,24 +795,24 @@ const GLTransactions = () => {
                                         );
                                       })}
                                       {/* Total Row */}
-                                      <tr className="table-dark fw-bold">
-                                        <td colSpan="2">TOTAL</td>
-                                        <td></td>
-                                        <td></td>
-                                        <td></td>
-                                        <td className="text-end">
-                                          <span className={`${
+                                      <tr style={{ backgroundColor: '#343a40' }}>
+                                        <td colSpan="2" className="text-white fw-bold py-3">TOTAL</td>
+                                        <td className="py-3"></td>
+                                        <td className="py-3"></td>
+                                        <td className="py-3"></td>
+                                        <td className="text-end py-3">
+                                          <span className={`fw-bold ${
                                             account.netChange >= 0 ? 'text-success' : 'text-danger'
-                                          }`}>
+                                          }`} style={{ fontSize: '1.1rem' }}>
                                             {account.netChange >= 0 ? '+' : ''}{formatCurrency(account.netChange)}
                                           </span>
                                         </td>
-                                        <td>
-                                          <span className="badge bg-light text-dark">
+                                        <td className="py-3">
+                                          <span className="badge bg-white text-dark px-3 py-2 fw-bold" style={{ borderRadius: '15px', fontSize: '0.75rem' }}>
                                             {account.totalDebits > account.totalCredits ? 'Debit' : 'Credit'}
                                           </span>
                                         </td>
-                                        <td></td>
+                                        <td className="py-3"></td>
                                       </tr>
                                     </tbody>
                                   </table>
@@ -940,6 +959,94 @@ const GLTransactions = () => {
                   {renderPagination()}
                 </div>
               )}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* GL Summary Panel */}
+      <div className="container-fluid mt-4">
+        <div className="card shadow">
+          <div className="card-header" style={{ backgroundColor: '#b3d9ff' }}>
+            <h5 className="mb-0 text-dark fw-bold">
+              <i className="fas fa-calculator me-2"></i>
+              General Ledger Summary
+            </h5>
+          </div>
+          <div className="card-body">
+            <div className="row">
+              <div className="col-md-4">
+                <div className="text-center">
+                  <h6 className="text-muted mb-2">Total Opening Balance</h6>
+                  <div className="h4 fw-bold text-primary">
+                    {(() => {
+                      const totalOpening = Object.values(groupedTransactions).reduce((sum, account) => sum + account.openingBalance, 0);
+                      return formatCurrency(totalOpening);
+                    })()}
+                  </div>
+                </div>
+              </div>
+              <div className="col-md-4">
+                <div className="text-center">
+                  <h6 className="text-muted mb-2">Total Change</h6>
+                  <div className="h4 fw-bold">
+                    {(() => {
+                      const totalChange = Object.values(groupedTransactions).reduce((sum, account) => sum + account.netChange, 0);
+                      return (
+                        <span className={totalChange >= 0 ? 'text-success' : 'text-danger'}>
+                          {totalChange >= 0 ? '+' : ''}{formatCurrency(totalChange)}
+                        </span>
+                      );
+                    })()}
+                  </div>
+                </div>
+              </div>
+              <div className="col-md-4">
+                <div className="text-center">
+                  <h6 className="text-muted mb-2">Total Closing Balance</h6>
+                  <div className="h4 fw-bold text-primary">
+                    {(() => {
+                      const totalClosing = Object.values(groupedTransactions).reduce((sum, account) => sum + account.closingBalance, 0);
+                      return formatCurrency(totalClosing);
+                    })()}
+                  </div>
+                </div>
+              </div>
+            </div>
+            <hr className="my-3" />
+            <div className="row">
+              <div className="col-md-6">
+                <div className="text-center">
+                  <h6 className="text-muted mb-2">Total Debits</h6>
+                  <div className="h5 fw-bold text-danger">
+                    {(() => {
+                      const totalDebits = Object.values(groupedTransactions).reduce((sum, account) => sum + account.totalDebits, 0);
+                      return formatCurrency(totalDebits);
+                    })()}
+                  </div>
+                </div>
+              </div>
+              <div className="col-md-6">
+                <div className="text-center">
+                  <h6 className="text-muted mb-2">Total Credits</h6>
+                  <div className="h5 fw-bold text-success">
+                    {(() => {
+                      const totalCredits = Object.values(groupedTransactions).reduce((sum, account) => sum + account.totalCredits, 0);
+                      return formatCurrency(totalCredits);
+                    })()}
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div className="row mt-3">
+              <div className="col-12">
+                <div className="text-center">
+                  <small className="text-muted">
+                    Summary based on {Object.keys(groupedTransactions).length} account{Object.keys(groupedTransactions).length !== 1 ? 's' : ''} 
+                    {filters.year && ` for ${filters.year}`}
+                  </small>
+                </div>
+              </div>
             </div>
           </div>
         </div>
