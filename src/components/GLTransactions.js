@@ -812,7 +812,7 @@ const GLTransactions = () => {
                         <div className="row">
                           <div className="col-md-6">
                             <h6 className="text-muted mb-3 text-center">Account Credits</h6>
-                            <div className="max-height-300 overflow-auto">
+                            <div>
                               {Object.entries(groupedTransactions)
                                 .filter(([_, account]) => account.totalCredits > 0)
                                 .sort(([_, a], [__, b]) => b.totalCredits - a.totalCredits)
@@ -833,7 +833,7 @@ const GLTransactions = () => {
                           </div>
                           <div className="col-md-6">
                             <h6 className="text-muted mb-3 text-center">Account Debits</h6>
-                            <div className="max-height-300 overflow-auto">
+                            <div>
                               {Object.entries(groupedTransactions)
                                 .filter(([_, account]) => account.totalDebits > 0)
                                 .sort(([_, a], [__, b]) => b.totalDebits - a.totalDebits)
