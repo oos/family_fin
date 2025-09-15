@@ -724,7 +724,7 @@ const GLTransactions = () => {
                     <small className="text-muted">
                       {rowsPerPage >= 10000 ? 
                         `Showing all ${summaryCounts.total} transactions` : 
-                        `Showing ${transactions.length} of ${summaryCounts.total} transactions on this page`
+                        `Showing ${transactions.length} of ${summaryCounts.total} transactions`
                       }
                     </small>
                     <div className="d-flex align-items-center gap-2">
