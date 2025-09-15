@@ -3733,6 +3733,7 @@ def get_all_gl_transactions():
         source = request.args.get('source', '', type=str)
         category_heading = request.args.get('category_heading', '', type=str)
         year = request.args.get('year', '', type=str)
+        transaction_type = request.args.get('transaction_type', '', type=str)
         sort_field = request.args.get('sort_field', 'date', type=str)
         sort_direction = request.args.get('sort_direction', 'desc', type=str)
         
@@ -3795,6 +3796,9 @@ def get_all_gl_transactions():
         
         if year:
             query = query.filter(TaxReturn.year == year)
+        
+        if transaction_type:
+            query = query.filter(TaxReturnTransaction.source == transaction_type)
         
         # Apply sorting
         valid_sort_fields = {

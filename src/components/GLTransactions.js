@@ -26,7 +26,8 @@ const GLTransactions = () => {
     amountMax: '',
     source: '',
     categoryHeading: '',
-    year: ''
+    year: '',
+    transactionType: '' // New: PJ vs AJ filtering
   });
 
   // Available filter options
@@ -293,6 +294,17 @@ const GLTransactions = () => {
                 <div className="col-md-2">
                   <select
                     className="form-select"
+                    value={filters.transactionType}
+                    onChange={(e) => handleFilterChange('transactionType', e.target.value)}
+                  >
+                    <option value="">All Types</option>
+                    <option value="PJ">PJ (Bank Transactions)</option>
+                    <option value="AJ">AJ (Adjustments)</option>
+                  </select>
+                </div>
+                <div className="col-md-2">
+                  <select
+                    className="form-select"
                     value={filters.categoryHeading}
                     onChange={(e) => handleFilterChange('categoryHeading', e.target.value)}
                   >
@@ -337,6 +349,42 @@ const GLTransactions = () => {
                 </div>
               </div>
 
+              {/* Transaction Summary */}
+              {transactions.length > 0 && (
+                <div className="row mb-3">
+                  <div className="col-12">
+                    <div className="card bg-light">
+                      <div className="card-body py-2">
+                        <div className="row text-center">
+                          <div className="col-md-3">
+                            <small className="text-muted">Total Transactions</small>
+                            <div className="fw-bold">{totalTransactions}</div>
+                          </div>
+                          <div className="col-md-3">
+                            <small className="text-muted">Bank Transactions (PJ)</small>
+                            <div className="fw-bold text-success">
+                              {transactions.filter(t => t.source === 'PJ').length}
+                            </div>
+                          </div>
+                          <div className="col-md-3">
+                            <small className="text-muted">Adjustments (AJ)</small>
+                            <div className="fw-bold text-warning">
+                              {transactions.filter(t => t.source === 'AJ').length}
+                            </div>
+                          </div>
+                          <div className="col-md-3">
+                            <small className="text-muted">Other Types</small>
+                            <div className="fw-bold text-secondary">
+                              {transactions.filter(t => t.source !== 'PJ' && t.source !== 'AJ').length}
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+
               {/* Transactions Table */}
               <div className="table-responsive">
                 <table className="table table-hover">
@@ -356,8 +404,8 @@ const GLTransactions = () => {
                         Description {sortField === 'name' && (sortDirection === 'asc' ? '↑' : '↓')}
                       </th>
                       <th>Reference</th>
-                      <th>Source</th>
-                      <th>Category</th>
+                      <th>Type</th>
+                      <th>Account</th>
                       <th 
                         className="cursor-pointer"
                         onClick={() => handleSort('amount')}
@@ -406,11 +454,17 @@ const GLTransactions = () => {
                             <td>{transaction.reference || 'N/A'}</td>
                             <td>
                               <span className={`badge ${
-                                transaction.source === 'AJ' ? 'bg-success' :
-                                transaction.source === 'PJ' ? 'bg-primary' :
+                                transaction.source === 'AJ' ? 'bg-warning' :
+                                transaction.source === 'PJ' ? 'bg-success' :
                                 'bg-secondary'
-                              }`}>
-                                {transaction.source || 'N/A'}
+                              }`} title={
+                                transaction.source === 'AJ' ? 'Adjustment Journal (Non-cash)' :
+                                transaction.source === 'PJ' ? 'Payment Journal (Bank Transaction)' :
+                                'Unknown Type'
+                              }>
+                                {transaction.source === 'AJ' ? 'AJ (Adjustment)' :
+                                 transaction.source === 'PJ' ? 'PJ (Bank)' :
+                                 transaction.source || 'N/A'}
                               </span>
                             </td>
                             <td>
