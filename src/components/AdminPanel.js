@@ -11,6 +11,11 @@ const AdminPanel = () => {
   const [showResetModal, setShowResetModal] = useState(false);
   const [resetPassword, setResetPassword] = useState('');
   const [resettingUser, setResettingUser] = useState(null);
+  
+  // App settings state
+  const [appSettings, setAppSettings] = useState([]);
+  const [showAppSettings, setShowAppSettings] = useState(false);
+  const [settingsLoading, setSettingsLoading] = useState(false);
 
   const availableSections = [
     { key: 'properties', label: 'Properties' },
@@ -136,6 +141,53 @@ const AdminPanel = () => {
     setResettingUser(null);
   };
 
+  const fetchAppSettings = async () => {
+    try {
+      setSettingsLoading(true);
+      const response = await axios.get('/app-settings');
+      if (response.data.success) {
+        setAppSettings(response.data.settings);
+      } else {
+        setError(response.data.message);
+      }
+    } catch (err) {
+      setError('Failed to fetch app settings');
+      console.error('Error fetching app settings:', err);
+    } finally {
+      setSettingsLoading(false);
+    }
+  };
+
+  const handleAppSettingChange = (settingKey, value) => {
+    setAppSettings(prev => 
+      prev.map(setting => 
+        setting.setting_key === settingKey 
+          ? { ...setting, setting_value: value }
+          : setting
+      )
+    );
+  };
+
+  const handleSaveAppSettings = async () => {
+    try {
+      setSettingsLoading(true);
+      const response = await axios.put('/app-settings', {
+        settings: appSettings
+      });
+
+      if (response.data.success) {
+        alert('App settings saved successfully! Please restart the servers for changes to take effect.');
+      } else {
+        setError(response.data.message);
+      }
+    } catch (err) {
+      setError('Failed to save app settings');
+      console.error('Error saving app settings:', err);
+    } finally {
+      setSettingsLoading(false);
+    }
+  };
+
   if (loading) {
     return (
       <div className="container">
@@ -160,7 +212,23 @@ const AdminPanel = () => {
 
   return (
     <div className="container">
-      <h1>Admin Panel</h1>
+      <div className="d-flex justify-content-between align-items-center mb-4">
+        <h1>Admin Panel</h1>
+        <div className="btn-group">
+          <button
+            className={`btn ${showAppSettings ? 'btn-primary' : 'btn-outline-primary'}`}
+            onClick={() => {
+              setShowAppSettings(!showAppSettings);
+              if (!showAppSettings) {
+                fetchAppSettings();
+              }
+            }}
+          >
+            <i className="fas fa-cog me-2"></i>
+            App Settings
+          </button>
+        </div>
+      </div>
       
       <div className="row">
         <div className="col-md-4">
@@ -270,6 +338,116 @@ const AdminPanel = () => {
           )}
         </div>
       </div>
+
+      {/* App Settings Panel */}
+      {showAppSettings && (
+        <div className="row mt-4">
+          <div className="col-12">
+            <div className="card">
+              <div className="card-header d-flex justify-content-between align-items-center">
+                <h5 className="mb-0">
+                  <i className="fas fa-cog me-2"></i>
+                  Application Settings
+                </h5>
+                <button
+                  className="btn btn-outline-secondary btn-sm"
+                  onClick={() => setShowAppSettings(false)}
+                >
+                  <i className="fas fa-times"></i>
+                </button>
+              </div>
+              <div className="card-body">
+                {settingsLoading ? (
+                  <div className="text-center">
+                    <div className="spinner-border" role="status">
+                      <span className="visually-hidden">Loading...</span>
+                    </div>
+                  </div>
+                ) : (
+                  <div>
+                    <div className="alert alert-info">
+                      <i className="fas fa-info-circle me-2"></i>
+                      <strong>Port Configuration:</strong> Configure the ports for the frontend and backend applications. 
+                      Changes will take effect after restarting both servers.
+                    </div>
+                    
+                    <div className="row">
+                      {appSettings.map(setting => (
+                        <div key={setting.setting_key} className="col-md-6 mb-3">
+                          <div className="card">
+                            <div className="card-body">
+                              <h6 className="card-title">
+                                {setting.setting_key === 'frontend_port' ? 'Frontend Port' : 'Backend Port'}
+                                <span className="badge bg-secondary ms-2">
+                                  {setting.setting_key === 'frontend_port' ? 'React App' : 'Flask API'}
+                                </span>
+                              </h6>
+                              <p className="card-text text-muted small">
+                                {setting.description}
+                              </p>
+                              <div className="input-group">
+                                <span className="input-group-text">
+                                  <i className={`fas ${setting.setting_key === 'frontend_port' ? 'fa-globe' : 'fa-server'}`}></i>
+                                </span>
+                                <input
+                                  type="number"
+                                  className="form-control"
+                                  value={setting.setting_value}
+                                  onChange={(e) => handleAppSettingChange(setting.setting_key, e.target.value)}
+                                  min="1000"
+                                  max="65535"
+                                  placeholder={`Enter ${setting.setting_key === 'frontend_port' ? 'frontend' : 'backend'} port`}
+                                />
+                                <span className="input-group-text">Port</span>
+                              </div>
+                              <small className="text-muted">
+                                Current URL: {setting.setting_key === 'frontend_port' ? 
+                                  `http://localhost:${setting.setting_value}` : 
+                                  `http://localhost:${setting.setting_value}/api`
+                                }
+                              </small>
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+
+                    <div className="mt-4">
+                      <div className="alert alert-warning">
+                        <i className="fas fa-exclamation-triangle me-2"></i>
+                        <strong>Important:</strong> After changing ports, you must:
+                        <ol className="mb-0 mt-2">
+                          <li>Stop both the frontend and backend servers</li>
+                          <li>Update the frontend's axios baseURL if needed</li>
+                          <li>Restart both servers with the new ports</li>
+                        </ol>
+                      </div>
+                      
+                      <div className="d-flex gap-2">
+                        <button
+                          className="btn btn-primary"
+                          onClick={handleSaveAppSettings}
+                          disabled={settingsLoading}
+                        >
+                          <i className="fas fa-save me-2"></i>
+                          Save Settings
+                        </button>
+                        <button
+                          className="btn btn-outline-secondary"
+                          onClick={() => setShowAppSettings(false)}
+                        >
+                          <i className="fas fa-times me-2"></i>
+                          Cancel
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Password Reset Modal */}
       {showResetModal && (

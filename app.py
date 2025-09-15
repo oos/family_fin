@@ -62,7 +62,7 @@ app.config['JWT_SECRET_KEY'] = os.getenv('JWT_SECRET_KEY', 'jwt-secret-string')
 app.config['JWT_ACCESS_TOKEN_EXPIRES'] = timedelta(hours=24)
 
 # Import models and db
-from models import db, User, Person, Property, Income, Loan, Family, BusinessAccount, Pension, PensionAccount, LoanERC, LoanPayment, BankTransaction, AirbnbBooking, DashboardSettings, AccountBalance, TaxReturn, TaxReturnTransaction, TransactionMatch, TransactionLearningPattern, TransactionCategoryPrediction, ModelTrainingHistory, TransactionCategory
+from models import db, User, Person, Property, Income, Loan, Family, BusinessAccount, Pension, PensionAccount, LoanERC, LoanPayment, BankTransaction, AirbnbBooking, DashboardSettings, AccountBalance, TaxReturn, TaxReturnTransaction, TransactionMatch, TransactionLearningPattern, TransactionCategoryPrediction, ModelTrainingHistory, TransactionCategory, AppSettings
 
 # Initialize extensions
 db.init_app(app)
@@ -5421,7 +5421,141 @@ def bulk_validate_predictions():
         db.session.rollback()
         return jsonify({'error': str(e)}), 500
 
+# App Settings API
+@app.route('/api/app-settings', methods=['GET'])
+@jwt_required()
+def get_app_settings():
+    """Get all application settings (admin only)"""
+    try:
+        current_user_username = get_jwt_identity()
+        current_user = User.query.filter_by(username=current_user_username).first()
+        
+        if not current_user or current_user.role != 'admin':
+            return jsonify({
+                'success': False,
+                'message': 'Admin access required'
+            }), 403
+        
+        settings = AppSettings.query.all()
+        return jsonify({
+            'success': True,
+            'settings': [setting.to_dict() for setting in settings]
+        })
+        
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'message': f'Failed to fetch app settings: {str(e)}'
+        }), 500
+
+@app.route('/api/app-settings', methods=['PUT'])
+@jwt_required()
+def update_app_settings():
+    """Update application settings (admin only)"""
+    try:
+        current_user_username = get_jwt_identity()
+        current_user = User.query.filter_by(username=current_user_username).first()
+        
+        if not current_user or current_user.role != 'admin':
+            return jsonify({
+                'success': False,
+                'message': 'Admin access required'
+            }), 403
+        
+        data = request.get_json()
+        settings = data.get('settings', [])
+        
+        # Update or create each setting
+        for setting_data in settings:
+            setting = AppSettings.query.filter_by(setting_key=setting_data['setting_key']).first()
+            
+            if setting:
+                setting.setting_value = setting_data['setting_value']
+                setting.updated_at = datetime.utcnow()
+            else:
+                setting = AppSettings(
+                    setting_key=setting_data['setting_key'],
+                    setting_value=setting_data['setting_value'],
+                    description=setting_data.get('description', '')
+                )
+                db.session.add(setting)
+        
+        db.session.commit()
+        
+        return jsonify({
+            'success': True,
+            'message': 'App settings updated successfully'
+        })
+        
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({
+            'success': False,
+            'message': f'Failed to update app settings: {str(e)}'
+        }), 500
+
+def get_app_setting(setting_key, default_value=None):
+    """Helper function to get an app setting value"""
+    try:
+        setting = AppSettings.query.filter_by(setting_key=setting_key).first()
+        return setting.setting_value if setting else default_value
+    except:
+        return default_value
+
+def initialize_default_settings():
+    """Initialize default app settings if they don't exist"""
+    try:
+        with app.app_context():
+            # Check if settings already exist
+            if AppSettings.query.count() > 0:
+                return
+            
+            # Create default settings
+            default_settings = [
+                {
+                    'setting_key': 'frontend_port',
+                    'setting_value': '3007',
+                    'description': 'Port for the React frontend application'
+                },
+                {
+                    'setting_key': 'backend_port',
+                    'setting_value': '5002',
+                    'description': 'Port for the Flask backend application'
+                }
+            ]
+            
+            for setting_data in default_settings:
+                setting = AppSettings(
+                    setting_key=setting_data['setting_key'],
+                    setting_value=setting_data['setting_value'],
+                    description=setting_data['description']
+                )
+                db.session.add(setting)
+            
+            db.session.commit()
+            print("Default app settings initialized")
+            
+    except Exception as e:
+        print(f"Error initializing default settings: {e}")
+
 if __name__ == '__main__':
     with app.app_context():
         db.create_all()
-    app.run(debug=True, port=int(os.environ.get('PORT', 5002)))
+        initialize_default_settings()
+        
+        # Get configured ports
+        frontend_port = get_app_setting('frontend_port', '3007')
+        backend_port = int(get_app_setting('backend_port', '5002'))
+        
+        # Update CORS configuration with the configured frontend port
+        from flask_cors import CORS
+        CORS(app, 
+             origins=[f'http://localhost:{frontend_port}'],
+             methods=['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+             allow_headers=['Content-Type', 'Authorization'],
+             supports_credentials=True)
+        
+        print(f"Starting Flask server on port {backend_port}")
+        print(f"Frontend should be running on port {frontend_port}")
+        
+    app.run(debug=True, port=backend_port)
