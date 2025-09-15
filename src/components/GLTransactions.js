@@ -476,7 +476,8 @@ const GLTransactions = () => {
   }
 
   return (
-    <div className="container-fluid mt-4">
+    <>
+      <div className="container-fluid mt-4">
       <style jsx>{`
         .cursor-pointer {
           cursor: pointer;
@@ -1774,7 +1775,8 @@ const GLTransactions = () => {
           </div>
         </div>
       )}
-    </div>
+      </div>
+    </>
   );
 };
 
