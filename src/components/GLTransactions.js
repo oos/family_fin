@@ -676,17 +676,17 @@ const GLTransactions = () => {
                                 </span>
                               </div>
                               <div className="d-flex align-items-center gap-3">
-                                <div className="text-end small">
-                                  <div>O: {formatCurrency(account.openingBalance)}</div>
-                                  <div>C: <span className={`fw-bold ${account.netChange >= 0 ? 'text-success' : 'text-warning'}`}>
-                                    {account.netChange >= 0 ? '+' : ''}{formatCurrency(account.netChange)}
-                                  </span></div>
-                                  <div>Cl: {formatCurrency(account.closingBalance)}</div>
-                                </div>
                                 <div className="d-flex align-items-center gap-2 small">
                                   <span className="text-primary">Max: {formatCurrency(stats.max)}</span>
                                   <span className="text-info">Min: {formatCurrency(stats.min)}</span>
                                   <span className="text-success">Avg: {formatCurrency(stats.avg)}</span>
+                                </div>
+                                <div className="text-end small">
+                                  <div>Opening: {formatCurrency(account.openingBalance)}</div>
+                                  <div>Change: <span className={`fw-bold ${account.netChange >= 0 ? 'text-success' : 'text-warning'}`}>
+                                    {account.netChange >= 0 ? '+' : ''}{formatCurrency(account.netChange)}
+                                  </span></div>
+                                  <div>Closing: {formatCurrency(account.closingBalance)}</div>
                                 </div>
                                 <i className={`fas fa-chevron-${isExpanded ? 'up' : 'down'}`}></i>
                               </div>
