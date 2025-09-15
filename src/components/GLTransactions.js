@@ -522,18 +522,66 @@ const GLTransactions = () => {
                         {summaryCounts.other > 0 && (
                           <div className="row mt-2">
                             <div className="col-12">
-                              <small className="text-muted">Other Types Breakdown:</small>
+                              <small className="text-muted">Breakdown of {summaryCounts.other} Other Types:</small>
                               <div className="mt-1">
-                                <span className="badge bg-primary me-1" title="AP - Accounts Payable: Money owed to suppliers/vendors">AP: {summaryCounts.ap || 0}</span>
-                                <span className="badge bg-info me-1" title="SE - Sales Entry: Revenue from sales transactions">SE: {summaryCounts.se || 0}</span>
-                                <span className="badge bg-secondary me-1" title="CD - Cash Deposit: Money deposited into accounts">CD: {summaryCounts.cd || 0}</span>
-                                <span className="badge bg-dark me-1" title="PL - Profit & Loss: Income statement adjustments">PL: {summaryCounts.pl || 0}</span>
                                 {(() => {
-                                  const remainingOther = summaryCounts.other - (summaryCounts.ap || 0) - (summaryCounts.se || 0) - (summaryCounts.cd || 0) - (summaryCounts.pl || 0);
-                                  if (remainingOther > 0) {
-                                    return <span className="badge bg-light text-dark me-1" title="Other: Transactions with unknown or empty source types">Other: {remainingOther}</span>;
+                                  const apCount = summaryCounts.ap || 0;
+                                  const seCount = summaryCounts.se || 0;
+                                  const cdCount = summaryCounts.cd || 0;
+                                  const plCount = summaryCounts.pl || 0;
+                                  const remainingOther = summaryCounts.other - apCount - seCount - cdCount - plCount;
+                                  
+                                  const components = [];
+                                  
+                                  if (apCount > 0) {
+                                    components.push(
+                                      <span key="ap" className="badge bg-primary me-1" title="AP - Accounts Payable: Money owed to suppliers/vendors">
+                                        AP: {apCount}
+                                      </span>
+                                    );
                                   }
-                                  return null;
+                                  
+                                  if (seCount > 0) {
+                                    components.push(
+                                      <span key="se" className="badge bg-info me-1" title="SE - Sales Entry: Revenue from sales transactions">
+                                        SE: {seCount}
+                                      </span>
+                                    );
+                                  }
+                                  
+                                  if (cdCount > 0) {
+                                    components.push(
+                                      <span key="cd" className="badge bg-secondary me-1" title="CD - Cash Deposit: Money deposited into accounts">
+                                        CD: {cdCount}
+                                      </span>
+                                    );
+                                  }
+                                  
+                                  if (plCount > 0) {
+                                    components.push(
+                                      <span key="pl" className="badge bg-dark me-1" title="PL - Profit & Loss: Income statement adjustments">
+                                        PL: {plCount}
+                                      </span>
+                                    );
+                                  }
+                                  
+                                  if (remainingOther > 0) {
+                                    components.push(
+                                      <span key="other" className="badge bg-light text-dark me-1" title="Other: Transactions with unknown or empty source types">
+                                        Unknown: {remainingOther}
+                                      </span>
+                                    );
+                                  }
+                                  
+                                  if (components.length === 0) {
+                                    return (
+                                      <span className="badge bg-light text-dark me-1" title="All other transactions have unknown or empty source types">
+                                        All Unknown: {summaryCounts.other}
+                                      </span>
+                                    );
+                                  }
+                                  
+                                  return components;
                                 })()}
                               </div>
                               <div className="mt-1">
