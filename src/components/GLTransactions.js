@@ -516,7 +516,7 @@ const GLTransactions = () => {
                   <button
                     className="btn btn-outline-secondary"
                     onClick={clearFilters}
-                    title="Clear all filters"
+                    title="Close"
                   >
                     <i className="fas fa-times"></i>
                   </button>
@@ -529,6 +529,16 @@ const GLTransactions = () => {
                 <div className="row mb-3">
                   <div className="col-12">
                     <div className="card bg-light">
+                      <div className="card-header d-flex justify-content-between align-items-center py-2">
+                        <h6 className="mb-0">Analytics</h6>
+                        <button
+                          className="btn btn-sm btn-outline-secondary"
+                          onClick={() => setShowAnalytics(false)}
+                          title="Close Analytics"
+                        >
+                          <i className="fas fa-times"></i>
+                        </button>
+                      </div>
                       <div className="card-body py-2">
                         <div className="row text-center">
                           <div className="col-md-3">
