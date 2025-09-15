@@ -49,7 +49,7 @@ const GLTransactions = () => {
   });
 
   // Account grouping state
-  const [groupByAccount, setGroupByAccount] = useState(false);
+  const [groupByAccount, setGroupByAccount] = useState(true);
   const [groupedTransactions, setGroupedTransactions] = useState({});
   const [expandedAccounts, setExpandedAccounts] = useState({});
   
@@ -421,13 +421,6 @@ const GLTransactions = () => {
               <h4 className="mb-0">General Ledger Transactions</h4>
               <div>
                 <button
-                  className={`btn me-2 ${groupByAccount ? 'btn-dark' : 'btn-outline-dark'}`}
-                  onClick={() => setGroupByAccount(!groupByAccount)}
-                >
-                  <i className={`fas ${groupByAccount ? 'fa-layer-group' : 'fa-list'}`}></i> 
-                  {groupByAccount ? 'Grouped by Account' : 'Group by Account'}
-                </button>
-                <button
                   className={`btn me-2 ${showFilters ? 'btn-secondary' : 'btn-outline-secondary'}`}
                   onClick={() => setShowFilters(!showFilters)}
                 >
@@ -618,7 +611,15 @@ const GLTransactions = () => {
               {/* Pagination Info */}
               <div className="row mb-2">
                 <div className="col-12 d-flex justify-content-between align-items-center">
-                  <div></div>
+                  <div className="d-flex align-items-center gap-3">
+                    <button
+                      className={`btn btn-sm ${groupByAccount ? 'btn-dark' : 'btn-outline-dark'}`}
+                      onClick={() => setGroupByAccount(!groupByAccount)}
+                    >
+                      <i className={`fas ${groupByAccount ? 'fa-layer-group' : 'fa-list'}`}></i> 
+                      {groupByAccount ? 'Grouped by Account' : 'Group by Account'}
+                    </button>
+                  </div>
                   <div className="d-flex align-items-center gap-3">
                     <small className="text-muted">
                       {rowsPerPage >= 10000 ? 
