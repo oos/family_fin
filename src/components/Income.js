@@ -551,14 +551,14 @@ function Income() {
 
   return (
     <div>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+      <div className="d-flex justify-content-between align-items-center mb-3">
         <h1>Family Incomes</h1>
       </div>
 
       {error && <div className="error">{error}</div>}
 
       {/* Tab Navigation */}
-      <div className="tab-navigation" style={{ marginBottom: '20px' }}>
+      <div className="tab-navigation mb-3">
         <button
           className={`tab-button ${activeTab === 'summary' ? 'active' : ''}`}
           onClick={() => handleTabChange('summary')}
@@ -833,7 +833,7 @@ function Income() {
       {/* Individual Income Records Table */}
       {activeTab === 'records' && (
       <div className="card">
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+        <div className="d-flex justify-content-between align-items-center mb-3">
         <h3>Individual Income Records</h3>
           <button className="btn btn-primary" onClick={handleAddNew}>
             Add New Income Record
@@ -934,7 +934,7 @@ function Income() {
       {/* Pension Contributions Table - DB Records Only */}
       {activeTab === 'pensions' && (
         <div className="card">
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+          <div className="d-flex justify-content-between align-items-center mb-3">
             <h3>Pension Contributions</h3>
             <button className="btn btn-primary" onClick={() => {
               setEditingIncome(null);

@@ -75,3 +75,5 @@ Thumbs.db
 # Temporary files
 *.tmp
 *.temp
+venv311/
+test_matching.py

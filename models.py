@@ -123,6 +123,7 @@ class Property(db.Model):
 
 class BusinessAccount(db.Model):
     id = db.Column(db.Integer, primary_key=True)
+    # user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)  # Temporarily commented out until migration is applied
     account_name = db.Column(db.String(200), nullable=False)
     account_number = db.Column(db.String(50), nullable=False)
     bank_name = db.Column(db.String(100), nullable=False)
@@ -131,12 +132,21 @@ class BusinessAccount(db.Model):
     balance = db.Column(db.Float, default=0.0)
     api_credentials = db.Column(db.JSON, nullable=True)  # Store bank API credentials
     last_refreshed = db.Column(db.DateTime, nullable=True)
+    # File storage fields for CSV imports
+    last_imported_file_name = db.Column(db.String(255), nullable=True)
+    last_imported_file_content = db.Column(db.LargeBinary, nullable=True)
+    last_imported_file_size = db.Column(db.Integer, nullable=True)
+    last_imported_at = db.Column(db.DateTime, nullable=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    
+    # Relationships
+    # user = db.relationship('User', backref='business_accounts', lazy=True)  # Temporarily commented out until migration is applied
     
     def to_dict(self):
         return {
             'id': self.id,
+            'user_id': getattr(self, 'user_id', None),  # Handle missing user_id field gracefully
             'account_name': self.account_name,
             'account_number': self.account_number,
             'bank_name': self.bank_name,
@@ -641,15 +651,31 @@ class DashboardSettings(db.Model):
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     
-    # Relationships
-    user = db.relationship('User', backref='dashboard_settings', lazy=True)
-    
     def to_dict(self):
         return {
             'id': self.id,
             'user_id': self.user_id,
             'section': self.section,
             'is_visible': self.is_visible,
+            'created_at': self.created_at.isoformat() if self.created_at else None,
+            'updated_at': self.updated_at.isoformat() if self.updated_at else None
+        }
+
+class AppSettings(db.Model):
+    """Model for storing application-wide settings"""
+    id = db.Column(db.Integer, primary_key=True)
+    setting_key = db.Column(db.String(100), unique=True, nullable=False)
+    setting_value = db.Column(db.String(500), nullable=False)
+    description = db.Column(db.String(200), nullable=True)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'setting_key': self.setting_key,
+            'setting_value': self.setting_value,
+            'description': self.description,
             'created_at': self.created_at.isoformat() if self.created_at else None,
             'updated_at': self.updated_at.isoformat() if self.updated_at else None
         }
@@ -733,13 +759,14 @@ class TaxReturnTransaction(db.Model):
     debit = db.Column(db.Float, default=0.0)  # Debit amount
     credit = db.Column(db.Float, default=0.0)  # Credit amount
     balance = db.Column(db.Float, default=0.0)  # Running balance
+    category_heading = db.Column(db.String(200), nullable=True)  # Category heading from GL (e.g., "207C00 Hosting Fee's")
     
     # Metadata
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     
     # Relationships
-    tax_return = db.relationship('TaxReturn', backref='transactions')
+    tax_return = db.relationship('TaxReturn', backref=db.backref('transactions', cascade='all, delete-orphan'))
     user = db.relationship('User', backref='tax_return_transactions')
     
     def to_dict(self):
@@ -756,6 +783,7 @@ class TaxReturnTransaction(db.Model):
             'debit': self.debit,
             'credit': self.credit,
             'balance': self.balance,
+            'category_heading': self.category_heading,
             'created_at': self.created_at.isoformat() if self.created_at else None,
             'updated_at': self.updated_at.isoformat() if self.updated_at else None
         }
@@ -833,3 +861,207 @@ class TransactionLearningPattern(db.Model):
             'created_at': self.created_at.isoformat() if self.created_at else None,
             'updated_at': self.updated_at.isoformat() if self.updated_at else None
         }
+
+class TransactionCategoryPrediction(db.Model):
+    """Model for storing predicted and validated categories for bank transactions"""
+    id = db.Column(db.Integer, primary_key=True)
+    bank_transaction_id = db.Column(db.Integer, db.ForeignKey('bank_transaction.id'), nullable=False)
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+    
+    # Prediction data
+    predicted_category = db.Column(db.String(200), nullable=True)  # ML model prediction
+    prediction_confidence = db.Column(db.Float, default=0.0)  # 0.0 to 1.0
+    prediction_model_version = db.Column(db.String(50), nullable=True)  # Track model version
+    prediction_features = db.Column(db.Text, nullable=True)  # JSON of features used
+    
+    # Validation data
+    validated_category = db.Column(db.String(200), nullable=True)  # Manually confirmed category
+    validation_status = db.Column(db.String(20), default='pending')  # pending, validated, rejected
+    validation_notes = db.Column(db.Text, nullable=True)  # User notes about validation
+    
+    # Learning data
+    is_training_data = db.Column(db.Boolean, default=False)  # Used for training
+    training_source = db.Column(db.String(100), nullable=True)  # Which tax return provided this training data
+    
+    # Metadata
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    
+    # Relationships
+    bank_transaction = db.relationship('BankTransaction', backref='category_predictions')
+    user = db.relationship('User', backref='category_predictions')
+    
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'bank_transaction_id': self.bank_transaction_id,
+            'user_id': self.user_id,
+            'predicted_category': self.predicted_category,
+            'prediction_confidence': self.prediction_confidence,
+            'prediction_model_version': self.prediction_model_version,
+            'prediction_features': self.prediction_features,
+            'validated_category': self.validated_category,
+            'validation_status': self.validation_status,
+            'validation_notes': self.validation_notes,
+            'is_training_data': self.is_training_data,
+            'training_source': self.training_source,
+            'created_at': self.created_at.isoformat() if self.created_at else None,
+            'updated_at': self.updated_at.isoformat() if self.updated_at else None
+        }
+
+class ModelTrainingHistory(db.Model):
+    """Model for tracking ML model training history and performance"""
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+    model_version = db.Column(db.String(50), nullable=False)
+    training_date = db.Column(db.DateTime, default=datetime.utcnow)
+    
+    # Training data info
+    training_samples = db.Column(db.Integer, nullable=False)
+    tax_return_years = db.Column(db.String(200), nullable=True)  # Comma-separated years
+    matched_transactions_count = db.Column(db.Integer, nullable=False)
+    
+    # Model performance metrics
+    accuracy = db.Column(db.Float, nullable=True)
+    precision = db.Column(db.Float, nullable=True)
+    recall = db.Column(db.Float, nullable=True)
+    f1_score = db.Column(db.Float, nullable=True)
+    
+    # Training parameters
+    algorithm = db.Column(db.String(50), default='RandomForest')
+    features_count = db.Column(db.Integer, nullable=True)
+    training_duration_seconds = db.Column(db.Float, nullable=True)
+    
+    # Status
+    status = db.Column(db.String(20), default='completed')  # training, completed, failed
+    error_message = db.Column(db.Text, nullable=True)
+    
+    # Relationships
+    user = db.relationship('User', backref='model_training_history')
+    
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'user_id': self.user_id,
+            'model_version': self.model_version,
+            'training_date': self.training_date.isoformat() if self.training_date else None,
+            'training_samples': self.training_samples,
+            'tax_return_years': self.tax_return_years,
+            'matched_transactions_count': self.matched_transactions_count,
+            'accuracy': self.accuracy,
+            'precision': self.precision,
+            'recall': self.recall,
+            'f1_score': self.f1_score,
+            'algorithm': self.algorithm,
+            'features_count': self.features_count,
+            'training_duration_seconds': self.training_duration_seconds,
+            'status': self.status,
+            'error_message': self.error_message
+        }
+
+class TransactionCategory(db.Model):
+    """Comprehensive list of transaction categories extracted from accountant's documents"""
+    __tablename__ = 'transaction_category'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.String(120), nullable=False)  # User email
+    
+    # Category information
+    category_name = db.Column(db.String(100), nullable=False)
+    category_type = db.Column(db.String(50), nullable=False)  # 'income', 'expense', 'asset', 'liability'
+    
+    # Matching patterns (comma-separated keywords)
+    description_keywords = db.Column(db.Text, nullable=True)  # Keywords found in descriptions
+    payer_keywords = db.Column(db.Text, nullable=True)  # Keywords found in payer names
+    reference_keywords = db.Column(db.Text, nullable=True)  # Keywords found in references
+    
+    # Statistical data
+    usage_count = db.Column(db.Integer, default=0)  # How many times this category was used
+    total_amount = db.Column(db.Float, default=0.0)  # Total amount for this category
+    average_amount = db.Column(db.Float, default=0.0)  # Average amount for this category
+    
+    # Source information
+    source_years = db.Column(db.String(100), nullable=True)  # Comma-separated years where this category was found
+    created_from_tax_return_id = db.Column(db.Integer, nullable=True)  # First tax return where this was found
+    
+    # Timestamps
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    last_used_at = db.Column(db.DateTime, nullable=True)
+    
+    # Relationships - removed due to foreign key constraint issues
+    # user = db.relationship('User', backref='transaction_categories')
+    
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'user_id': self.user_id,
+            'category_name': self.category_name,
+            'category_type': self.category_type,
+            'description_keywords': self.description_keywords,
+            'payer_keywords': self.payer_keywords,
+            'reference_keywords': self.reference_keywords,
+            'usage_count': self.usage_count,
+            'total_amount': self.total_amount,
+            'average_amount': self.average_amount,
+            'source_years': self.source_years,
+            'created_from_tax_return_id': self.created_from_tax_return_id,
+            'created_at': self.created_at.isoformat() if self.created_at else None,
+            'updated_at': self.updated_at.isoformat() if self.updated_at else None,
+            'last_used_at': self.last_used_at.isoformat() if self.last_used_at else None
+        }
+    
+    def get_all_keywords(self):
+        """Get all keywords as a list"""
+        keywords = []
+        if self.description_keywords:
+            keywords.extend([kw.strip() for kw in self.description_keywords.split(',') if kw.strip()])
+        if self.payer_keywords:
+            keywords.extend([kw.strip() for kw in self.payer_keywords.split(',') if kw.strip()])
+        if self.reference_keywords:
+            keywords.extend([kw.strip() for kw in self.reference_keywords.split(',') if kw.strip()])
+        return list(set(keywords))  # Remove duplicates
+    
+    def calculate_similarity_score(self, bank_transaction):
+        """Calculate similarity score between this category and a bank transaction"""
+        score = 0.0
+        matches = 0
+        
+        # Check description keywords
+        if self.description_keywords and bank_transaction.get('description'):
+            desc_lower = bank_transaction['description'].lower()
+            for keyword in self.description_keywords.split(','):
+                keyword = keyword.strip().lower()
+                if keyword in desc_lower:
+                    score += 1.0
+                    matches += 1
+        
+        # Check payer keywords
+        if self.payer_keywords and bank_transaction.get('payer'):
+            payer_lower = bank_transaction['payer'].lower()
+            for keyword in self.payer_keywords.split(','):
+                keyword = keyword.strip().lower()
+                if keyword in payer_lower:
+                    score += 1.0
+                    matches += 1
+        
+        # Check reference keywords
+        if self.reference_keywords and bank_transaction.get('reference'):
+            ref_lower = bank_transaction['reference'].lower()
+            for keyword in self.reference_keywords.split(','):
+                keyword = keyword.strip().lower()
+                if keyword in ref_lower:
+                    score += 0.5  # Lower weight for reference matches
+                    matches += 1
+        
+        # Normalize score by number of available fields
+        available_fields = sum([
+            1 if bank_transaction.get('description') else 0,
+            1 if bank_transaction.get('payer') else 0,
+            1 if bank_transaction.get('reference') else 0
+        ])
+        
+        if available_fields > 0:
+            score = score / available_fields
+        
+        return score, matches

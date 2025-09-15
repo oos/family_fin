@@ -15,9 +15,12 @@ import Pension from './components/Pension';
 import CompanyPensionCalculator from './components/CompanyPensionCalculator';
 import NetWorth from './components/NetWorth';
 import Transactions from './components/Transactions';
+import GLTransactions from './components/GLTransactions';
 import TaxReturns from './components/TaxReturns';
 import TransactionMatching from './components/TransactionMatching';
+import TransactionPredictions from './components/TransactionPredictions';
 import Bookings from './components/Bookings';
+import FileViewer from './components/FileViewer';
 import AdminPanel from './components/AdminPanel';
 import UserDashboard from './components/UserDashboard';
 import Login from './components/Login';
@@ -84,9 +87,12 @@ function Sidebar({ userRole, sidebarOpen, setSidebarOpen }) {
     { path: '/pension', icon: 'fas fa-piggy-bank', label: 'Pension' },
     { path: '/company-pension', icon: 'fas fa-building', label: 'Company Pension' },
         { path: '/transactions', icon: 'fas fa-exchange-alt', label: 'Transactions' },
+        { path: '/gl-transactions', icon: 'fas fa-book', label: 'GL Transactions' },
         { path: '/tax-returns', icon: 'fas fa-file-invoice', label: 'Tax Returns' },
         { path: '/transaction-matching', icon: 'fas fa-link', label: 'Transaction Matching' },
+        { path: '/transaction-predictions', icon: 'fas fa-brain', label: 'ML Predictions' },
         { path: '/bookings', icon: 'fas fa-calendar-check', label: 'Bookings' },
+        { path: '/files', icon: 'fas fa-folder-open', label: 'File Viewer' },
     { path: '/admin', icon: 'fas fa-cog', label: 'Admin Panel' }
   ];
 
@@ -294,6 +300,11 @@ function App() {
                   <Transactions />
                 </ProtectedRoute>
               } />
+              <Route path="/gl-transactions" element={
+                <ProtectedRoute userRole={userRole} requiredRole="admin" fallbackPath="/user-dashboard">
+                  <GLTransactions />
+                </ProtectedRoute>
+              } />
         <Route path="/tax-returns" element={
           <ProtectedRoute userRole={userRole} requiredRole="admin" fallbackPath="/user-dashboard">
             <TaxReturns />
@@ -304,9 +315,19 @@ function App() {
             <TransactionMatching />
           </ProtectedRoute>
         } />
+        <Route path="/transaction-predictions" element={
+          <ProtectedRoute userRole={userRole} requiredRole="admin" fallbackPath="/user-dashboard">
+            <TransactionPredictions />
+          </ProtectedRoute>
+        } />
               <Route path="/bookings" element={
                 <ProtectedRoute userRole={userRole} requiredRole="admin" fallbackPath="/user-dashboard">
                   <Bookings />
+                </ProtectedRoute>
+              } />
+              <Route path="/files" element={
+                <ProtectedRoute userRole={userRole} requiredRole="admin" fallbackPath="/user-dashboard">
+                  <FileViewer />
                 </ProtectedRoute>
               } />
               <Route path="/admin" element={
