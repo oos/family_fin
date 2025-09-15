@@ -56,6 +56,7 @@ const GLTransactions = () => {
   // UI state for toggling panels
   const [showFilters, setShowFilters] = useState(false);
   const [showAnalytics, setShowAnalytics] = useState(false);
+  const [showBalance, setShowBalance] = useState(false);
 
   useEffect(() => {
     fetchTransactions();
@@ -441,6 +442,12 @@ const GLTransactions = () => {
                   <i className="fas fa-chart-bar"></i> Analytics
                 </button>
                 <button
+                  className={`btn me-2 ${showBalance ? 'btn-info' : 'btn-outline-info'}`}
+                  onClick={() => setShowBalance(!showBalance)}
+                >
+                  <i className="fas fa-calculator"></i> Balance
+                </button>
+                <button
                   className="btn btn-outline-secondary"
                   onClick={fetchTransactions}
                   disabled={loading}
@@ -656,6 +663,105 @@ const GLTransactions = () => {
                   </div>
                 </div>
               </div>
+
+              {/* GL Summary Panel */}
+              {showBalance && (
+                <div className="row mb-3">
+                  <div className="col-12">
+                    <div className="card shadow">
+                      <div className="card-header d-flex justify-content-between align-items-center py-2" style={{ backgroundColor: '#b3d9ff' }}>
+                        <h6 className="mb-0 text-dark fw-bold">
+                          <i className="fas fa-calculator me-2"></i>
+                          General Ledger Summary
+                        </h6>
+                        <button
+                          className="btn btn-sm btn-outline-secondary"
+                          onClick={() => setShowBalance(false)}
+                          title="Close Balance Panel"
+                        >
+                          <i className="fas fa-times"></i>
+                        </button>
+                      </div>
+                      <div className="card-body">
+                        <div className="row">
+                          <div className="col-md-4">
+                            <div className="text-center">
+                              <h6 className="text-muted mb-2">Total Opening Balance</h6>
+                              <div className="h4 fw-bold text-primary">
+                                {(() => {
+                                  const totalOpening = Object.values(groupedTransactions).reduce((sum, account) => sum + account.openingBalance, 0);
+                                  return formatCurrency(totalOpening);
+                                })()}
+                              </div>
+                            </div>
+                          </div>
+                          <div className="col-md-4">
+                            <div className="text-center">
+                              <h6 className="text-muted mb-2">Total Change</h6>
+                              <div className="h4 fw-bold">
+                                {(() => {
+                                  const totalChange = Object.values(groupedTransactions).reduce((sum, account) => sum + account.netChange, 0);
+                                  return (
+                                    <span className={totalChange >= 0 ? 'text-success' : 'text-danger'}>
+                                      {totalChange >= 0 ? '+' : ''}{formatCurrency(totalChange)}
+                                    </span>
+                                  );
+                                })()}
+                              </div>
+                            </div>
+                          </div>
+                          <div className="col-md-4">
+                            <div className="text-center">
+                              <h6 className="text-muted mb-2">Total Closing Balance</h6>
+                              <div className="h4 fw-bold text-primary">
+                                {(() => {
+                                  const totalClosing = Object.values(groupedTransactions).reduce((sum, account) => sum + account.closingBalance, 0);
+                                  return formatCurrency(totalClosing);
+                                })()}
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                        <hr className="my-3" />
+                        <div className="row">
+                          <div className="col-md-6">
+                            <div className="text-center">
+                              <h6 className="text-muted mb-2">Total Debits</h6>
+                              <div className="h5 fw-bold text-danger">
+                                {(() => {
+                                  const totalDebits = Object.values(groupedTransactions).reduce((sum, account) => sum + account.totalDebits, 0);
+                                  return formatCurrency(totalDebits);
+                                })()}
+                              </div>
+                            </div>
+                          </div>
+                          <div className="col-md-6">
+                            <div className="text-center">
+                              <h6 className="text-muted mb-2">Total Credits</h6>
+                              <div className="h5 fw-bold text-success">
+                                {(() => {
+                                  const totalCredits = Object.values(groupedTransactions).reduce((sum, account) => sum + account.totalCredits, 0);
+                                  return formatCurrency(totalCredits);
+                                })()}
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                        <div className="row mt-3">
+                          <div className="col-12">
+                            <div className="text-center">
+                              <small className="text-muted">
+                                Summary based on {Object.keys(groupedTransactions).length} account{Object.keys(groupedTransactions).length !== 1 ? 's' : ''} 
+                                {filters.year && ` for ${filters.year}`}
+                              </small>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
 
               {/* Transactions Table or Grouped View */}
               {groupByAccount ? (
@@ -964,93 +1070,6 @@ const GLTransactions = () => {
         </div>
       </div>
 
-      {/* GL Summary Panel */}
-      <div className="container-fluid mt-4">
-        <div className="card shadow">
-          <div className="card-header" style={{ backgroundColor: '#b3d9ff' }}>
-            <h5 className="mb-0 text-dark fw-bold">
-              <i className="fas fa-calculator me-2"></i>
-              General Ledger Summary
-            </h5>
-          </div>
-          <div className="card-body">
-            <div className="row">
-              <div className="col-md-4">
-                <div className="text-center">
-                  <h6 className="text-muted mb-2">Total Opening Balance</h6>
-                  <div className="h4 fw-bold text-primary">
-                    {(() => {
-                      const totalOpening = Object.values(groupedTransactions).reduce((sum, account) => sum + account.openingBalance, 0);
-                      return formatCurrency(totalOpening);
-                    })()}
-                  </div>
-                </div>
-              </div>
-              <div className="col-md-4">
-                <div className="text-center">
-                  <h6 className="text-muted mb-2">Total Change</h6>
-                  <div className="h4 fw-bold">
-                    {(() => {
-                      const totalChange = Object.values(groupedTransactions).reduce((sum, account) => sum + account.netChange, 0);
-                      return (
-                        <span className={totalChange >= 0 ? 'text-success' : 'text-danger'}>
-                          {totalChange >= 0 ? '+' : ''}{formatCurrency(totalChange)}
-                        </span>
-                      );
-                    })()}
-                  </div>
-                </div>
-              </div>
-              <div className="col-md-4">
-                <div className="text-center">
-                  <h6 className="text-muted mb-2">Total Closing Balance</h6>
-                  <div className="h4 fw-bold text-primary">
-                    {(() => {
-                      const totalClosing = Object.values(groupedTransactions).reduce((sum, account) => sum + account.closingBalance, 0);
-                      return formatCurrency(totalClosing);
-                    })()}
-                  </div>
-                </div>
-              </div>
-            </div>
-            <hr className="my-3" />
-            <div className="row">
-              <div className="col-md-6">
-                <div className="text-center">
-                  <h6 className="text-muted mb-2">Total Debits</h6>
-                  <div className="h5 fw-bold text-danger">
-                    {(() => {
-                      const totalDebits = Object.values(groupedTransactions).reduce((sum, account) => sum + account.totalDebits, 0);
-                      return formatCurrency(totalDebits);
-                    })()}
-                  </div>
-                </div>
-              </div>
-              <div className="col-md-6">
-                <div className="text-center">
-                  <h6 className="text-muted mb-2">Total Credits</h6>
-                  <div className="h5 fw-bold text-success">
-                    {(() => {
-                      const totalCredits = Object.values(groupedTransactions).reduce((sum, account) => sum + account.totalCredits, 0);
-                      return formatCurrency(totalCredits);
-                    })()}
-                  </div>
-                </div>
-              </div>
-            </div>
-            <div className="row mt-3">
-              <div className="col-12">
-                <div className="text-center">
-                  <small className="text-muted">
-                    Summary based on {Object.keys(groupedTransactions).length} account{Object.keys(groupedTransactions).length !== 1 ? 's' : ''} 
-                    {filters.year && ` for ${filters.year}`}
-                  </small>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
 
       {/* Transaction Detail Modal */}
       {showTransactionModal && selectedTransaction && (
