@@ -691,7 +691,7 @@ const GLTransactions = () => {
                                             type === 'credit' ? 'bg-success' : 
                                             'bg-secondary'
                                           }`}>
-                                            {type === 'debit' ? 'D' : type === 'credit' ? 'C' : 'N/A'}
+                                            {type === 'debit' ? 'Debit' : type === 'credit' ? 'Credit' : 'N/A'}
                                           </span>
                                         </td>
                                         <td>
@@ -818,7 +818,7 @@ const GLTransactions = () => {
                                   type === 'credit' ? 'bg-success' : 
                                   'bg-secondary'
                                 }`}>
-                                  {type === 'debit' ? 'D' : type === 'credit' ? 'C' : 'N/A'}
+                                  {type === 'debit' ? 'Debit' : type === 'credit' ? 'Credit' : 'N/A'}
                                 </span>
                               </td>
                               <td>{transaction.tax_return_year || 'N/A'}</td>
