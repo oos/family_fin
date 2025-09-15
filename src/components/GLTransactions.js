@@ -476,7 +476,8 @@ const GLTransactions = () => {
   }
 
   return (
-    <div className="container-fluid mt-4">
+    <>
+      <div className="container-fluid mt-4">
       <style jsx>{`
         .cursor-pointer {
           cursor: pointer;
@@ -1165,7 +1166,7 @@ const GLTransactions = () => {
                                         <td>
                                           <div className="fw-bold">{account.accountName}</div>
                                         </td>
-                                        <td>
+                                        <td style={{ backgroundColor: '#d1ecf1' }}>
                                           <code className="small text-primary">Opening</code>
                                         </td>
                                         <td>
@@ -1273,7 +1274,7 @@ const GLTransactions = () => {
                                         <td>
                                           <div className="fw-bold">Change</div>
                                         </td>
-                                        <td>
+                                        <td style={{ backgroundColor: '#d1ecf1' }}>
                                           <code className="small text-primary">Change</code>
                                         </td>
                                         <td>
@@ -1307,7 +1308,7 @@ const GLTransactions = () => {
                                         <td>
                                           <div className="fw-bold">Close</div>
                                         </td>
-                                        <td>
+                                        <td style={{ backgroundColor: '#d1ecf1' }}>
                                           <code className="small text-primary">Close</code>
                                         </td>
                                         <td>
@@ -1480,7 +1481,6 @@ const GLTransactions = () => {
           </div>
         </div>
       </div>
-
 
       {/* Transaction Detail Modal */}
       {showTransactionModal && selectedTransaction && (
@@ -1753,7 +1753,8 @@ const GLTransactions = () => {
           </div>
         </div>
       )}
-    </div>
+      </div>
+    </>
   );
 };
 
