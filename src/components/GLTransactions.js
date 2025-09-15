@@ -37,6 +37,12 @@ const GLTransactions = () => {
     years: [],
     transactionTypes: []
   });
+  const [summaryCounts, setSummaryCounts] = useState({
+    total: 0,
+    pj: 0,
+    aj: 0,
+    other: 0
+  });
 
   // Account grouping state
   const [groupByAccount, setGroupByAccount] = useState(false);
@@ -45,6 +51,7 @@ const GLTransactions = () => {
   useEffect(() => {
     fetchTransactions();
     fetchFilterOptions();
+    fetchSummaryCounts();
   }, [currentPage, rowsPerPage, sortField, sortDirection, filters]);
 
   const fetchTransactions = async () => {
@@ -103,6 +110,31 @@ const GLTransactions = () => {
       });
     } catch (err) {
       console.error('Error fetching filter options:', err);
+    }
+  };
+
+  // Fetch summary counts for all transactions
+  const fetchSummaryCounts = async () => {
+    try {
+      const token = localStorage.getItem('token');
+      if (!token) return;
+
+      const response = await axios.get('/gl-transactions?per_page=10000', {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      
+      const allTransactions = response.data.transactions;
+      
+      const counts = {
+        total: allTransactions.length,
+        pj: allTransactions.filter(t => t.source === 'PJ').length,
+        aj: allTransactions.filter(t => t.source === 'AJ').length,
+        other: allTransactions.filter(t => t.source !== 'PJ' && t.source !== 'AJ').length
+      };
+      
+      setSummaryCounts(counts);
+    } catch (error) {
+      console.error('Error fetching summary counts:', error);
     }
   };
 
@@ -438,41 +470,32 @@ const GLTransactions = () => {
                         <div className="row text-center">
                           <div className="col-md-3">
                             <small className="text-muted">Total Transactions</small>
-                            <div className="fw-bold">{totalTransactions}</div>
+                            <div className="fw-bold">{summaryCounts.total}</div>
                           </div>
                           <div className="col-md-3">
                             <small className="text-muted">Bank Transactions (PJ)</small>
                             <div className="fw-bold text-success">
-                              {transactions.filter(t => t.source === 'PJ').length}
-                              {totalTransactions > transactions.length && (
-                                <small className="text-muted d-block">(of {totalTransactions} total)</small>
-                              )}
+                              {summaryCounts.pj}
                             </div>
                           </div>
                           <div className="col-md-3">
                             <small className="text-muted">Adjustments (AJ)</small>
                             <div className="fw-bold text-warning">
-                              {transactions.filter(t => t.source === 'AJ').length}
-                              {totalTransactions > transactions.length && (
-                                <small className="text-muted d-block">(of {totalTransactions} total)</small>
-                              )}
+                              {summaryCounts.aj}
                             </div>
                           </div>
                           <div className="col-md-3">
                             <small className="text-muted">Other Types</small>
                             <div className="fw-bold text-secondary">
-                              {transactions.filter(t => t.source !== 'PJ' && t.source !== 'AJ').length}
-                              {totalTransactions > transactions.length && (
-                                <small className="text-muted d-block">(of {totalTransactions} total)</small>
-                              )}
+                              {summaryCounts.other}
                             </div>
                           </div>
                         </div>
-                        {totalTransactions > transactions.length && (
+                        {summaryCounts.total > transactions.length && (
                           <div className="row mt-2">
                             <div className="col-12 text-center">
                               <small className="text-muted">
-                                Showing {transactions.length} of {totalTransactions} transactions on this page
+                                Showing {transactions.length} of {summaryCounts.total} transactions on this page
                               </small>
                             </div>
                           </div>
