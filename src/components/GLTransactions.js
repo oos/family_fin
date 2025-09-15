@@ -472,6 +472,9 @@ const GLTransactions = () => {
         .cursor-pointer {
           cursor: pointer;
         }
+        .max-height-300 {
+          max-height: 300px;
+        }
         .account-group .card {
           border: 1px solid #dee2e6;
           box-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.075);
@@ -808,16 +811,50 @@ const GLTransactions = () => {
                         <hr className="my-3" />
                         <div className="row">
                           <div className="col-md-6">
-                            <div className="text-center">
-                              <h6 className="text-muted mb-2">Total Debits</h6>
-                              <div className="h5 fw-bold text-danger">
-                                {(() => {
-                                  const totalDebits = Object.values(groupedTransactions).reduce((sum, account) => sum + account.totalDebits, 0);
-                                  return formatCurrency(totalDebits);
-                                })()}
-                              </div>
+                            <h6 className="text-muted mb-3 text-center">Account Credits</h6>
+                            <div className="max-height-300 overflow-auto">
+                              {Object.entries(groupedTransactions)
+                                .filter(([_, account]) => account.totalCredits > 0)
+                                .sort(([_, a], [__, b]) => b.totalCredits - a.totalCredits)
+                                .map(([accountName, account]) => (
+                                  <div key={accountName} className="d-flex justify-content-between align-items-center py-1 border-bottom">
+                                    <span className="text-truncate me-2" style={{ maxWidth: '200px' }} title={accountName}>
+                                      {accountName}
+                                    </span>
+                                    <span className="text-success fw-bold">
+                                      {formatCurrency(account.totalCredits)}
+                                    </span>
+                                  </div>
+                                ))}
+                              {Object.values(groupedTransactions).filter(account => account.totalCredits > 0).length === 0 && (
+                                <div className="text-center text-muted py-3">No credits</div>
+                              )}
                             </div>
                           </div>
+                          <div className="col-md-6">
+                            <h6 className="text-muted mb-3 text-center">Account Debits</h6>
+                            <div className="max-height-300 overflow-auto">
+                              {Object.entries(groupedTransactions)
+                                .filter(([_, account]) => account.totalDebits > 0)
+                                .sort(([_, a], [__, b]) => b.totalDebits - a.totalDebits)
+                                .map(([accountName, account]) => (
+                                  <div key={accountName} className="d-flex justify-content-between align-items-center py-1 border-bottom">
+                                    <span className="text-truncate me-2" style={{ maxWidth: '200px' }} title={accountName}>
+                                      {accountName}
+                                    </span>
+                                    <span className="text-danger fw-bold">
+                                      {formatCurrency(account.totalDebits)}
+                                    </span>
+                                  </div>
+                                ))}
+                              {Object.values(groupedTransactions).filter(account => account.totalDebits > 0).length === 0 && (
+                                <div className="text-center text-muted py-3">No debits</div>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                        <hr className="my-3" />
+                        <div className="row">
                           <div className="col-md-6">
                             <div className="text-center">
                               <h6 className="text-muted mb-2">Total Credits</h6>
@@ -825,6 +862,17 @@ const GLTransactions = () => {
                                 {(() => {
                                   const totalCredits = Object.values(groupedTransactions).reduce((sum, account) => sum + account.totalCredits, 0);
                                   return formatCurrency(totalCredits);
+                                })()}
+                              </div>
+                            </div>
+                          </div>
+                          <div className="col-md-6">
+                            <div className="text-center">
+                              <h6 className="text-muted mb-2">Total Debits</h6>
+                              <div className="h5 fw-bold text-danger">
+                                {(() => {
+                                  const totalDebits = Object.values(groupedTransactions).reduce((sum, account) => sum + account.totalDebits, 0);
+                                  return formatCurrency(totalDebits);
                                 })()}
                               </div>
                             </div>
