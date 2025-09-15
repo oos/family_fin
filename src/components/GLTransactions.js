@@ -575,8 +575,8 @@ const GLTransactions = () => {
                                   
                                   if (components.length === 0) {
                                     return (
-                                      <span className="badge bg-light text-dark me-1" title="All other transactions have unknown or empty source types">
-                                        All Unknown: {summaryCounts.other}
+                                      <span className="badge bg-warning text-dark me-1" title="All other transactions have unknown or empty source types">
+                                        Unknown: {summaryCounts.other}
                                       </span>
                                     );
                                   }
