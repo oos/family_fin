@@ -38,6 +38,10 @@ const GLTransactions = () => {
     transactionTypes: []
   });
 
+  // Account grouping state
+  const [groupByAccount, setGroupByAccount] = useState(false);
+  const [groupedTransactions, setGroupedTransactions] = useState({});
+
   useEffect(() => {
     fetchTransactions();
     fetchFilterOptions();
@@ -146,6 +150,60 @@ const GLTransactions = () => {
     return new Date(dateString).toLocaleDateString();
   };
 
+  // Group transactions by account and calculate totals
+  const groupTransactionsByAccount = (transactions) => {
+    const grouped = {};
+    
+    transactions.forEach(transaction => {
+      const accountKey = transaction.category_heading || 'Uncategorized';
+      
+      if (!grouped[accountKey]) {
+        grouped[accountKey] = {
+          accountName: accountKey,
+          transactions: [],
+          openingBalance: 0,
+          closingBalance: 0,
+          totalDebits: 0,
+          totalCredits: 0,
+          netChange: 0
+        };
+      }
+      
+      grouped[accountKey].transactions.push(transaction);
+      
+      // Calculate totals
+      const debit = parseFloat(transaction.debit) || 0;
+      const credit = parseFloat(transaction.credit) || 0;
+      
+      grouped[accountKey].totalDebits += debit;
+      grouped[accountKey].totalCredits += credit;
+      grouped[accountKey].netChange += (debit - credit);
+    });
+    
+    // Calculate opening and closing balances
+    Object.keys(grouped).forEach(accountKey => {
+      const account = grouped[accountKey];
+      // For now, we'll set opening to 0 and closing to net change
+      // In a real GL, opening would come from previous year's closing
+      account.openingBalance = 0;
+      account.closingBalance = account.netChange;
+    });
+    
+    return grouped;
+  };
+
+  // Update grouped transactions when transactions change
+  useEffect(() => {
+    if (groupByAccount && transactions.length > 0) {
+      setGroupedTransactions(groupTransactionsByAccount(transactions));
+    }
+  }, [transactions, groupByAccount]);
+
+  const handleTransactionClick = (transaction) => {
+    setSelectedTransaction(transaction);
+    setShowTransactionModal(true);
+  };
+
   const getTransactionAmount = (transaction) => {
     if (transaction.debit > 0) {
       return { amount: transaction.debit, type: 'debit' };
@@ -243,12 +301,38 @@ const GLTransactions = () => {
 
   return (
     <div className="container-fluid mt-4">
+      <style jsx>{`
+        .cursor-pointer {
+          cursor: pointer;
+        }
+        .account-group .card {
+          border: 1px solid #dee2e6;
+          box-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.075);
+        }
+        .account-group .card-header {
+          border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+        }
+        .grouped-view .table th {
+          border-top: none;
+          font-weight: 600;
+        }
+        .grouped-view .table td {
+          vertical-align: middle;
+        }
+      `}</style>
       <div className="row">
         <div className="col-12">
           <div className="card">
             <div className="card-header d-flex justify-content-between align-items-center">
               <h4 className="mb-0">General Ledger Transactions</h4>
               <div>
+                <button
+                  className={`btn me-2 ${groupByAccount ? 'btn-success' : 'btn-outline-success'}`}
+                  onClick={() => setGroupByAccount(!groupByAccount)}
+                >
+                  <i className={`fas ${groupByAccount ? 'fa-layer-group' : 'fa-list'}`}></i> 
+                  {groupByAccount ? 'Grouped by Account' : 'Group by Account'}
+                </button>
                 <button
                   className="btn btn-outline-primary me-2"
                   onClick={() => setShowFiltersModal(true)}
@@ -386,122 +470,234 @@ const GLTransactions = () => {
                 </div>
               )}
 
-              {/* Transactions Table */}
-              <div className="table-responsive">
-                <table className="table table-hover">
-                  <thead className="table-dark">
-                    <tr>
-                      <th>ID</th>
-                      <th 
-                        className="cursor-pointer"
-                        onClick={() => handleSort('date')}
-                      >
-                        Date {sortField === 'date' && (sortDirection === 'asc' ? '↑' : '↓')}
-                      </th>
-                      <th 
-                        className="cursor-pointer"
-                        onClick={() => handleSort('name')}
-                      >
-                        Description {sortField === 'name' && (sortDirection === 'asc' ? '↑' : '↓')}
-                      </th>
-                      <th>Reference</th>
-                      <th>Type</th>
-                      <th>Account</th>
-                      <th 
-                        className="cursor-pointer"
-                        onClick={() => handleSort('amount')}
-                      >
-                        Amount {sortField === 'amount' && (sortDirection === 'asc' ? '↑' : '↓')}
-                      </th>
-                      <th>Year</th>
-                      <th>File</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {loading ? (
-                      <tr>
-                        <td colSpan="9" className="text-center">
-                          <div className="spinner-border" role="status">
-                            <span className="visually-hidden">Loading...</span>
+              {/* Transactions Table or Grouped View */}
+              {groupByAccount ? (
+                <div className="grouped-view">
+                  {Object.keys(groupedTransactions).length === 0 ? (
+                    <div className="text-center text-muted py-4">
+                      No transactions found
+                    </div>
+                  ) : (
+                    Object.entries(groupedTransactions).map(([accountKey, account]) => (
+                      <div key={accountKey} className="account-group mb-4">
+                        <div className="card">
+                          <div className="card-header bg-primary text-white">
+                            <div className="row align-items-center">
+                              <div className="col-md-6">
+                                <h5 className="mb-0">
+                                  <i className="fas fa-folder me-2"></i>
+                                  {account.accountName}
+                                </h5>
+                              </div>
+                              <div className="col-md-6 text-end">
+                                <div className="row text-center">
+                                  <div className="col-4">
+                                    <small>Opening</small>
+                                    <div className="fw-bold">{formatCurrency(account.openingBalance)}</div>
+                                  </div>
+                                  <div className="col-4">
+                                    <small>Change</small>
+                                    <div className={`fw-bold ${account.netChange >= 0 ? 'text-success' : 'text-danger'}`}>
+                                      {account.netChange >= 0 ? '+' : ''}{formatCurrency(account.netChange)}
+                                    </div>
+                                  </div>
+                                  <div className="col-4">
+                                    <small>Closing</small>
+                                    <div className="fw-bold">{formatCurrency(account.closingBalance)}</div>
+                                  </div>
+                                </div>
+                              </div>
+                            </div>
                           </div>
-                        </td>
-                      </tr>
-                    ) : transactions.length === 0 ? (
+                          <div className="card-body p-0">
+                            <div className="table-responsive">
+                              <table className="table table-sm table-hover mb-0">
+                                <thead className="table-light">
+                                  <tr>
+                                    <th>ID</th>
+                                    <th>Date</th>
+                                    <th>Description</th>
+                                    <th>Reference</th>
+                                    <th>Type</th>
+                                    <th>Amount</th>
+                                    <th>Year</th>
+                                  </tr>
+                                </thead>
+                                <tbody>
+                                  {account.transactions.map((transaction, index) => {
+                                    const { amount, type } = getTransactionAmount(transaction);
+                                    const uid = generateUID(transaction, index);
+                                    return (
+                                      <tr 
+                                        key={transaction.id} 
+                                        className="cursor-pointer"
+                                        onClick={() => handleTransactionClick(transaction)}
+                                      >
+                                        <td><code className="text-muted small">{uid}</code></td>
+                                        <td>{formatDate(transaction.date)}</td>
+                                        <td>
+                                          <div className="fw-bold">{transaction.name}</div>
+                                          {transaction.annotation && (
+                                            <small className="text-muted">{transaction.annotation}</small>
+                                          )}
+                                        </td>
+                                        <td>
+                                          <code className="small">{transaction.reference || 'N/A'}</code>
+                                        </td>
+                                        <td>
+                                          <span className={`badge ${
+                                            transaction.source === 'AJ' ? 'bg-warning' :
+                                            transaction.source === 'PJ' ? 'bg-success' :
+                                            'bg-secondary'
+                                          }`}>
+                                            {transaction.source === 'AJ' ? 'AJ (Adjustment)' :
+                                             transaction.source === 'PJ' ? 'PJ (Bank)' :
+                                             transaction.source || 'N/A'}
+                                          </span>
+                                        </td>
+                                        <td>
+                                          <span className={`fw-bold ${
+                                            type === 'debit' ? 'text-danger' : 
+                                            type === 'credit' ? 'text-success' : 
+                                            'text-muted'
+                                          }`}>
+                                            {type === 'debit' ? '-' : '+'}{formatCurrency(amount)}
+                                          </span>
+                                        </td>
+                                        <td>
+                                          <span className="badge bg-secondary">
+                                            {transaction.tax_return_year || 'N/A'}
+                                          </span>
+                                        </td>
+                                      </tr>
+                                    );
+                                  })}
+                                </tbody>
+                              </table>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    ))
+                  )}
+                </div>
+              ) : (
+                <div className="table-responsive">
+                  <table className="table table-hover">
+                    <thead className="table-dark">
                       <tr>
-                        <td colSpan="9" className="text-center text-muted">
-                          No transactions found
-                        </td>
+                        <th>ID</th>
+                        <th 
+                          className="cursor-pointer"
+                          onClick={() => handleSort('date')}
+                        >
+                          Date {sortField === 'date' && (sortDirection === 'asc' ? '↑' : '↓')}
+                        </th>
+                        <th 
+                          className="cursor-pointer"
+                          onClick={() => handleSort('name')}
+                        >
+                          Description {sortField === 'name' && (sortDirection === 'asc' ? '↑' : '↓')}
+                        </th>
+                        <th>Reference</th>
+                        <th>Type</th>
+                        <th>Account</th>
+                        <th 
+                          className="cursor-pointer"
+                          onClick={() => handleSort('amount')}
+                        >
+                          Amount {sortField === 'amount' && (sortDirection === 'asc' ? '↑' : '↓')}
+                        </th>
+                        <th>Year</th>
+                        <th>File</th>
                       </tr>
-                    ) : (
-                      transactions.map((transaction, index) => {
-                        const { amount, type } = getTransactionAmount(transaction);
-                        const uid = generateUID(transaction, index);
-                        return (
-                          <tr 
-                            key={`${transaction.id}-${index}`}
-                            className="cursor-pointer"
-                            onClick={() => handleTransactionClick(transaction)}
-                          >
-                            <td>
-                              <code className="text-muted small">{uid}</code>
-                            </td>
-                            <td>{formatDate(transaction.date)}</td>
-                            <td>
-                              <div className="fw-bold">{transaction.name}</div>
-                              {transaction.annotation && (
-                                <small className="text-muted">{transaction.annotation}</small>
-                              )}
-                            </td>
-                            <td>{transaction.reference || 'N/A'}</td>
-                            <td>
-                              <span className={`badge ${
-                                transaction.source === 'AJ' ? 'bg-warning' :
-                                transaction.source === 'PJ' ? 'bg-success' :
-                                'bg-secondary'
-                              }`} title={
-                                transaction.source === 'AJ' ? 'Adjustment Journal (Non-cash)' :
-                                transaction.source === 'PJ' ? 'Payment Journal (Bank Transaction)' :
-                                'Unknown Type'
-                              }>
-                                {transaction.source === 'AJ' ? 'AJ (Adjustment)' :
-                                 transaction.source === 'PJ' ? 'PJ (Bank)' :
-                                 transaction.source || 'N/A'}
-                              </span>
-                            </td>
-                            <td>
-                              {transaction.category_heading ? (
-                                <span className="badge bg-info">
-                                  {transaction.category_heading}
+                    </thead>
+                    <tbody>
+                      {loading ? (
+                        <tr>
+                          <td colSpan="9" className="text-center">
+                            <div className="spinner-border" role="status">
+                              <span className="visually-hidden">Loading...</span>
+                            </div>
+                          </td>
+                        </tr>
+                      ) : transactions.length === 0 ? (
+                        <tr>
+                          <td colSpan="9" className="text-center text-muted">
+                            No transactions found
+                          </td>
+                        </tr>
+                      ) : (
+                        transactions.map((transaction, index) => {
+                          const { amount, type } = getTransactionAmount(transaction);
+                          const uid = generateUID(transaction, index);
+                          return (
+                            <tr 
+                              key={`${transaction.id}-${index}`}
+                              className="cursor-pointer"
+                              onClick={() => handleTransactionClick(transaction)}
+                            >
+                              <td>
+                                <code className="text-muted small">{uid}</code>
+                              </td>
+                              <td>{formatDate(transaction.date)}</td>
+                              <td>
+                                <div className="fw-bold">{transaction.name}</div>
+                                {transaction.annotation && (
+                                  <small className="text-muted">{transaction.annotation}</small>
+                                )}
+                              </td>
+                              <td>{transaction.reference || 'N/A'}</td>
+                              <td>
+                                <span className={`badge ${
+                                  transaction.source === 'AJ' ? 'bg-warning' :
+                                  transaction.source === 'PJ' ? 'bg-success' :
+                                  'bg-secondary'
+                                }`} title={
+                                  transaction.source === 'AJ' ? 'Adjustment Journal (Non-cash)' :
+                                  transaction.source === 'PJ' ? 'Payment Journal (Bank Transaction)' :
+                                  'Unknown Type'
+                                }>
+                                  {transaction.source === 'AJ' ? 'AJ (Adjustment)' :
+                                   transaction.source === 'PJ' ? 'PJ (Bank)' :
+                                   transaction.source || 'N/A'}
                                 </span>
-                              ) : (
-                                <span className="text-muted">N/A</span>
-                              )}
-                            </td>
-                            <td>
-                              <span className={`fw-bold ${
-                                type === 'debit' ? 'text-danger' : 
-                                type === 'credit' ? 'text-success' : 
-                                'text-muted'
-                              }`}>
-                                {type === 'debit' ? '-' : '+'}{formatCurrency(amount)}
-                              </span>
-                            </td>
-                            <td>{transaction.tax_return_year || 'N/A'}</td>
-                            <td>
-                              <small className="text-muted">
-                                {transaction.tax_return_filename ? 
-                                  transaction.tax_return_filename.substring(0, 20) + '...' : 
-                                  'N/A'
-                                }
-                              </small>
-                            </td>
-                          </tr>
-                        );
-                      })
-                    )}
-                  </tbody>
-                </table>
-              </div>
+                              </td>
+                              <td>
+                                {transaction.category_heading ? (
+                                  <span className="badge bg-info">
+                                    {transaction.category_heading}
+                                  </span>
+                                ) : (
+                                  <span className="text-muted">N/A</span>
+                                )}
+                              </td>
+                              <td>
+                                <span className={`fw-bold ${
+                                  type === 'debit' ? 'text-danger' : 
+                                  type === 'credit' ? 'text-success' : 
+                                  'text-muted'
+                                }`}>
+                                  {type === 'debit' ? '-' : '+'}{formatCurrency(amount)}
+                                </span>
+                              </td>
+                              <td>{transaction.tax_return_year || 'N/A'}</td>
+                              <td>
+                                <small className="text-muted">
+                                  {transaction.tax_return_filename ? 
+                                    transaction.tax_return_filename.substring(0, 20) + '...' : 
+                                    'N/A'
+                                  }
+                                </small>
+                              </td>
+                            </tr>
+                          );
+                        })
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              )}
 
               {/* Pagination */}
               {totalPages > 1 && (
