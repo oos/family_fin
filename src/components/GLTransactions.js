@@ -531,57 +531,27 @@ const GLTransactions = () => {
                                   const plCount = summaryCounts.pl || 0;
                                   const remainingOther = summaryCounts.other - apCount - seCount - cdCount - plCount;
                                   
-                                  const components = [];
-                                  
-                                  if (apCount > 0) {
-                                    components.push(
-                                      <span key="ap" className="badge bg-primary me-1" title="AP - Accounts Payable: Money owed to suppliers/vendors">
+                                  return (
+                                    <>
+                                      <span className="badge bg-primary me-1" title="AP - Accounts Payable: Money owed to suppliers/vendors">
                                         AP: {apCount}
                                       </span>
-                                    );
-                                  }
-                                  
-                                  if (seCount > 0) {
-                                    components.push(
-                                      <span key="se" className="badge bg-info me-1" title="SE - Sales Entry: Revenue from sales transactions">
+                                      <span className="badge bg-info me-1" title="SE - Sales Entry: Revenue from sales transactions">
                                         SE: {seCount}
                                       </span>
-                                    );
-                                  }
-                                  
-                                  if (cdCount > 0) {
-                                    components.push(
-                                      <span key="cd" className="badge bg-secondary me-1" title="CD - Cash Deposit: Money deposited into accounts">
+                                      <span className="badge bg-secondary me-1" title="CD - Cash Deposit: Money deposited into accounts">
                                         CD: {cdCount}
                                       </span>
-                                    );
-                                  }
-                                  
-                                  if (plCount > 0) {
-                                    components.push(
-                                      <span key="pl" className="badge bg-dark me-1" title="PL - Profit & Loss: Income statement adjustments">
+                                      <span className="badge bg-dark me-1" title="PL - Profit & Loss: Income statement adjustments">
                                         PL: {plCount}
                                       </span>
-                                    );
-                                  }
-                                  
-                                  if (remainingOther > 0) {
-                                    components.push(
-                                      <span key="other" className="badge bg-warning text-dark me-1" title="Other: Transactions with unknown or empty source types">
-                                        Unknown: {remainingOther}
-                                      </span>
-                                    );
-                                  }
-                                  
-                                  if (components.length === 0) {
-                                    return (
-                                      <span className="badge bg-warning text-dark me-1" title="All other transactions have unknown or empty source types">
-                                        Unknown: {summaryCounts.other}
-                                      </span>
-                                    );
-                                  }
-                                  
-                                  return components;
+                                      {remainingOther > 0 && (
+                                        <span className="badge bg-warning text-dark me-1" title="Other: Transactions with unknown or empty source types">
+                                          Unknown: {remainingOther}
+                                        </span>
+                                      )}
+                                    </>
+                                  );
                                 })()}
                               </div>
                               <div className="mt-1">
