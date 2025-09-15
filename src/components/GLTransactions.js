@@ -252,7 +252,7 @@ const GLTransactions = () => {
       const token = localStorage.getItem('token');
       if (!token) return;
 
-      const response = await axios.get('/gl-transactions?per_page=10000', {
+      const response = await axios.get(`/gl-transactions?per_page=10000&year=${filters.year}`, {
         headers: { Authorization: `Bearer ${token}` }
       });
       
@@ -263,7 +263,7 @@ const GLTransactions = () => {
     }
   };
 
-  // Update grouped transactions when groupByAccount changes
+  // Update grouped transactions when groupByAccount or year filter changes
   useEffect(() => {
     if (groupByAccount) {
       fetchAllTransactionsForGrouping().then(allTransactions => {
@@ -272,7 +272,7 @@ const GLTransactions = () => {
     } else {
       setGroupedTransactions({});
     }
-  }, [groupByAccount]);
+  }, [groupByAccount, filters.year]);
 
   const handleTransactionClick = (transaction) => {
     setSelectedTransaction(transaction);

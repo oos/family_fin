@@ -3795,7 +3795,7 @@ def get_all_gl_transactions():
             query = query.filter(TaxReturnTransaction.category_heading.contains(category_heading))
         
         if year:
-            query = query.filter(TaxReturn.year == year)
+            query = query.filter(TaxReturn.year == int(year))
         
         if transaction_type:
             query = query.filter(TaxReturnTransaction.source == transaction_type)
