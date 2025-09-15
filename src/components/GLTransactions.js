@@ -444,21 +444,66 @@ const GLTransactions = () => {
                             <small className="text-muted">Bank Transactions (PJ)</small>
                             <div className="fw-bold text-success">
                               {transactions.filter(t => t.source === 'PJ').length}
+                              {totalTransactions > transactions.length && (
+                                <small className="text-muted d-block">(of {totalTransactions} total)</small>
+                              )}
                             </div>
                           </div>
                           <div className="col-md-3">
                             <small className="text-muted">Adjustments (AJ)</small>
                             <div className="fw-bold text-warning">
                               {transactions.filter(t => t.source === 'AJ').length}
+                              {totalTransactions > transactions.length && (
+                                <small className="text-muted d-block">(of {totalTransactions} total)</small>
+                              )}
                             </div>
                           </div>
                           <div className="col-md-3">
                             <small className="text-muted">Other Types</small>
                             <div className="fw-bold text-secondary">
                               {transactions.filter(t => t.source !== 'PJ' && t.source !== 'AJ').length}
+                              {totalTransactions > transactions.length && (
+                                <small className="text-muted d-block">(of {totalTransactions} total)</small>
+                              )}
                             </div>
                           </div>
                         </div>
+                        {totalTransactions > transactions.length && (
+                          <div className="row mt-2">
+                            <div className="col-12 text-center">
+                              <small className="text-muted">
+                                Showing {transactions.length} of {totalTransactions} transactions on this page
+                              </small>
+                            </div>
+                          </div>
+                        )}
+                        
+                        {/* Other Types Breakdown */}
+                        {(() => {
+                          const otherTypes = transactions.filter(t => t.source !== 'PJ' && t.source !== 'AJ');
+                          const otherTypesGrouped = otherTypes.reduce((acc, t) => {
+                            acc[t.source] = (acc[t.source] || 0) + 1;
+                            return acc;
+                          }, {});
+                          
+                          if (Object.keys(otherTypesGrouped).length > 0) {
+                            return (
+                              <div className="row mt-2">
+                                <div className="col-12">
+                                  <small className="text-muted">Other Types on this page:</small>
+                                  <div className="mt-1">
+                                    {Object.entries(otherTypesGrouped).map(([source, count]) => (
+                                      <span key={source} className="badge bg-secondary me-1">
+                                        {source}: {count}
+                                      </span>
+                                    ))}
+                                  </div>
+                                </div>
+                              </div>
+                            );
+                          }
+                          return null;
+                        })()}
                       </div>
                     </div>
                   </div>
