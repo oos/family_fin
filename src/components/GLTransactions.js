@@ -670,14 +670,14 @@ const GLTransactions = () => {
                             >
                               <div className="d-flex align-items-center">
                                 <i className={`fas ${isExpanded ? 'fa-folder-open' : 'fa-folder'} me-2`}></i>
-                                <h6 className="mb-0">{account.accountName}</h6>
+                                <h6 className="mb-0 text-white">{account.accountName}</h6>
                                 <span className="badge bg-light text-dark ms-2 small">
                                   {transactionCount} Transactions
                                 </span>
                                 <div className="d-flex align-items-center gap-2 small ms-3">
-                                  <span className="text-primary">Max: {formatCurrency(stats.max)}</span>
-                                  <span className="text-success">Avg: {formatCurrency(stats.avg)}</span>
-                                  <span className="text-info">Min: {formatCurrency(stats.min)}</span>
+                                  <span className="text-white">Max: {formatCurrency(stats.max)}</span>
+                                  <span className="text-white">Avg: {formatCurrency(stats.avg)}</span>
+                                  <span className="text-white">Min: {formatCurrency(stats.min)}</span>
                                 </div>
                               </div>
                               <div className="d-flex align-items-center">
