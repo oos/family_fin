@@ -719,74 +719,142 @@ const GLTransactions = () => {
                 ></button>
               </div>
               <div className="modal-body">
-                <div className="row">
-                  <div className="col-md-6">
-                    <h6>Transaction Information</h6>
-                    <table className="table table-sm">
-                      <tbody>
-                        <tr>
-                          <td><strong>ID:</strong></td>
-                          <td><code>{generateUID(selectedTransaction, 0)}</code></td>
-                        </tr>
-                        <tr>
-                          <td><strong>Date:</strong></td>
-                          <td>{formatDate(selectedTransaction.date)}</td>
-                        </tr>
-                        <tr>
-                          <td><strong>Description:</strong></td>
-                          <td>{selectedTransaction.name}</td>
-                        </tr>
-                        <tr>
-                          <td><strong>Reference:</strong></td>
-                          <td>{selectedTransaction.reference || 'N/A'}</td>
-                        </tr>
-                        <tr>
-                          <td><strong>Source:</strong></td>
-                          <td>{selectedTransaction.source || 'N/A'}</td>
-                        </tr>
-                        <tr>
-                          <td><strong>Category:</strong></td>
-                          <td>{selectedTransaction.category_heading || 'N/A'}</td>
-                        </tr>
-                        <tr>
-                          <td><strong>Annotation:</strong></td>
-                          <td>{selectedTransaction.annotation || 'N/A'}</td>
-                        </tr>
-                      </tbody>
-                    </table>
+                {selectedTransaction ? (
+                  <div className="row">
+                    <div className="col-md-6">
+                      <h6>Transaction Information</h6>
+                      <table className="table table-sm">
+                        <tbody>
+                          <tr>
+                            <td><strong>ID:</strong></td>
+                            <td><code>{generateUID(selectedTransaction, 0)}</code></td>
+                          </tr>
+                          <tr>
+                            <td><strong>Date:</strong></td>
+                            <td>{formatDate(selectedTransaction.date)}</td>
+                          </tr>
+                          <tr>
+                            <td><strong>Description:</strong></td>
+                            <td>{selectedTransaction.name || 'N/A'}</td>
+                          </tr>
+                          <tr>
+                            <td><strong>Reference:</strong></td>
+                            <td><code>{selectedTransaction.reference || 'N/A'}</code></td>
+                          </tr>
+                          <tr>
+                            <td><strong>Source:</strong></td>
+                            <td>
+                              <span className={`badge ${
+                                selectedTransaction.source === 'AJ' ? 'bg-warning' :
+                                selectedTransaction.source === 'PJ' ? 'bg-success' :
+                                'bg-secondary'
+                              }`}>
+                                {selectedTransaction.source || 'N/A'}
+                              </span>
+                            </td>
+                          </tr>
+                          <tr>
+                            <td><strong>Category:</strong></td>
+                            <td>
+                              <span className="badge bg-info">
+                                {selectedTransaction.category_heading || 'N/A'}
+                              </span>
+                            </td>
+                          </tr>
+                          <tr>
+                            <td><strong>Annotation:</strong></td>
+                            <td>{selectedTransaction.annotation || 'N/A'}</td>
+                          </tr>
+                          <tr>
+                            <td><strong>User ID:</strong></td>
+                            <td><code>{selectedTransaction.user_id || 'N/A'}</code></td>
+                          </tr>
+                          <tr>
+                            <td><strong>Tax Return ID:</strong></td>
+                            <td><code>{selectedTransaction.tax_return_id || 'N/A'}</code></td>
+                          </tr>
+                        </tbody>
+                      </table>
+                    </div>
+                    <div className="col-md-6">
+                      <h6>Financial Information</h6>
+                      <table className="table table-sm">
+                        <tbody>
+                          <tr>
+                            <td><strong>Debit:</strong></td>
+                            <td className="text-danger fw-bold">
+                              {selectedTransaction.debit > 0 ? formatCurrency(selectedTransaction.debit) : 'N/A'}
+                            </td>
+                          </tr>
+                          <tr>
+                            <td><strong>Credit:</strong></td>
+                            <td className="text-success fw-bold">
+                              {selectedTransaction.credit > 0 ? formatCurrency(selectedTransaction.credit) : 'N/A'}
+                            </td>
+                          </tr>
+                          <tr>
+                            <td><strong>Net Amount:</strong></td>
+                            <td className="fw-bold">
+                              {(() => {
+                                const debit = parseFloat(selectedTransaction.debit) || 0;
+                                const credit = parseFloat(selectedTransaction.credit) || 0;
+                                const net = debit - credit;
+                                return (
+                                  <span className={net >= 0 ? 'text-danger' : 'text-success'}>
+                                    {net >= 0 ? '-' : '+'}{formatCurrency(Math.abs(net))}
+                                  </span>
+                                );
+                              })()}
+                            </td>
+                          </tr>
+                          <tr>
+                            <td><strong>Tax Year:</strong></td>
+                            <td>
+                              <span className="badge bg-secondary">
+                                {selectedTransaction.tax_return_year || 'N/A'}
+                              </span>
+                            </td>
+                          </tr>
+                          <tr>
+                            <td><strong>File:</strong></td>
+                            <td>
+                              <small className="text-muted">
+                                {selectedTransaction.tax_return_filename || 'N/A'}
+                              </small>
+                            </td>
+                          </tr>
+                          <tr>
+                            <td><strong>Created:</strong></td>
+                            <td>{selectedTransaction.created_at ? formatDate(selectedTransaction.created_at) : 'N/A'}</td>
+                          </tr>
+                          <tr>
+                            <td><strong>Updated:</strong></td>
+                            <td>{selectedTransaction.updated_at ? formatDate(selectedTransaction.updated_at) : 'N/A'}</td>
+                          </tr>
+                        </tbody>
+                      </table>
+                    </div>
                   </div>
-                  <div className="col-md-6">
-                    <h6>Financial Information</h6>
-                    <table className="table table-sm">
-                      <tbody>
-                        <tr>
-                          <td><strong>Debit:</strong></td>
-                          <td className="text-danger">
-                            {selectedTransaction.debit > 0 ? formatCurrency(selectedTransaction.debit) : 'N/A'}
-                          </td>
-                        </tr>
-                        <tr>
-                          <td><strong>Credit:</strong></td>
-                          <td className="text-success">
-                            {selectedTransaction.credit > 0 ? formatCurrency(selectedTransaction.credit) : 'N/A'}
-                          </td>
-                        </tr>
-                        <tr>
-                          <td><strong>Balance:</strong></td>
-                          <td>{formatCurrency(selectedTransaction.balance)}</td>
-                        </tr>
-                        <tr>
-                          <td><strong>Tax Year:</strong></td>
-                          <td>{selectedTransaction.tax_return_year || 'N/A'}</td>
-                        </tr>
-                        <tr>
-                          <td><strong>File:</strong></td>
-                          <td>{selectedTransaction.tax_return_filename || 'N/A'}</td>
-                        </tr>
-                      </tbody>
-                    </table>
+                ) : (
+                  <div className="text-center text-muted">
+                    <p>No transaction data available</p>
+                    <small>Debug: selectedTransaction = {JSON.stringify(selectedTransaction)}</small>
                   </div>
-                </div>
+                )}
+                
+                {/* Debug Section - Show ALL available fields */}
+                {selectedTransaction && (
+                  <div className="mt-4">
+                    <h6>All Available Data (Debug)</h6>
+                    <div className="card bg-light">
+                      <div className="card-body">
+                        <pre className="small mb-0" style={{maxHeight: '200px', overflow: 'auto'}}>
+                          {JSON.stringify(selectedTransaction, null, 2)}
+                        </pre>
+                      </div>
+                    </div>
+                  </div>
+                )}
               </div>
               <div className="modal-footer">
                 <button
