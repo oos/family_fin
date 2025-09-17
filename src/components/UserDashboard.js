@@ -1,8 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
+import FinancialOverview from './FinancialOverview';
 
 const UserDashboard = () => {
   const [dashboardData, setDashboardData] = useState(null);
+  const [loans, setLoans] = useState([]);
+  const [accounts, setAccounts] = useState([]);
+  const [loanBalances, setLoanBalances] = useState([]);
+  const [accountBalances, setAccountBalances] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [showBalanceForm, setShowBalanceForm] = useState(false);
@@ -21,12 +26,24 @@ const UserDashboard = () => {
   const fetchDashboardData = async () => {
     try {
       setLoading(true);
-      const response = await axios.get('/user-dashboard');
-      if (response.data.success) {
-        setDashboardData(response.data.dashboard);
+      const [dashboardRes, loansRes, accountsRes, loanBalancesRes, accountBalancesRes] = await Promise.all([
+        axios.get('/user-dashboard'),
+        axios.get('/loans'),
+        axios.get('/business-accounts'),
+        axios.get('/user-loan-balances'),
+        axios.get('/user-account-balances')
+      ]);
+      
+      if (dashboardRes.data.success) {
+        setDashboardData(dashboardRes.data.dashboard);
       } else {
-        setError(response.data.message);
+        setError(dashboardRes.data.message);
       }
+      
+      setLoans(loansRes.data.success ? loansRes.data.loans : []);
+      setAccounts(accountsRes.data.success ? accountsRes.data.accounts : []);
+      setLoanBalances(loanBalancesRes.data.success ? loanBalancesRes.data.balances : []);
+      setAccountBalances(accountBalancesRes.data.success ? accountBalancesRes.data.balances : []);
     } catch (err) {
       setError('Failed to fetch dashboard data');
       console.error('Error fetching dashboard data:', err);
@@ -51,6 +68,29 @@ const UserDashboard = () => {
 
   const formatDate = (dateString) => {
     return new Date(dateString).toLocaleDateString('en-GB');
+  };
+
+  // Helper functions for financial calculations
+  const getCurrentLoanBalance = (loanId) => {
+    const balance = loanBalances.find(b => b.loan_id === loanId);
+    return balance ? balance.balance : 0;
+  };
+
+  const getCurrentAccountBalance = (accountId) => {
+    const balance = accountBalances.find(b => b.account_id === accountId);
+    return balance ? balance.balance : 0;
+  };
+
+  const getTotalLoanBalance = () => {
+    return loans.reduce((total, loan) => total + getCurrentLoanBalance(loan.id), 0);
+  };
+
+  const getTotalAccountBalance = () => {
+    return accounts.reduce((total, account) => total + getCurrentAccountBalance(account.id), 0);
+  };
+
+  const getNetPosition = () => {
+    return getTotalAccountBalance() - getTotalLoanBalance();
   };
 
   const handleAddAccountBalance = (account) => {
@@ -142,99 +182,62 @@ const UserDashboard = () => {
     <div className="container">
       <h1>Welcome, {user.username}!</h1>
       
-      <div className="row">
-        {/* Loans Section */}
-        {visible_sections.loans && data.loans && (
-          <div className="col-md-6 mb-4">
-            <div className="card">
-              <div className="card-header">
-                <h5>Loans</h5>
-              </div>
-              <div className="card-body">
-                <div className="table-responsive">
-                  <table className="table table-sm">
-                    <thead>
-                      <tr>
-                        <th>Bank</th>
-                        <th>Amount</th>
-                        <th>Interest Rate</th>
-                        <th>Term</th>
-                        <th>Actions</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {data.loans
-                        .filter(loan => !['Pepper', 'AIB', 'B&G'].includes(loan.lender))
-                        .map(loan => (
-                        <tr key={loan.id}>
-                          <td>{loan.lender}</td>
-                          <td>{formatCurrency(loan.principal_amount)}</td>
-                          <td>{loan.interest_rate}%</td>
-                          <td>{loan.term_years} years</td>
-                          <td>
-                            <button 
-                              className="btn btn-sm btn-primary"
-                              onClick={() => handleAddLoanBalance(loan)}
-                            >
-                              Add Balance
-                            </button>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
+      {/* Financial Position Overview */}
+      <div className="card" style={{ marginBottom: '20px' }}>
+        <h3>Current Financial Position</h3>
+        <div className="row">
+          {/* Loans Section */}
+          <FinancialOverview
+            type="loans"
+            items={loans}
+            balances={loanBalances}
+            title="Loans & Debt"
+            icon="fa-credit-card"
+            colorClass="text-danger"
+            borderClass="border-danger"
+          />
+
+          {/* Bank Accounts Section */}
+          <FinancialOverview
+            type="accounts"
+            items={accounts}
+            balances={accountBalances}
+            title="Bank Accounts & Cash"
+            icon="fa-university"
+            colorClass="text-success"
+            borderClass="border-success"
+          />
+        </div>
+
+        {/* Net Position Summary */}
+        <div className="row mt-4">
+          <div className="col-12">
+            <div className="card" style={{ backgroundColor: '#f8f9fa', border: '2px solid #dee2e6' }}>
+              <div className="card-body text-center">
+                <h4 className="mb-3">Net Financial Position</h4>
+                <div className="row">
+                  <div className="col-md-4">
+                    <h6 className="text-muted">Total Cash</h6>
+                    <h4 className="text-success">{formatCurrency(getTotalAccountBalance())}</h4>
+                  </div>
+                  <div className="col-md-4">
+                    <h6 className="text-muted">Total Debt</h6>
+                    <h4 className="text-danger">{formatCurrency(getTotalLoanBalance())}</h4>
+                  </div>
+                  <div className="col-md-4">
+                    <h6 className="text-muted">Net Position</h6>
+                    <h3 className={getNetPosition() >= 0 ? 'text-success' : 'text-danger'}>
+                      {formatCurrency(getNetPosition())}
+                    </h3>
+                    <small className="text-muted">
+                      {getNetPosition() >= 0 ? 'Positive (Cash > Debt)' : 'Negative (Debt > Cash)'}
+                    </small>
+                  </div>
                 </div>
               </div>
             </div>
           </div>
-        )}
-
-        {/* Bank Accounts Section */}
-        {visible_sections.bank_accounts && data.bank_accounts && (
-          <div className="col-md-6 mb-4">
-            <div className="card">
-              <div className="card-header">
-                <h5>Bank Accounts</h5>
-              </div>
-              <div className="card-body">
-                <div className="table-responsive">
-                  <table className="table table-sm">
-                    <thead>
-                      <tr>
-                        <th>Bank</th>
-                        <th>Account Name</th>
-                        <th>Account Number</th>
-                        <th>Currency</th>
-                        <th>Type</th>
-                        <th>Actions</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {data.bank_accounts.map(account => (
-                        <tr key={account.id}>
-                          <td>{account.bank_name}</td>
-                          <td>{account.account_name}</td>
-                          <td>{account.account_number}</td>
-                          <td>{account.currency}</td>
-                          <td>{account.account_type}</td>
-                          <td>
-                            <button 
-                              className="btn btn-sm btn-primary"
-                              onClick={() => handleAddAccountBalance(account)}
-                            >
-                              Add Balance
-                            </button>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
-
+        </div>
       </div>
 
       {/* Balance Form Modal */}
