@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
+import FinancialOverview from './FinancialOverview';
 
 const UserAccounts = () => {
   const [accounts, setAccounts] = useState([]);
@@ -206,46 +207,15 @@ const UserAccounts = () => {
                 <h5 className="mb-0"><i className="fas fa-chart-pie me-2"></i>Bank Accounts Overview</h5>
               </div>
               <div className="card-body">
-                <div className="row">
-                  {accounts.map((account) => {
-                    const currentBalance = getCurrentBalance(account.id);
-                    const lastUpdated = getLastUpdated(account.id);
-                    const balanceCount = balances.filter(b => b.account_id === account.id).length;
-                    
-                    return (
-                      <div key={account.id} className="col-md-6 col-lg-4 mb-3">
-                        <div className="card h-100 border-start border-4 border-success">
-                          <div className="card-body">
-                            <h6 className="card-title text-success">{account.account_name}</h6>
-                            <p className="card-text mb-1">
-                              <small className="text-muted">Account Number:</small> {account.account_number}
-                            </p>
-                            <hr className="my-2" />
-                            <div className="d-flex justify-content-between align-items-center">
-                              <div>
-                                <small className="text-muted">Current Balance:</small><br />
-                                <span className={`fw-bold ${currentBalance ? 'text-success' : 'text-muted'}`}>
-                                  {currentBalance ? formatCurrency(currentBalance) : 'Not set'}
-                                </span>
-                              </div>
-                              <div className="text-end">
-                                <small className="text-muted">Entries:</small><br />
-                                <span className="badge bg-success">{balanceCount}</span>
-                              </div>
-                            </div>
-                            {lastUpdated && (
-                              <div className="mt-2">
-                                <small className="text-muted">
-                                  Last updated: {new Date(lastUpdated).toLocaleDateString()}
-                                </small>
-                              </div>
-                            )}
-                          </div>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
+                <FinancialOverview
+                  type="accounts"
+                  items={accounts}
+                  balances={balances}
+                  title=""
+                  icon=""
+                  colorClass="text-success"
+                  borderClass="border-success"
+                />
               </div>
             </div>
           )}

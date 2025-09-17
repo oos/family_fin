@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
+import FinancialOverview from './FinancialOverview';
 
 const UserLoans = () => {
   const [loans, setLoans] = useState([]);
@@ -206,46 +207,15 @@ const UserLoans = () => {
                 <h5 className="mb-0"><i className="fas fa-chart-pie me-2"></i>Loans Overview</h5>
               </div>
               <div className="card-body">
-                <div className="row">
-                  {loans.map((loan) => {
-                    const currentBalance = getCurrentBalance(loan.id);
-                    const lastUpdated = getLastUpdated(loan.id);
-                    const balanceCount = balances.filter(b => b.loan_id === loan.id).length;
-                    
-                    return (
-                      <div key={loan.id} className="col-md-6 col-lg-4 mb-3">
-                        <div className="card h-100 border-start border-4 border-primary">
-                          <div className="card-body">
-                            <h6 className="card-title text-primary">{loan.loan_name}</h6>
-                            <p className="card-text mb-1">
-                              <small className="text-muted">Lender:</small> {loan.lender}
-                            </p>
-                            <hr className="my-2" />
-                            <div className="d-flex justify-content-between align-items-center">
-                              <div>
-                                <small className="text-muted">Current Balance:</small><br />
-                                <span className={`fw-bold ${currentBalance ? 'text-success' : 'text-muted'}`}>
-                                  {currentBalance ? formatCurrency(currentBalance) : 'Not set'}
-                                </span>
-                              </div>
-                              <div className="text-end">
-                                <small className="text-muted">Entries:</small><br />
-                                <span className="badge bg-primary">{balanceCount}</span>
-                              </div>
-                            </div>
-                            {lastUpdated && (
-                              <div className="mt-2">
-                                <small className="text-muted">
-                                  Last updated: {new Date(lastUpdated).toLocaleDateString()}
-                                </small>
-                              </div>
-                            )}
-                          </div>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
+                <FinancialOverview
+                  type="loans"
+                  items={loans}
+                  balances={balances}
+                  title=""
+                  icon=""
+                  colorClass="text-primary"
+                  borderClass="border-primary"
+                />
               </div>
             </div>
           )}

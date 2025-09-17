@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { formatCurrency, formatNumber, getChartConfig } from '../utils/chartConfig';
+import FinancialOverview from './FinancialOverview';
 
 function Dashboard() {
   const [summary, setSummary] = useState(null);
@@ -202,88 +203,26 @@ function Dashboard() {
         <h3>Current Financial Position</h3>
         <div className="row">
           {/* Loans Section */}
-          <div className="col-md-6">
-            <h4 style={{ color: '#dc3545', marginBottom: '15px' }}>
-              <i className="fas fa-credit-card me-2"></i>Loans & Debt
-            </h4>
-            {loans.length > 0 ? (
-              <div>
-                <table className="table table-sm">
-                  <thead>
-                    <tr>
-                      <th>Loan</th>
-                      <th>Lender</th>
-                      <th>Current Balance</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {loans.map(loan => {
-                      const currentBalance = getCurrentLoanBalance(loan.id);
-                      return (
-                        <tr key={loan.id}>
-                          <td>{loan.loan_name}</td>
-                          <td>{loan.lender}</td>
-                          <td className={currentBalance > 0 ? 'text-danger fw-bold' : 'text-muted'}>
-                            {currentBalance > 0 ? formatCurrency(currentBalance) : 'No balance set'}
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                  <tfoot>
-                    <tr className="table-danger">
-                      <th colSpan="2">Total Debt</th>
-                      <th className="text-danger fw-bold">{formatCurrency(getTotalLoanBalance())}</th>
-                    </tr>
-                  </tfoot>
-                </table>
-              </div>
-            ) : (
-              <p className="text-muted">No loans available</p>
-            )}
-          </div>
+          <FinancialOverview
+            type="loans"
+            items={loans}
+            balances={loanBalances}
+            title="Loans & Debt"
+            icon="fa-credit-card"
+            colorClass="text-danger"
+            borderClass="border-danger"
+          />
 
           {/* Bank Accounts Section */}
-          <div className="col-md-6">
-            <h4 style={{ color: '#28a745', marginBottom: '15px' }}>
-              <i className="fas fa-university me-2"></i>Bank Accounts & Cash
-            </h4>
-            {accounts.length > 0 ? (
-              <div>
-                <table className="table table-sm">
-                  <thead>
-                    <tr>
-                      <th>Account</th>
-                      <th>Bank</th>
-                      <th>Current Balance</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {accounts.map(account => {
-                      const currentBalance = getCurrentAccountBalance(account.id);
-                      return (
-                        <tr key={account.id}>
-                          <td>{account.account_name}</td>
-                          <td>{account.bank_name}</td>
-                          <td className={currentBalance > 0 ? 'text-success fw-bold' : 'text-muted'}>
-                            {currentBalance > 0 ? formatCurrency(currentBalance) : 'No balance set'}
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                  <tfoot>
-                    <tr className="table-success">
-                      <th colSpan="2">Total Cash</th>
-                      <th className="text-success fw-bold">{formatCurrency(getTotalAccountBalance())}</th>
-                    </tr>
-                  </tfoot>
-                </table>
-              </div>
-            ) : (
-              <p className="text-muted">No bank accounts available</p>
-            )}
-          </div>
+          <FinancialOverview
+            type="accounts"
+            items={accounts}
+            balances={accountBalances}
+            title="Bank Accounts & Cash"
+            icon="fa-university"
+            colorClass="text-success"
+            borderClass="border-success"
+          />
         </div>
 
         {/* Net Position Summary */}
