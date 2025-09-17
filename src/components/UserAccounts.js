@@ -108,6 +108,11 @@ const UserAccounts = () => {
   const getBalancesForAccount = (accountId) => {
     const accountBalances = balances.filter(b => b.account_id === accountId).sort((a, b) => new Date(b.date_entered) - new Date(a.date_entered));
     
+    // Return empty array if no balances
+    if (accountBalances.length === 0) {
+      return [];
+    }
+    
     // Find the best balance first
     const bestBalance = accountBalances.reduce((best, current) => 
       current.balance > best.balance ? current : best

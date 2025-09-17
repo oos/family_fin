@@ -108,6 +108,11 @@ const UserLoans = () => {
   const getBalancesForLoan = (loanId) => {
     const loanBalances = balances.filter(b => b.loan_id === loanId).sort((a, b) => new Date(b.date_entered) - new Date(a.date_entered));
     
+    // Return empty array if no balances
+    if (loanBalances.length === 0) {
+      return [];
+    }
+    
     // Find the best balance first
     const bestBalance = loanBalances.reduce((best, current) => 
       current.balance > best.balance ? current : best
