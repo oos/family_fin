@@ -99,8 +99,14 @@ const FinancialOverview = ({
           const bestEverComparison = getBestEverComparison(item.id);
           const comparison = formatComparison(bestEverComparison);
           
+          // Calculate column size based on number of items to fit all on one row
+          const colSize = items.length <= 2 ? 'col-md-6' : 
+                         items.length <= 3 ? 'col-md-4' : 
+                         items.length <= 4 ? 'col-md-3' : 
+                         items.length <= 6 ? 'col-md-2' : 'col-md-1';
+          
           return (
-            <div key={item.id} className="col-md-6 col-lg-4 mb-3">
+            <div key={item.id} className={`${colSize} mb-3`}>
               <div className={`card h-100 border-start border-4 ${borderClass}`}>
                 <div className="card-body">
                   <h6 className={`card-title ${colorClass}`}>
