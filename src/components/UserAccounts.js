@@ -249,11 +249,25 @@ const UserAccounts = () => {
                       {/* Account Details */}
                       <div className="row mb-4">
                         <div className="col-md-6">
-                          <h5 className="text-primary">{account.account_name}</h5>
-                          <p className="text-muted mb-1"><strong>Bank:</strong> {account.bank_name}</p>
-                          <p className="text-muted mb-1"><strong>Account Number:</strong> {account.account_number}</p>
-                          <p className="text-muted mb-1"><strong>Currency:</strong> {account.currency || 'EUR'}</p>
-                          <p className="text-muted mb-0"><strong>Type:</strong> {account.account_type || 'N/A'}</p>
+                          <h5 className="text-primary mb-3">{account.account_name}</h5>
+                          <div className="row">
+                            <div className="col-md-3">
+                              <small className="text-muted"><strong>Bank:</strong></small><br />
+                              <span>{account.bank_name}</span>
+                            </div>
+                            <div className="col-md-3">
+                              <small className="text-muted"><strong>Account Number:</strong></small><br />
+                              <span>{account.account_number}</span>
+                            </div>
+                            <div className="col-md-3">
+                              <small className="text-muted"><strong>Currency:</strong></small><br />
+                              <span>{account.currency || 'EUR'}</span>
+                            </div>
+                            <div className="col-md-3">
+                              <small className="text-muted"><strong>Type:</strong></small><br />
+                              <span>{account.account_type || 'N/A'}</span>
+                            </div>
+                          </div>
                         </div>
                         <div className="col-md-6">
                           <div className="text-end">
