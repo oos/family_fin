@@ -7,6 +7,10 @@ function Dashboard() {
   const [summary, setSummary] = useState(null);
   const [properties, setProperties] = useState([]);
   const [income, setIncome] = useState([]);
+  const [loans, setLoans] = useState([]);
+  const [accounts, setAccounts] = useState([]);
+  const [loanBalances, setLoanBalances] = useState([]);
+  const [accountBalances, setAccountBalances] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [sortField, setSortField] = useState('equity');
@@ -19,15 +23,23 @@ function Dashboard() {
   const fetchDashboardData = async () => {
     try {
       setLoading(true);
-      const [summaryRes, propertiesRes, incomeRes] = await Promise.all([
+      const [summaryRes, propertiesRes, incomeRes, loansRes, accountsRes, loanBalancesRes, accountBalancesRes] = await Promise.all([
         axios.get('/dashboard/summary'),
         axios.get('/properties'),
-        axios.get('/income')
+        axios.get('/income'),
+        axios.get('/loans'),
+        axios.get('/business-accounts'),
+        axios.get('/user-loan-balances'),
+        axios.get('/user-account-balances')
       ]);
       
       setSummary(summaryRes.data);
       setProperties(propertiesRes.data);
       setIncome(incomeRes.data);
+      setLoans(loansRes.data.success ? loansRes.data.loans : []);
+      setAccounts(accountsRes.data.success ? accountsRes.data.accounts : []);
+      setLoanBalances(loanBalancesRes.data.success ? loanBalancesRes.data.balances : []);
+      setAccountBalances(accountBalancesRes.data.success ? accountBalancesRes.data.balances : []);
     } catch (err) {
       setError('Failed to load dashboard data');
       console.error(err);
@@ -68,6 +80,29 @@ function Dashboard() {
   const getSortIcon = (field) => {
     if (sortField !== field) return '↕️';
     return sortDirection === 'asc' ? '↑' : '↓';
+  };
+
+  // Helper functions for financial calculations
+  const getCurrentLoanBalance = (loanId) => {
+    const balance = loanBalances.find(b => b.loan_id === loanId);
+    return balance ? balance.balance : 0;
+  };
+
+  const getCurrentAccountBalance = (accountId) => {
+    const balance = accountBalances.find(b => b.account_id === accountId);
+    return balance ? balance.balance : 0;
+  };
+
+  const getTotalLoanBalance = () => {
+    return loans.reduce((total, loan) => total + getCurrentLoanBalance(loan.id), 0);
+  };
+
+  const getTotalAccountBalance = () => {
+    return accounts.reduce((total, account) => total + getCurrentAccountBalance(account.id), 0);
+  };
+
+  const getNetPosition = () => {
+    return getTotalAccountBalance() - getTotalLoanBalance();
   };
 
   if (loading) {
@@ -159,6 +194,126 @@ function Dashboard() {
         <div className="dashboard-card">
           <h3>Properties Count</h3>
           <div className="value">{properties.length}</div>
+        </div>
+      </div>
+
+      {/* Financial Position Overview */}
+      <div className="card" style={{ marginBottom: '20px' }}>
+        <h3>Current Financial Position</h3>
+        <div className="row">
+          {/* Loans Section */}
+          <div className="col-md-6">
+            <h4 style={{ color: '#dc3545', marginBottom: '15px' }}>
+              <i className="fas fa-credit-card me-2"></i>Loans & Debt
+            </h4>
+            {loans.length > 0 ? (
+              <div>
+                <table className="table table-sm">
+                  <thead>
+                    <tr>
+                      <th>Loan</th>
+                      <th>Lender</th>
+                      <th>Current Balance</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {loans.map(loan => {
+                      const currentBalance = getCurrentLoanBalance(loan.id);
+                      return (
+                        <tr key={loan.id}>
+                          <td>{loan.loan_name}</td>
+                          <td>{loan.lender}</td>
+                          <td className={currentBalance > 0 ? 'text-danger fw-bold' : 'text-muted'}>
+                            {currentBalance > 0 ? formatCurrency(currentBalance) : 'No balance set'}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                  <tfoot>
+                    <tr className="table-danger">
+                      <th colSpan="2">Total Debt</th>
+                      <th className="text-danger fw-bold">{formatCurrency(getTotalLoanBalance())}</th>
+                    </tr>
+                  </tfoot>
+                </table>
+              </div>
+            ) : (
+              <p className="text-muted">No loans available</p>
+            )}
+          </div>
+
+          {/* Bank Accounts Section */}
+          <div className="col-md-6">
+            <h4 style={{ color: '#28a745', marginBottom: '15px' }}>
+              <i className="fas fa-university me-2"></i>Bank Accounts & Cash
+            </h4>
+            {accounts.length > 0 ? (
+              <div>
+                <table className="table table-sm">
+                  <thead>
+                    <tr>
+                      <th>Account</th>
+                      <th>Bank</th>
+                      <th>Current Balance</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {accounts.map(account => {
+                      const currentBalance = getCurrentAccountBalance(account.id);
+                      return (
+                        <tr key={account.id}>
+                          <td>{account.account_name}</td>
+                          <td>{account.bank_name}</td>
+                          <td className={currentBalance > 0 ? 'text-success fw-bold' : 'text-muted'}>
+                            {currentBalance > 0 ? formatCurrency(currentBalance) : 'No balance set'}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                  <tfoot>
+                    <tr className="table-success">
+                      <th colSpan="2">Total Cash</th>
+                      <th className="text-success fw-bold">{formatCurrency(getTotalAccountBalance())}</th>
+                    </tr>
+                  </tfoot>
+                </table>
+              </div>
+            ) : (
+              <p className="text-muted">No bank accounts available</p>
+            )}
+          </div>
+        </div>
+
+        {/* Net Position Summary */}
+        <div className="row mt-4">
+          <div className="col-12">
+            <div className="card" style={{ backgroundColor: '#f8f9fa', border: '2px solid #dee2e6' }}>
+              <div className="card-body text-center">
+                <h4 className="mb-3">Net Financial Position</h4>
+                <div className="row">
+                  <div className="col-md-4">
+                    <h6 className="text-muted">Total Cash</h6>
+                    <h4 className="text-success">{formatCurrency(getTotalAccountBalance())}</h4>
+                  </div>
+                  <div className="col-md-4">
+                    <h6 className="text-muted">Total Debt</h6>
+                    <h4 className="text-danger">{formatCurrency(getTotalLoanBalance())}</h4>
+                  </div>
+                  <div className="col-md-4">
+                    <h6 className="text-muted">Net Position</h6>
+                    <h3 className={getNetPosition() >= 0 ? 'text-success' : 'text-danger'}>
+                      {formatCurrency(getNetPosition())}
+                    </h3>
+                    <small className="text-muted">
+                      {getNetPosition() >= 0 ? 'Positive (Cash > Debt)' : 'Negative (Debt > Cash)'}
+                    </small>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
 
