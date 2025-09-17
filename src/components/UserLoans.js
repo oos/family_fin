@@ -249,13 +249,33 @@ const UserLoans = () => {
                       {/* Loan Details */}
                       <div className="row mb-4">
                         <div className="col-md-6">
-                          <h5 className="text-primary">{loan.loan_name}</h5>
-                          <p className="text-muted mb-1"><strong>Lender:</strong> {loan.lender}</p>
-                          <p className="text-muted mb-1"><strong>Type:</strong> {loan.loan_type}</p>
-                          <p className="text-muted mb-1"><strong>Principal:</strong> {formatCurrency(loan.principal_amount)}</p>
-                          <p className="text-muted mb-1"><strong>Interest Rate:</strong> {loan.interest_rate ? `${loan.interest_rate}%` : 'N/A'}</p>
-                          <p className="text-muted mb-1"><strong>Term:</strong> {loan.term_years ? `${loan.term_years} years` : 'N/A'}</p>
-                          <p className="text-muted mb-0"><strong>Monthly Payment:</strong> {formatCurrency(loan.monthly_payment)}</p>
+                          <h5 className="text-primary mb-3">{loan.loan_name}</h5>
+                          <div className="row">
+                            <div className="col-md-2">
+                              <small className="text-muted"><strong>Lender:</strong></small><br />
+                              <span>{loan.lender}</span>
+                            </div>
+                            <div className="col-md-2">
+                              <small className="text-muted"><strong>Type:</strong></small><br />
+                              <span>{loan.loan_type}</span>
+                            </div>
+                            <div className="col-md-2">
+                              <small className="text-muted"><strong>Principal:</strong></small><br />
+                              <span>{formatCurrency(loan.principal_amount)}</span>
+                            </div>
+                            <div className="col-md-2">
+                              <small className="text-muted"><strong>Interest Rate:</strong></small><br />
+                              <span>{loan.interest_rate ? `${loan.interest_rate}%` : 'N/A'}</span>
+                            </div>
+                            <div className="col-md-2">
+                              <small className="text-muted"><strong>Term:</strong></small><br />
+                              <span>{loan.term_years ? `${loan.term_years} years` : 'N/A'}</span>
+                            </div>
+                            <div className="col-md-2">
+                              <small className="text-muted"><strong>Monthly Payment:</strong></small><br />
+                              <span>{formatCurrency(loan.monthly_payment)}</span>
+                            </div>
+                          </div>
                         </div>
                         <div className="col-md-6">
                           <div className="text-end">
