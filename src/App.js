@@ -23,11 +23,29 @@ import Bookings from './components/Bookings';
 import FileViewer from './components/FileViewer';
 import AdminPanel from './components/AdminPanel';
 import UserDashboard from './components/UserDashboard';
+import UserLoans from './components/UserLoans';
+import UserAccounts from './components/UserAccounts';
 import Login from './components/Login';
 import './sidebar.css';
 
 // Set up axios defaults
 axios.defaults.baseURL = 'http://localhost:5002/api';
+
+// Function to validate and refresh token if needed
+const validateToken = async () => {
+  const token = localStorage.getItem('token');
+  if (!token) return false;
+  
+  try {
+    // Test the token with a simple API call
+    await axios.get('/user-dashboard');
+    return true;
+  } catch (error) {
+    // Token is invalid, clear it
+    localStorage.removeItem('token');
+    return false;
+  }
+};
 
 // Add request interceptor to include JWT token
 axios.interceptors.request.use(
@@ -43,11 +61,12 @@ axios.interceptors.request.use(
   }
 );
 
-// Add response interceptor to handle 401 errors
+// Add response interceptor to handle 401 and 500 errors
 axios.interceptors.response.use(
   (response) => response,
   (error) => {
-    if (error.response?.status === 401) {
+    if (error.response?.status === 401 || error.response?.status === 500) {
+      // Clear token and redirect to login for any auth-related errors
       localStorage.removeItem('token');
       window.location.href = '/login';
     }
@@ -97,7 +116,9 @@ function Sidebar({ userRole, sidebarOpen, setSidebarOpen }) {
   ];
 
   const userMenuItems = [
-    { path: '/user-dashboard', icon: 'fas fa-tachometer-alt', label: 'My Dashboard' }
+    { path: '/user-dashboard', icon: 'fas fa-tachometer-alt', label: 'My Dashboard' },
+    { path: '/user-loans', icon: 'fas fa-credit-card', label: 'My Loans' },
+    { path: '/user-accounts', icon: 'fas fa-university', label: 'My Bank Accounts' }
   ];
 
   const menuItems = userRole === 'admin' ? adminMenuItems : userMenuItems;
@@ -163,33 +184,40 @@ function App() {
   const [roleLoading, setRoleLoading] = useState(true);
 
   useEffect(() => {
-    const token = localStorage.getItem('token');
-    if (token) {
-      setIsAuthenticated(true);
-      // Fetch user data for already logged in users
-      const fetchUserData = async () => {
-        try {
-          setRoleLoading(true);
-          const response = await axios.get('/user-dashboard');
-          if (response.data.success) {
-            setUserRole(response.data.dashboard.user.role);
-            setCurrentUser(response.data.dashboard.user);
+    const initializeAuth = async () => {
+      const token = localStorage.getItem('token');
+      if (token) {
+        // Validate the token first
+        const isValid = await validateToken();
+        if (isValid) {
+          setIsAuthenticated(true);
+          // Fetch user data for already logged in users
+          try {
+            setRoleLoading(true);
+            const response = await axios.get('/user-dashboard');
+            if (response.data.success) {
+              setUserRole(response.data.dashboard.user.role);
+              setCurrentUser(response.data.dashboard.user);
+            }
+          } catch (err) {
+            console.error('Error fetching user data:', err);
+            localStorage.removeItem('token');
+            setIsAuthenticated(false);
+          } finally {
+            setRoleLoading(false);
           }
-        } catch (err) {
-          console.error('Error fetching user data:', err);
-          // If token is invalid, clear it
-          localStorage.removeItem('token');
+        } else {
           setIsAuthenticated(false);
-        } finally {
           setRoleLoading(false);
         }
-      };
-      fetchUserData();
-    } else {
-      setIsAuthenticated(false);
-      setRoleLoading(false);
-    }
-    setLoading(false);
+      } else {
+        setIsAuthenticated(false);
+        setRoleLoading(false);
+      }
+      setLoading(false);
+    };
+    
+    initializeAuth();
   }, []);
 
   const handleLogin = async (token, userData) => {
@@ -210,6 +238,9 @@ function App() {
     } finally {
       setRoleLoading(false);
     }
+    
+    // Redirect to dashboard after successful login
+    window.location.href = '/';
   };
 
   const handleLogout = () => {
@@ -225,34 +256,35 @@ function App() {
     return <div className="loading">Loading...</div>;
   }
 
-  if (!isAuthenticated) {
-    return <Login onLogin={handleLogin} />;
-  }
-
-  if (roleLoading) {
-    return <div className="loading">Loading user data...</div>;
-  }
-
   return (
-    <Router>
+    <Router future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
       <div className="App">
-        <Navbar 
-          onLogout={handleLogout} 
-          userRole={userRole} 
-          currentUser={currentUser}
-          sidebarOpen={sidebarOpen}
-          setSidebarOpen={setSidebarOpen}
-        />
-        <Sidebar 
-          userRole={userRole}
-          sidebarOpen={sidebarOpen}
-          setSidebarOpen={setSidebarOpen}
-        />
-        <div className={`main-content ${sidebarOpen ? 'sidebar-open' : ''}`} style={{ paddingTop: '50px' }}>
-          <div className="container-fluid mt-1">
-            <Routes>
-              {/* Root route - role-based dashboard */}
-              <Route path="/" element={<RoleBasedDashboard userRole={userRole} />} />
+        {!isAuthenticated ? (
+          <Routes>
+            <Route path="/login" element={<Login onLogin={handleLogin} />} />
+            <Route path="*" element={<Navigate to="/login" replace />} />
+          </Routes>
+        ) : roleLoading ? (
+          <div className="loading">Loading user data...</div>
+        ) : (
+          <>
+            <Navbar 
+              onLogout={handleLogout} 
+              userRole={userRole} 
+              currentUser={currentUser}
+              sidebarOpen={sidebarOpen}
+              setSidebarOpen={setSidebarOpen}
+            />
+            <Sidebar 
+              userRole={userRole}
+              sidebarOpen={sidebarOpen}
+              setSidebarOpen={setSidebarOpen}
+            />
+            <div className={`main-content ${sidebarOpen ? 'sidebar-open' : ''}`} style={{ paddingTop: '50px' }}>
+              <div className="container-fluid mt-1">
+                <Routes>
+                  {/* Root route - role-based dashboard */}
+                  <Route path="/" element={<RoleBasedDashboard userRole={userRole} />} />
               
               {/* Admin-only routes */}
               <Route path="/entities" element={
@@ -342,9 +374,23 @@ function App() {
                   <UserDashboard />
                 </ProtectedRoute>
               } />
-            </Routes>
-          </div>
-        </div>
+              
+              {/* User-specific routes */}
+              <Route path="/user-loans" element={
+                <ProtectedRoute userRole={userRole} requiredRole="user" fallbackPath="/">
+                  <UserLoans />
+                </ProtectedRoute>
+              } />
+              <Route path="/user-accounts" element={
+                <ProtectedRoute userRole={userRole} requiredRole="user" fallbackPath="/">
+                  <UserAccounts />
+                </ProtectedRoute>
+              } />
+                </Routes>
+              </div>
+            </div>
+          </>
+        )}
       </div>
     </Router>
   );

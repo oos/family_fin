@@ -710,8 +710,8 @@ class AccountBalance(db.Model):
             'date_entered': self.date_entered.isoformat() if self.date_entered else None,
             'created_at': self.created_at.isoformat() if self.created_at else None,
             'updated_at': self.updated_at.isoformat() if self.updated_at else None,
-            'account_name': self.account.name if self.account else None,
-            'loan_name': f"{self.loan.bank} - {self.loan.property_name}" if self.loan else None
+            'account_name': self.account.account_name if self.account else None,
+            'loan_name': self.loan.loan_name if self.loan else None
         }
 
 class TaxReturn(db.Model):
@@ -1065,3 +1065,49 @@ class TransactionCategory(db.Model):
             score = score / available_fields
         
         return score, matches
+
+class UserLoanAccess(db.Model):
+    """Controls which loans a user can access"""
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+    loan_id = db.Column(db.Integer, db.ForeignKey('loan.id'), nullable=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    
+    # Relationships
+    user = db.relationship('User', backref='loan_access')
+    loan = db.relationship('Loan', backref='user_access')
+    
+    # Unique constraint to prevent duplicates
+    __table_args__ = (db.UniqueConstraint('user_id', 'loan_id', name='unique_user_loan_access'),)
+    
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'user_id': self.user_id,
+            'loan_id': self.loan_id,
+            'loan_name': self.loan.loan_name if self.loan else None,
+            'created_at': self.created_at.isoformat() if self.created_at else None
+        }
+
+class UserAccountAccess(db.Model):
+    """Controls which bank accounts a user can access"""
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+    business_account_id = db.Column(db.Integer, db.ForeignKey('business_account.id'), nullable=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    
+    # Relationships
+    user = db.relationship('User', backref='account_access')
+    business_account = db.relationship('BusinessAccount', backref='user_access')
+    
+    # Unique constraint to prevent duplicates
+    __table_args__ = (db.UniqueConstraint('user_id', 'business_account_id', name='unique_user_account_access'),)
+    
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'user_id': self.user_id,
+            'business_account_id': self.business_account_id,
+            'account_name': self.business_account.account_name if self.business_account else None,
+            'created_at': self.created_at.isoformat() if self.created_at else None
+        }

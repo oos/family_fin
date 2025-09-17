@@ -3,7 +3,7 @@ import axios from 'axios';
 
 function Login({ onLogin }) {
   const [credentials, setCredentials] = useState({
-    username: '',
+    email: '',
     password: ''
   });
   const [error, setError] = useState('');
@@ -40,12 +40,12 @@ function Login({ onLogin }) {
         
         <form onSubmit={handleSubmit}>
           <div className="form-group">
-            <label htmlFor="username">Email</label>
+            <label htmlFor="email">Email</label>
             <input
               type="email"
-              id="username"
-              name="username"
-              value={credentials.username}
+              id="email"
+              name="email"
+              value={credentials.email}
               onChange={handleChange}
               placeholder="Enter your email address"
               required

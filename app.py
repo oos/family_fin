@@ -62,7 +62,7 @@ app.config['JWT_SECRET_KEY'] = os.getenv('JWT_SECRET_KEY', 'jwt-secret-string')
 app.config['JWT_ACCESS_TOKEN_EXPIRES'] = timedelta(hours=24)
 
 # Import models and db
-from models import db, User, Person, Property, Income, Loan, Family, BusinessAccount, Pension, PensionAccount, LoanERC, LoanPayment, BankTransaction, AirbnbBooking, DashboardSettings, AccountBalance, TaxReturn, TaxReturnTransaction, TransactionMatch, TransactionLearningPattern, TransactionCategoryPrediction, ModelTrainingHistory, TransactionCategory, AppSettings
+from models import db, User, Person, Property, Income, Loan, Family, BusinessAccount, Pension, PensionAccount, LoanERC, LoanPayment, BankTransaction, AirbnbBooking, DashboardSettings, AccountBalance, TaxReturn, TaxReturnTransaction, TransactionMatch, TransactionLearningPattern, TransactionCategoryPrediction, ModelTrainingHistory, TransactionCategory, AppSettings, UserLoanAccess, UserAccountAccess
 
 # Initialize extensions
 db.init_app(app)
@@ -93,7 +93,7 @@ def login():
     ).first()
     
     if user and user.check_password(password) and user.is_active:
-        access_token = create_access_token(identity=user.username)
+        access_token = create_access_token(identity=str(user.id))
         return jsonify({
             'access_token': access_token,
             'user': {
@@ -271,7 +271,18 @@ def delete_property(property_id):
 @app.route('/api/business-accounts', methods=['GET'])
 @jwt_required()
 def get_business_accounts():
-    accounts = BusinessAccount.query.all()
+    current_user_id = int(get_jwt_identity())
+    current_user = User.query.filter_by(id=current_user_id).first()
+    
+    if current_user.role == 'admin':
+        # Admin sees all accounts
+        accounts = BusinessAccount.query.all()
+    else:
+        # Regular users see only accounts they have access to
+        user_account_access = UserAccountAccess.query.filter_by(user_id=current_user_id).all()
+        account_ids = [access.business_account_id for access in user_account_access]
+        accounts = BusinessAccount.query.filter(BusinessAccount.id.in_(account_ids)).all() if account_ids else []
+    
     accounts_with_calculated_balance = []
     
     for account in accounts:
@@ -295,7 +306,10 @@ def get_business_accounts():
         
         accounts_with_calculated_balance.append(account_dict)
     
-    return jsonify(accounts_with_calculated_balance)
+    return jsonify({
+        'success': True,
+        'accounts': accounts_with_calculated_balance
+    })
 
 @app.route('/api/business-accounts', methods=['POST'])
 @jwt_required()
@@ -382,8 +396,22 @@ def delete_income(income_id):
 @app.route('/api/loans', methods=['GET'])
 @jwt_required()
 def get_loans():
-    loans = Loan.query.all()
-    return jsonify([loan.to_dict() for loan in loans])
+    current_user_id = int(get_jwt_identity())
+    current_user = User.query.filter_by(id=current_user_id).first()
+    
+    if current_user.role == 'admin':
+        # Admin sees all loans
+        loans = Loan.query.all()
+    else:
+        # Regular users see only loans they have access to
+        user_loan_access = UserLoanAccess.query.filter_by(user_id=current_user_id).all()
+        loan_ids = [access.loan_id for access in user_loan_access]
+        loans = Loan.query.filter(Loan.id.in_(loan_ids)).all() if loan_ids else []
+    
+    return jsonify({
+        'success': True,
+        'loans': [loan.to_dict() for loan in loans]
+    })
 
 @app.route('/api/loans', methods=['POST'])
 @jwt_required()
@@ -2096,7 +2124,7 @@ def download_business_account_csv(account_id):
 def get_all_files():
     """Get all uploaded files in the system"""
     try:
-        current_user_id = get_jwt_identity()
+        current_user_id = int(get_jwt_identity())
         
         files_list = []
         
@@ -2208,8 +2236,8 @@ def get_account_transactions(account_id):
 def create_user():
     """Create a new user (admin only)"""
     try:
-        current_user_username = get_jwt_identity()
-        current_user = User.query.filter_by(username=current_user_username).first()
+        current_user_id = int(get_jwt_identity())
+        current_user = User.query.filter_by(id=current_user_id).first()
         
         if not current_user or current_user.role != 'admin':
             return jsonify({
@@ -2264,8 +2292,8 @@ def create_user():
 def get_users():
     """Get all users (admin only)"""
     try:
-        current_user_username = get_jwt_identity()
-        current_user = User.query.filter_by(username=current_user_username).first()
+        current_user_id = int(get_jwt_identity())
+        current_user = User.query.filter_by(id=current_user_id).first()
         
         if not current_user or current_user.role != 'admin':
             return jsonify({
@@ -2285,13 +2313,177 @@ def get_users():
             'message': f'Failed to fetch users: {str(e)}'
         }), 500
 
+@app.route('/api/user-access/loans/<int:user_id>', methods=['GET'])
+@jwt_required()
+def get_user_loan_access(user_id):
+    """Get loan access permissions for a specific user (admin only)"""
+    try:
+        current_user_id = int(get_jwt_identity())
+        current_user = User.query.filter_by(id=current_user_id).first()
+        
+        if not current_user or current_user.role != 'admin':
+            return jsonify({
+                'success': False,
+                'message': 'Admin access required'
+            }), 403
+        
+        # Get all loans
+        all_loans = Loan.query.all()
+        
+        # Get user's current loan access
+        user_loan_access = UserLoanAccess.query.filter_by(user_id=user_id).all()
+        user_loan_ids = {access.loan_id for access in user_loan_access}
+        
+        # Format response
+        loans_data = []
+        for loan in all_loans:
+            loans_data.append({
+                'id': loan.id,
+                'loan_name': loan.loan_name,
+                'lender': loan.lender,
+                'current_balance': loan.current_balance,
+                'has_access': loan.id in user_loan_ids
+            })
+        
+        return jsonify({
+            'success': True,
+            'loans': loans_data
+        })
+        
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'message': f'Failed to fetch user loan access: {str(e)}'
+        }), 500
+
+@app.route('/api/user-access/loans/<int:user_id>', methods=['POST'])
+@jwt_required()
+def update_user_loan_access(user_id):
+    """Update loan access permissions for a specific user (admin only)"""
+    try:
+        current_user_id = int(get_jwt_identity())
+        current_user = User.query.filter_by(id=current_user_id).first()
+        
+        if not current_user or current_user.role != 'admin':
+            return jsonify({
+                'success': False,
+                'message': 'Admin access required'
+            }), 403
+        
+        data = request.get_json()
+        loan_ids = data.get('loan_ids', [])
+        
+        # Remove existing access
+        UserLoanAccess.query.filter_by(user_id=user_id).delete()
+        
+        # Add new access
+        for loan_id in loan_ids:
+            access = UserLoanAccess(user_id=user_id, loan_id=loan_id)
+            db.session.add(access)
+        
+        db.session.commit()
+        
+        return jsonify({
+            'success': True,
+            'message': 'Loan access updated successfully'
+        })
+        
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({
+            'success': False,
+            'message': f'Failed to update user loan access: {str(e)}'
+        }), 500
+
+@app.route('/api/user-access/accounts/<int:user_id>', methods=['GET'])
+@jwt_required()
+def get_user_account_access(user_id):
+    """Get bank account access permissions for a specific user (admin only)"""
+    try:
+        current_user_id = int(get_jwt_identity())
+        current_user = User.query.filter_by(id=current_user_id).first()
+        
+        if not current_user or current_user.role != 'admin':
+            return jsonify({
+                'success': False,
+                'message': 'Admin access required'
+            }), 403
+        
+        # Get all business accounts
+        all_accounts = BusinessAccount.query.all()
+        
+        # Get user's current account access
+        user_account_access = UserAccountAccess.query.filter_by(user_id=user_id).all()
+        user_account_ids = {access.business_account_id for access in user_account_access}
+        
+        # Format response
+        accounts_data = []
+        for account in all_accounts:
+            accounts_data.append({
+                'id': account.id,
+                'account_name': account.account_name,
+                'bank_name': account.bank_name,
+                'account_number': account.account_number,
+                'has_access': account.id in user_account_ids
+            })
+        
+        return jsonify({
+            'success': True,
+            'accounts': accounts_data
+        })
+        
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'message': f'Failed to fetch user account access: {str(e)}'
+        }), 500
+
+@app.route('/api/user-access/accounts/<int:user_id>', methods=['POST'])
+@jwt_required()
+def update_user_account_access(user_id):
+    """Update bank account access permissions for a specific user (admin only)"""
+    try:
+        current_user_id = int(get_jwt_identity())
+        current_user = User.query.filter_by(id=current_user_id).first()
+        
+        if not current_user or current_user.role != 'admin':
+            return jsonify({
+                'success': False,
+                'message': 'Admin access required'
+            }), 403
+        
+        data = request.get_json()
+        account_ids = data.get('account_ids', [])
+        
+        # Remove existing access
+        UserAccountAccess.query.filter_by(user_id=user_id).delete()
+        
+        # Add new access
+        for account_id in account_ids:
+            access = UserAccountAccess(user_id=user_id, business_account_id=account_id)
+            db.session.add(access)
+        
+        db.session.commit()
+        
+        return jsonify({
+            'success': True,
+            'message': 'Account access updated successfully'
+        })
+        
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({
+            'success': False,
+            'message': f'Failed to update user account access: {str(e)}'
+        }), 500
+
 @app.route('/api/users/<int:user_id>/reset-password', methods=['POST'])
 @jwt_required()
 def reset_user_password(user_id):
     """Reset password for a user (admin only)"""
     try:
-        current_user_username = get_jwt_identity()
-        current_user = User.query.filter_by(username=current_user_username).first()
+        current_user_id = int(get_jwt_identity())
+        current_user = User.query.filter_by(id=current_user_id).first()
         
         if not current_user or current_user.role != 'admin':
             return jsonify({
@@ -2338,8 +2530,8 @@ def reset_user_password(user_id):
 def get_dashboard_settings(user_id):
     """Get dashboard settings for a user (admin only)"""
     try:
-        current_user_username = get_jwt_identity()
-        current_user = User.query.filter_by(username=current_user_username).first()
+        current_user_id = int(get_jwt_identity())
+        current_user = User.query.filter_by(id=current_user_id).first()
         
         if not current_user or current_user.role != 'admin':
             return jsonify({
@@ -2364,8 +2556,8 @@ def get_dashboard_settings(user_id):
 def update_dashboard_settings(user_id):
     """Update dashboard settings for a user (admin only)"""
     try:
-        current_user_username = get_jwt_identity()
-        current_user = User.query.filter_by(username=current_user_username).first()
+        current_user_id = int(get_jwt_identity())
+        current_user = User.query.filter_by(id=current_user_id).first()
         
         if not current_user or current_user.role != 'admin':
             return jsonify({
@@ -2408,8 +2600,8 @@ def update_dashboard_settings(user_id):
 def get_account_balances():
     """Get account balances for current user"""
     try:
-        current_user_username = get_jwt_identity()
-        current_user = User.query.filter_by(username=current_user_username).first()
+        current_user_id = int(get_jwt_identity())
+        current_user = User.query.filter_by(id=current_user_id).first()
         if not current_user:
             return jsonify({'success': False, 'message': 'User not found'}), 404
         
@@ -2431,8 +2623,8 @@ def get_account_balances():
 def create_account_balance():
     """Create a new account balance entry"""
     try:
-        current_user_username = get_jwt_identity()
-        current_user = User.query.filter_by(username=current_user_username).first()
+        current_user_id = int(get_jwt_identity())
+        current_user = User.query.filter_by(id=current_user_id).first()
         if not current_user:
             return jsonify({'success': False, 'message': 'User not found'}), 404
         
@@ -2469,8 +2661,8 @@ def create_account_balance():
 def update_account_balance(balance_id):
     """Update an account balance entry"""
     try:
-        current_user_username = get_jwt_identity()
-        current_user = User.query.filter_by(username=current_user_username).first()
+        current_user_id = int(get_jwt_identity())
+        current_user = User.query.filter_by(id=current_user_id).first()
         if not current_user:
             return jsonify({'success': False, 'message': 'User not found'}), 404
         
@@ -2510,8 +2702,8 @@ def update_account_balance(balance_id):
 def delete_account_balance(balance_id):
     """Delete an account balance entry"""
     try:
-        current_user_username = get_jwt_identity()
-        current_user = User.query.filter_by(username=current_user_username).first()
+        current_user_id = int(get_jwt_identity())
+        current_user = User.query.filter_by(id=current_user_id).first()
         if not current_user:
             return jsonify({'success': False, 'message': 'User not found'}), 404
         
@@ -2544,8 +2736,8 @@ def delete_account_balance(balance_id):
 def get_user_dashboard():
     """Get personalized dashboard data for current user"""
     try:
-        current_user_username = get_jwt_identity()
-        current_user = User.query.filter_by(username=current_user_username).first()
+        current_user_id = int(get_jwt_identity())
+        current_user = User.query.filter_by(id=current_user_id).first()
         
         if not current_user:
             return jsonify({
@@ -2591,6 +2783,28 @@ def get_user_dashboard():
                 # Fallback: get all accounts if user_id field doesn't exist
                 accounts = BusinessAccount.query.all()
             dashboard_data['data']['bank_accounts'] = [account.to_dict() for account in accounts]
+        
+        if visible_sections.get('income', True):
+            # Get income records for the current user's person record
+            from models import Person
+            # Try to match by username first, then by email prefix
+            person = Person.query.filter_by(name=current_user.username).first()
+            if not person:
+                # Try to match by email prefix (e.g., 'sean.osullivan@gmail.com' -> 'Sean')
+                email_prefix = current_user.email.split('@')[0]
+                if '.' in email_prefix:
+                    # Convert 'sean.osullivan' to 'Sean' (just first part)
+                    first_name = email_prefix.split('.')[0].capitalize()
+                    person = Person.query.filter_by(name=first_name).first()
+                else:
+                    # Try exact match with capitalized email prefix
+                    person = Person.query.filter_by(name=email_prefix.capitalize()).first()
+            
+            if person:
+                income_records = Income.query.filter_by(person_id=person.id).all()
+                dashboard_data['data']['income'] = [income.to_dict() for income in income_records]
+            else:
+                dashboard_data['data']['income'] = []
         
         return jsonify({
             'success': True,
@@ -2828,7 +3042,7 @@ def delete_airbnb_booking(booking_id):
 def get_tax_returns():
     """Get all tax returns for the authenticated user"""
     try:
-        current_user_id = get_jwt_identity()
+        current_user_id = int(get_jwt_identity())
         
         # Get all tax returns for the user
         tax_returns = TaxReturn.query.filter_by(user_id=current_user_id).order_by(TaxReturn.uploaded_at.desc()).all()
@@ -2850,7 +3064,7 @@ def get_tax_returns():
 def get_tax_returns_analytics():
     """Get financial analytics and insights for tax return transaction data"""
     try:
-        current_user_id = get_jwt_identity()
+        current_user_id = int(get_jwt_identity())
         
         # Get all tax returns for the user
         tax_returns = TaxReturn.query.filter_by(user_id=current_user_id).all()
@@ -3402,7 +3616,7 @@ def process_pdf_file(file):
 def upload_tax_return():
     """Upload a tax return CSV file"""
     try:
-        current_user_id = get_jwt_identity()
+        current_user_id = int(get_jwt_identity())
         
         if 'file' not in request.files:
             return jsonify({'error': 'No file provided'}), 400
@@ -3584,7 +3798,7 @@ def upload_tax_return():
 def download_tax_return(tax_return_id):
     """Download a tax return CSV file"""
     try:
-        current_user_id = get_jwt_identity()
+        current_user_id = int(get_jwt_identity())
         
         tax_return = TaxReturn.query.filter_by(
             id=tax_return_id, 
@@ -3610,7 +3824,7 @@ def download_tax_return(tax_return_id):
 def delete_tax_return(tax_return_id):
     """Delete a tax return and all related transactions"""
     try:
-        current_user_id = get_jwt_identity()
+        current_user_id = int(get_jwt_identity())
         
         tax_return = TaxReturn.query.filter_by(
             id=tax_return_id, 
@@ -3635,7 +3849,7 @@ def delete_tax_return(tax_return_id):
 def get_tax_return_data(tax_return_id):
     """Get parsed CSV data from a tax return"""
     try:
-        current_user_id = get_jwt_identity()
+        current_user_id = int(get_jwt_identity())
         
         tax_return = TaxReturn.query.filter_by(
             id=tax_return_id, 
@@ -3720,7 +3934,7 @@ def get_tax_return_data(tax_return_id):
 def get_all_bank_transactions():
     """Get all bank transactions for the current user for matching purposes"""
     try:
-        current_user_id = get_jwt_identity()
+        current_user_id = int(get_jwt_identity())
         
         # Get all bank transactions for this user's business accounts
         try:
@@ -3747,7 +3961,7 @@ def get_all_bank_transactions():
 def get_all_gl_transactions():
     """Get all GL transactions from all tax returns with filtering and pagination"""
     try:
-        current_user_id = get_jwt_identity()
+        current_user_id = int(get_jwt_identity())
         
         # Get query parameters
         page = request.args.get('page', 1, type=int)
@@ -3878,7 +4092,7 @@ def get_all_gl_transactions():
 def get_gl_transactions_summary_counts():
     """Get summary counts for GL transactions by type with optional year filtering"""
     try:
-        current_user_id = get_jwt_identity()
+        current_user_id = int(get_jwt_identity())
         
         # Get query parameters for filtering
         year = request.args.get('year', '', type=str)
@@ -3914,7 +4128,7 @@ def get_gl_transactions_summary_counts():
 def get_gl_transactions_filter_options():
     """Get filter options for GL transactions"""
     try:
-        current_user_id = get_jwt_identity()
+        current_user_id = int(get_jwt_identity())
         
         # Get all unique values for filtering
         query = TaxReturnTransaction.query.join(TaxReturn).filter(TaxReturn.user_id == current_user_id)
@@ -3986,7 +4200,7 @@ def get_gl_transactions_filter_options():
 def get_tax_return_transactions(tax_return_id):
     """Get saved transaction data from database for a tax return"""
     try:
-        current_user_id = get_jwt_identity()
+        current_user_id = int(get_jwt_identity())
         
         # Verify tax return belongs to user
         tax_return = TaxReturn.query.filter_by(
@@ -4133,7 +4347,7 @@ def calculate_reference_similarity(tax_ref, bank_ref):
 def get_potential_matches(tax_return_id):
     """Get potential bank transaction matches for tax return transactions"""
     try:
-        current_user_id = get_jwt_identity()
+        current_user_id = int(get_jwt_identity())
         
         # Verify tax return belongs to user
         tax_return = TaxReturn.query.filter_by(
@@ -4378,7 +4592,7 @@ def get_potential_matches(tax_return_id):
 def extract_transaction_categories():
     """Extract all categories from tax return transactions and populate the category table"""
     try:
-        current_user_id = get_jwt_identity()
+        current_user_id = int(get_jwt_identity())
         
         # Get all tax return transactions for the user
         tax_transactions = TaxReturnTransaction.query.join(TaxReturn).filter(
@@ -4545,7 +4759,7 @@ def extract_keywords(text):
 def get_transaction_categories():
     """Get all transaction categories for the user"""
     try:
-        current_user_id = get_jwt_identity()
+        current_user_id = int(get_jwt_identity())
         
         categories = TransactionCategory.query.filter_by(user_id=current_user_id).order_by(
             TransactionCategory.usage_count.desc(),
@@ -4562,7 +4776,7 @@ def get_transaction_categories():
 def suggest_transaction_category():
     """Suggest category for a bank transaction based on existing categories"""
     try:
-        current_user_id = get_jwt_identity()
+        current_user_id = int(get_jwt_identity())
         data = request.get_json()
         
         bank_transaction = data.get('bank_transaction')
@@ -4602,7 +4816,7 @@ def suggest_transaction_category():
 def get_auto_matches(tax_return_id):
     """Get automatically matched transactions that need category assignment"""
     try:
-        current_user_id = get_jwt_identity()
+        current_user_id = int(get_jwt_identity())
         
         # Verify tax return belongs to user
         tax_return = TaxReturn.query.filter_by(
@@ -4648,7 +4862,7 @@ def get_auto_matches(tax_return_id):
 def apply_category_suggestions_to_matches(tax_return_id):
     """Apply category suggestions to existing auto-matches that don't have categories"""
     try:
-        current_user_id = get_jwt_identity()
+        current_user_id = int(get_jwt_identity())
         
         # Verify tax return belongs to user
         tax_return = TaxReturn.query.filter_by(
@@ -4720,7 +4934,7 @@ def apply_category_suggestions_to_matches(tax_return_id):
 def create_transaction_match():
     """Create a match between a tax return transaction and a bank transaction"""
     try:
-        current_user_id = get_jwt_identity()
+        current_user_id = int(get_jwt_identity())
         data = request.get_json()
         
         tax_return_transaction_id = data.get('tax_return_transaction_id')
@@ -4795,7 +5009,7 @@ def create_transaction_match():
 def update_match_category(match_id):
     """Update the category for an auto-matched transaction"""
     try:
-        current_user_id = get_jwt_identity()
+        current_user_id = int(get_jwt_identity())
         data = request.get_json()
         
         category = data.get('category')
@@ -5139,7 +5353,7 @@ predictor = TransactionCategoryPredictor()
 def train_category_model():
     """Train the ML model on matched transaction data"""
     try:
-        current_user_id = get_jwt_identity()
+        current_user_id = int(get_jwt_identity())
         data = request.get_json() or {}
         incremental = data.get('incremental', False)
         
@@ -5163,7 +5377,7 @@ def train_category_model():
 def get_training_history():
     """Get training history for the user"""
     try:
-        current_user_id = get_jwt_identity()
+        current_user_id = int(get_jwt_identity())
         
         history = ModelTrainingHistory.query.filter_by(
             user_id=current_user_id
@@ -5181,7 +5395,7 @@ def get_training_history():
 def get_model_performance():
     """Get current model performance metrics"""
     try:
-        current_user_id = get_jwt_identity()
+        current_user_id = int(get_jwt_identity())
         
         # Get latest successful training
         latest_training = ModelTrainingHistory.query.filter_by(
@@ -5259,7 +5473,7 @@ def get_model_performance():
 def predict_all_transactions():
     """Apply predictions to all historical bank transactions"""
     try:
-        current_user_id = get_jwt_identity()
+        current_user_id = int(get_jwt_identity())
         
         if not predictor.is_trained:
             return jsonify({'error': 'Model not trained. Please train the model first.'}), 400
@@ -5325,7 +5539,7 @@ def predict_all_transactions():
 def get_transaction_predictions():
     """Get all transaction predictions for validation"""
     try:
-        current_user_id = get_jwt_identity()
+        current_user_id = int(get_jwt_identity())
         page = request.args.get('page', 1, type=int)
         per_page = request.args.get('per_page', 50, type=int)
         status = request.args.get('status', 'all')  # all, pending, validated, rejected
@@ -5368,7 +5582,7 @@ def get_transaction_predictions():
 def validate_prediction(prediction_id):
     """Validate or update a transaction prediction"""
     try:
-        current_user_id = get_jwt_identity()
+        current_user_id = int(get_jwt_identity())
         data = request.get_json()
         
         prediction = TransactionCategoryPrediction.query.filter_by(
@@ -5404,7 +5618,7 @@ def validate_prediction(prediction_id):
 def bulk_validate_predictions():
     """Bulk validate multiple predictions"""
     try:
-        current_user_id = get_jwt_identity()
+        current_user_id = int(get_jwt_identity())
         data = request.get_json()
         
         validations = data.get('validations', [])
@@ -5449,8 +5663,8 @@ def bulk_validate_predictions():
 def get_app_settings():
     """Get all application settings (admin only)"""
     try:
-        current_user_username = get_jwt_identity()
-        current_user = User.query.filter_by(username=current_user_username).first()
+        current_user_id = int(get_jwt_identity())
+        current_user = User.query.filter_by(id=current_user_id).first()
         
         if not current_user or current_user.role != 'admin':
             return jsonify({
@@ -5475,8 +5689,8 @@ def get_app_settings():
 def update_app_settings():
     """Update application settings (admin only)"""
     try:
-        current_user_username = get_jwt_identity()
-        current_user = User.query.filter_by(username=current_user_username).first()
+        current_user_id = int(get_jwt_identity())
+        current_user = User.query.filter_by(id=current_user_id).first()
         
         if not current_user or current_user.role != 'admin':
             return jsonify({
@@ -5559,6 +5773,153 @@ def initialize_default_settings():
             
     except Exception as e:
         print(f"Error initializing default settings: {e}")
+
+# User-specific API endpoints for loan and account balances
+@app.route('/api/user-loan-balances', methods=['GET'])
+@jwt_required()
+def get_user_loan_balances():
+    """Get loan balances for the current user"""
+    try:
+        current_user_id = int(get_jwt_identity())
+        
+        balances = AccountBalance.query.filter_by(
+            user_id=current_user_id
+        ).filter(AccountBalance.loan_id.isnot(None)).all()
+        
+        return jsonify({
+            'success': True,
+            'balances': [balance.to_dict() for balance in balances]
+        })
+        
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'message': f'Failed to fetch loan balances: {str(e)}'
+        }), 500
+
+@app.route('/api/user-loan-balances', methods=['POST'])
+@jwt_required()
+def add_user_loan_balance():
+    """Add or update a loan balance for the current user"""
+    try:
+        current_user_id = int(get_jwt_identity())
+        data = request.get_json()
+        
+        loan_id = data.get('loan_id')
+        balance = data.get('balance')
+        date_entered = data.get('date_entered')
+        notes = data.get('notes', '')
+        
+        if not loan_id or balance is None:
+            return jsonify({
+                'success': False,
+                'message': 'Loan ID and balance are required'
+            }), 400
+        
+        # Check if loan exists
+        loan = Loan.query.get(loan_id)
+        if not loan:
+            return jsonify({
+                'success': False,
+                'message': 'Loan not found'
+            }), 404
+        
+        # Always create a new balance entry (allow multiple entries per loan)
+        new_balance = AccountBalance(
+            user_id=current_user_id,
+            loan_id=loan_id,
+            balance=balance,
+            date_entered=datetime.strptime(date_entered, '%Y-%m-%d').date(),
+            notes=notes
+        )
+        db.session.add(new_balance)
+        
+        db.session.commit()
+        
+        return jsonify({
+            'success': True,
+            'message': 'Loan balance updated successfully'
+        })
+        
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({
+            'success': False,
+            'message': f'Failed to update loan balance: {str(e)}'
+        }), 500
+
+@app.route('/api/user-account-balances', methods=['GET'])
+@jwt_required()
+def get_user_account_balances():
+    """Get account balances for the current user"""
+    try:
+        current_user_id = int(get_jwt_identity())
+        
+        balances = AccountBalance.query.filter_by(
+            user_id=current_user_id
+        ).filter(AccountBalance.account_id.isnot(None)).all()
+        
+        return jsonify({
+            'success': True,
+            'balances': [balance.to_dict() for balance in balances]
+        })
+        
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'message': f'Failed to fetch account balances: {str(e)}'
+        }), 500
+
+@app.route('/api/user-account-balances', methods=['POST'])
+@jwt_required()
+def add_user_account_balance():
+    """Add or update an account balance for the current user"""
+    try:
+        current_user_id = int(get_jwt_identity())
+        data = request.get_json()
+        
+        account_id = data.get('account_id')
+        balance = data.get('balance')
+        date_entered = data.get('date_entered')
+        notes = data.get('notes', '')
+        
+        if not account_id or balance is None:
+            return jsonify({
+                'success': False,
+                'message': 'Account ID and balance are required'
+            }), 400
+        
+        # Check if account exists
+        account = BusinessAccount.query.get(account_id)
+        if not account:
+            return jsonify({
+                'success': False,
+                'message': 'Account not found'
+            }), 404
+        
+        # Always create a new balance entry (allow multiple entries per account)
+        new_balance = AccountBalance(
+            user_id=current_user_id,
+            account_id=account_id,
+            balance=balance,
+            date_entered=datetime.strptime(date_entered, '%Y-%m-%d').date(),
+            notes=notes
+        )
+        db.session.add(new_balance)
+        
+        db.session.commit()
+        
+        return jsonify({
+            'success': True,
+            'message': 'Account balance updated successfully'
+        })
+        
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({
+            'success': False,
+            'message': f'Failed to update account balance: {str(e)}'
+        }), 500
 
 if __name__ == '__main__':
     with app.app_context():

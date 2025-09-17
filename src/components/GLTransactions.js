@@ -80,6 +80,11 @@ const GLTransactions = () => {
   const [showAnalytics, setShowAnalytics] = useState(false);
   const [showSummaryPanel, setShowSummaryPanel] = useState(false);
 
+  // Helper function to check if all accounts are expanded
+  const areAllAccountsExpanded = () => {
+    return Object.keys(groupedTransactions).every(accountKey => expandedAccounts[accountKey]);
+  };
+
   useEffect(() => {
     fetchTransactions();
     fetchFilterOptions();
@@ -166,7 +171,7 @@ const GLTransactions = () => {
       const token = localStorage.getItem('token');
       if (!token) return;
 
-      const response = await axios.get('/api/transactions', {
+      const response = await axios.get('/transactions', {
         headers: { Authorization: `Bearer ${token}` }
       });
       setBankTransactions(response.data.transactions || []);
@@ -352,7 +357,7 @@ const GLTransactions = () => {
     const actualTransactions = transactions.filter(transaction => 
       transaction.reference !== 'Opening' && 
       transaction.reference !== 'Change' && 
-      transaction.reference !== 'Close' &&
+      transaction.reference !== 'Closing' &&
       transaction.source !== 'N/A' &&
       transaction.source !== null &&
       transaction.source !== undefined
@@ -378,11 +383,45 @@ const GLTransactions = () => {
   const groupTransactionsByAccount = (transactions) => {
     const grouped = {};
     
+    // Define mapping of GL accounts to related transaction patterns
+    const accountMappings = {
+      '172C00 Airbnb': [
+        '683B00 Revolut - Airbnb',
+        'Money added from AIRBNB PAYMENTS',
+        'Revolut.*Airbnb',
+        'reverse opening debtor - airbnb'
+      ],
+      '207C00 Hosting Fee\'s': [
+        'hosting',
+        'Hosting'
+      ],
+      '210C00 Contancy Services': [
+        'consultancy',
+        'Consultancy',
+        'To Niall Crotty',
+        'To Dwayne O\'Sullivan',
+        'To YOURCITYCOHOST LIMITED'
+      ],
+      '243C00 Rent': [
+        'being rent chg for year',
+        'rent',
+        'Rent'
+      ],
+      '300C01 Directors Salaries': [
+        'salary',
+        'Salary',
+        'Wages',
+        'Directors current Account'
+      ]
+    };
+    
+    // First, group all transactions by their actual names
+    const allGrouped = {};
     transactions.forEach(transaction => {
-      const accountKey = transaction.category_heading || 'Uncategorized';
+      const accountKey = transaction.name || 'Uncategorized';
       
-      if (!grouped[accountKey]) {
-        grouped[accountKey] = {
+      if (!allGrouped[accountKey]) {
+        allGrouped[accountKey] = {
           accountName: accountKey,
           transactions: [],
           openingBalance: 0,
@@ -393,26 +432,104 @@ const GLTransactions = () => {
         };
       }
       
-      grouped[accountKey].transactions.push(transaction);
+      allGrouped[accountKey].transactions.push(transaction);
       
-      // Calculate totals
-      const debit = parseFloat(transaction.debit) || 0;
-      const credit = parseFloat(transaction.credit) || 0;
+      // Calculate totals - EXCLUDE summary rows (Opening, Change, Closing)
+      const isSummaryRow = transaction.reference === 'Opening' || 
+                          transaction.reference === 'Change' || 
+                          transaction.reference === 'Closing';
       
-      grouped[accountKey].totalDebits += debit;
-      grouped[accountKey].totalCredits += credit;
-      grouped[accountKey].netChange += (debit - credit);
+      if (!isSummaryRow) {
+        const debit = parseFloat(transaction.debit) || 0;
+        const credit = parseFloat(transaction.credit) || 0;
+        
+        allGrouped[accountKey].totalDebits += debit;
+        allGrouped[accountKey].totalCredits += credit;
+        allGrouped[accountKey].netChange += (debit - credit);
+      }
     });
     
-    // Calculate opening and closing balances and sort transactions
+    // Now create GL accounts and map related transactions
+    Object.keys(accountMappings).forEach(glAccount => {
+      const patterns = accountMappings[glAccount];
+      grouped[glAccount] = {
+        accountName: glAccount,
+        transactions: [],
+        openingBalance: 0,
+        closingBalance: 0,
+        totalDebits: 0,
+        totalCredits: 0,
+        netChange: 0
+      };
+      
+      // Find and add matching transactions
+      Object.keys(allGrouped).forEach(accountKey => {
+        const isMatch = patterns.some(pattern => {
+          if (pattern.includes('.*')) {
+            // Regex pattern
+            const regex = new RegExp(pattern, 'i');
+            return regex.test(accountKey);
+          } else {
+            // Simple string match
+            return accountKey.toLowerCase().includes(pattern.toLowerCase());
+          }
+        });
+        
+        if (isMatch) {
+          const account = allGrouped[accountKey];
+          grouped[glAccount].transactions.push(...account.transactions);
+          grouped[glAccount].totalDebits += account.totalDebits;
+          grouped[glAccount].totalCredits += account.totalCredits;
+          grouped[glAccount].netChange += account.netChange;
+        }
+      });
+      
+      // Add the original GL account transaction if it exists
+      if (allGrouped[glAccount]) {
+        grouped[glAccount].transactions.push(...allGrouped[glAccount].transactions);
+        grouped[glAccount].totalDebits += allGrouped[glAccount].totalDebits;
+        grouped[glAccount].totalCredits += allGrouped[glAccount].totalCredits;
+        grouped[glAccount].netChange += allGrouped[glAccount].netChange;
+      }
+    });
+    
+    // Add any remaining accounts that don't match GL structure
+    Object.keys(allGrouped).forEach(accountKey => {
+      const isGLAccount = Object.keys(accountMappings).includes(accountKey);
+      if (!isGLAccount) {
+        grouped[accountKey] = allGrouped[accountKey];
+      }
+    });
+    
+    // Calculate opening and closing balances
     Object.keys(grouped).forEach(accountKey => {
       const account = grouped[accountKey];
       
-      // Sort transactions by date in ascending order (oldest first) to match original document
+      // Sort transactions by date to maintain proper order
       account.transactions.sort((a, b) => {
         const dateA = new Date(a.date || '1900-01-01');
         const dateB = new Date(b.date || '1900-01-01');
         return dateA - dateB;
+      });
+      
+      // Recalculate totals excluding summary rows to ensure accuracy
+      account.totalDebits = 0;
+      account.totalCredits = 0;
+      account.netChange = 0;
+      
+      account.transactions.forEach(transaction => {
+        const isSummaryRow = transaction.reference === 'Opening' || 
+                            transaction.reference === 'Change' || 
+                            transaction.reference === 'Closing';
+        
+        if (!isSummaryRow) {
+          const debit = parseFloat(transaction.debit) || 0;
+          const credit = parseFloat(transaction.credit) || 0;
+          
+          account.totalDebits += debit;
+          account.totalCredits += credit;
+          account.netChange += (debit - credit);
+        }
       });
       
       // For now, we'll set opening to 0 and closing to net change
@@ -421,7 +538,43 @@ const GLTransactions = () => {
       account.closingBalance = account.netChange;
     });
     
-    return grouped;
+    // Extract account codes and sort by them
+    const accountCodes = {};
+    const accountsWithoutCodes = {};
+    
+    Object.keys(grouped).forEach(accountKey => {
+      const account = grouped[accountKey];
+      if (account) {
+        // Extract account code (e.g., '172C00' from '172C00 Airbnb')
+        const match = accountKey.match(/^(\d+[A-Z]\d+)\s+(.*)/);
+        if (match) {
+          const code = match[1];
+          accountCodes[code] = accountKey;
+        } else {
+          // Handle accounts without codes - store separately
+          accountsWithoutCodes[accountKey] = accountKey;
+        }
+      }
+    });
+    
+    // Sort account codes first, then add accounts without codes
+    const sortedCodes = Object.keys(accountCodes).sort();
+    const sortedAccountsWithoutCodes = Object.keys(accountsWithoutCodes).sort();
+    
+    const filteredGrouped = {};
+    
+    // Add accounts with codes first (in sorted order)
+    sortedCodes.forEach(code => {
+      const accountKey = accountCodes[code];
+      filteredGrouped[accountKey] = grouped[accountKey];
+    });
+    
+    // Add accounts without codes at the end (in alphabetical order)
+    sortedAccountsWithoutCodes.forEach(accountKey => {
+      filteredGrouped[accountKey] = grouped[accountKey];
+    });
+    
+    return filteredGrouped;
   };
 
   // Fetch all transactions for grouping (separate from paginated view)
@@ -430,7 +583,7 @@ const GLTransactions = () => {
       const token = localStorage.getItem('token');
       if (!token) return;
 
-      const response = await axios.get(`/gl-transactions?per_page=10000&year=${filters.year}`, {
+      const response = await axios.get(`/gl-transactions?per_page=10000&year=${filters.year}&sort_field=id&sort_direction=asc`, {
         headers: { Authorization: `Bearer ${token}` }
       });
       
@@ -574,7 +727,7 @@ const GLTransactions = () => {
   return (
     <>
       <div className="container-fluid mt-4">
-      <style jsx>{`
+      <style>{`
         .cursor-pointer {
           cursor: pointer;
         }
@@ -984,6 +1137,34 @@ const GLTransactions = () => {
                       <i className={`fas ${groupByAccount ? 'fa-layer-group' : 'fa-list'}`}></i> 
                       {groupByAccount ? 'Grouped by Account' : 'Group by Account'}
                     </button>
+                    {groupByAccount && (
+                      <button
+                        className="btn btn-sm btn-outline-primary"
+                        onClick={() => {
+                          const allExpanded = {};
+                          const allCollapsed = {};
+                          const isAllExpanded = areAllAccountsExpanded();
+                          
+                          if (isAllExpanded) {
+                            // Collapse all
+                            setExpandedAccounts(allCollapsed);
+                          } else {
+                            // Expand all
+                            Object.keys(groupedTransactions).forEach(accountKey => {
+                              allExpanded[accountKey] = true;
+                            });
+                            setExpandedAccounts(allExpanded);
+                          }
+                        }}
+                        title={areAllAccountsExpanded() ? 
+                          "Collapse all accounts" : "Expand all accounts"}
+                      >
+                        <i className={`fas ${areAllAccountsExpanded() ? 
+                          'fa-compress-arrows-alt' : 'fa-expand-arrows-alt'}`}></i> 
+                        {areAllAccountsExpanded() ? 
+                          'Collapse All' : 'Expand All'}
+                      </button>
+                    )}
                     <div className="d-flex align-items-center gap-2 flex-wrap">
                       <div className="d-flex align-items-center gap-2">
                         <i className="fas fa-search text-muted"></i>
@@ -1079,7 +1260,7 @@ const GLTransactions = () => {
                       const actualTransactions = account.transactions.filter(transaction => 
                         transaction.reference !== 'Opening' && 
                         transaction.reference !== 'Change' && 
-                        transaction.reference !== 'Close' &&
+                        transaction.reference !== 'Closing' &&
                         transaction.source !== 'N/A' &&
                         transaction.source !== null &&
                         transaction.source !== undefined
@@ -1175,56 +1356,64 @@ const GLTransactions = () => {
                                           backgroundColor: '#212529 !important',
                                           fontWeight: 'bold',
                                           padding: '12px 8px',
-                                          fontSize: '14px'
+                                          fontSize: '14px',
+                                          textAlign: 'center'
                                         }}>ID</th>
                                         <th style={{ 
                                           color: '#ffffff !important', 
                                           backgroundColor: '#212529 !important',
                                           fontWeight: 'bold',
                                           padding: '12px 8px',
-                                          fontSize: '14px'
+                                          fontSize: '14px',
+                                          textAlign: 'center'
                                         }}>Date</th>
                                         <th style={{ 
                                           color: '#ffffff !important', 
                                           backgroundColor: '#212529 !important',
                                           fontWeight: 'bold',
                                           padding: '12px 8px',
-                                          fontSize: '14px'
+                                          fontSize: '14px',
+                                          textAlign: 'center'
                                         }}>Description</th>
                                         <th style={{ 
                                           color: '#ffffff !important', 
                                           backgroundColor: '#212529 !important',
                                           fontWeight: 'bold',
                                           padding: '12px 8px',
-                                          fontSize: '14px'
+                                          fontSize: '14px',
+                                          textAlign: 'center'
                                         }}>Reference</th>
                                         <th style={{ 
                                           color: '#ffffff !important', 
                                           backgroundColor: '#212529 !important',
                                           fontWeight: 'bold',
                                           padding: '12px 8px',
-                                          fontSize: '14px'
+                                          fontSize: '14px',
+                                          textAlign: 'center'
                                         }}>Type</th>
                                         <th style={{ 
                                           color: '#ffffff !important', 
                                           backgroundColor: '#212529 !important',
                                           fontWeight: 'bold',
                                           padding: '12px 8px',
-                                          fontSize: '14px'
+                                          fontSize: '14px',
+                                          textAlign: 'center'
                                         }}>Amount</th>
                                         <th style={{ 
                                           color: '#ffffff !important', 
                                           backgroundColor: '#212529 !important',
                                           fontWeight: 'bold',
                                           padding: '12px 8px',
-                                          fontSize: '14px'
+                                          fontSize: '14px',
+                                          textAlign: 'center'
                                         }}>D/C</th>
                                         <th style={{ 
                                           color: '#ffffff !important', 
                                           backgroundColor: '#212529 !important',
                                           fontWeight: 'bold',
                                           padding: '12px 8px',
-                                          fontSize: '14px'
+                                          fontSize: '14px',
+                                          textAlign: 'center'
                                         }}>Year</th>
                                         <th style={{ 
                                           color: '#ffffff !important', 
@@ -1232,10 +1421,10 @@ const GLTransactions = () => {
                                           fontWeight: 'bold',
                                           padding: '12px 8px',
                                           fontSize: '14px',
-                                          whiteSpace: 'nowrap',
-                                          overflow: 'hidden',
-                                          textOverflow: 'ellipsis',
-                                          maxWidth: '120px'
+                                          whiteSpace: 'normal',
+                                          wordWrap: 'break-word',
+                                          maxWidth: '150px',
+                                          textAlign: 'center'
                                         }} title="Bank Transaction ID">Bank Transaction ID</th>
                                       </tr>
                                     </thead>
@@ -1279,7 +1468,7 @@ const GLTransactions = () => {
                                         .filter(transaction => 
                                           transaction.reference !== 'Opening' && 
                                           transaction.reference !== 'Change' && 
-                                          transaction.reference !== 'Close' &&
+                                          transaction.reference !== 'Closing' &&
                                           transaction.source !== 'N/A' &&
                                           transaction.source !== null &&
                                           transaction.source !== undefined
@@ -1466,32 +1655,35 @@ const GLTransactions = () => {
                   <table className="table table-hover">
                     <thead className="table-dark">
                       <tr>
-                        <th>ID</th>
+                        <th style={{ textAlign: 'center' }}>ID</th>
                         <th 
                           className="cursor-pointer"
                           onClick={() => handleSort('date')}
+                          style={{ textAlign: 'center' }}
                         >
                           Date {sortField === 'date' && (sortDirection === 'asc' ? '↑' : '↓')}
                         </th>
                         <th 
                           className="cursor-pointer"
                           onClick={() => handleSort('name')}
+                          style={{ textAlign: 'center' }}
                         >
                           Description {sortField === 'name' && (sortDirection === 'asc' ? '↑' : '↓')}
                         </th>
-                        <th>Reference</th>
-                        <th>Type</th>
-                        <th>Account</th>
+                        <th style={{ textAlign: 'center' }}>Reference</th>
+                        <th style={{ textAlign: 'center' }}>Type</th>
+                        <th style={{ textAlign: 'center' }}>Account</th>
                         <th 
                           className="cursor-pointer"
                           onClick={() => handleSort('amount')}
+                          style={{ textAlign: 'center' }}
                         >
                           Amount {sortField === 'amount' && (sortDirection === 'asc' ? '↑' : '↓')}
                         </th>
-                        <th>D/C</th>
-                        <th>Year</th>
-                        <th style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '120px' }} title="Bank Transaction ID">Bank Transaction ID</th>
-                        <th>File</th>
+                        <th style={{ textAlign: 'center' }}>D/C</th>
+                        <th style={{ textAlign: 'center' }}>Year</th>
+                        <th style={{ whiteSpace: 'normal', wordWrap: 'break-word', maxWidth: '150px', textAlign: 'center' }} title="Bank Transaction ID">Bank Transaction ID</th>
+                        <th style={{ textAlign: 'center' }}>File</th>
                       </tr>
                     </thead>
                     <tbody>
