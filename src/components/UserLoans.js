@@ -9,6 +9,7 @@ const UserLoans = () => {
   const [showAddBalance, setShowAddBalance] = useState(false);
   const [selectedLoan, setSelectedLoan] = useState(null);
   const [activeTab, setActiveTab] = useState(0);
+  const [showOverview, setShowOverview] = useState(true);
   const [balanceForm, setBalanceForm] = useState({
     balance: '',
     date_entered: new Date().toISOString().split('T')[0],
@@ -175,12 +176,21 @@ const UserLoans = () => {
         <div className="col-12">
           <div className="d-flex justify-content-between align-items-center mb-4">
             <h2><i className="fas fa-credit-card me-2"></i>My Loans</h2>
-            <button 
-              className="btn btn-primary"
-              onClick={() => setShowAddBalance(true)}
-            >
-              <i className="fas fa-plus me-2"></i>Add Balance
-            </button>
+            <div className="d-flex gap-2">
+              <button 
+                className="btn btn-outline-secondary"
+                onClick={() => setShowOverview(!showOverview)}
+              >
+                <i className={`fas ${showOverview ? 'fa-eye-slash' : 'fa-eye'} me-2`}></i>
+                {showOverview ? 'Hide' : 'Show'} Overview
+              </button>
+              <button 
+                className="btn btn-primary"
+                onClick={() => setShowAddBalance(true)}
+              >
+                <i className="fas fa-plus me-2"></i>Add Balance
+              </button>
+            </div>
           </div>
 
           {error && (
@@ -190,7 +200,7 @@ const UserLoans = () => {
           )}
 
           {/* Loans Overview Panel */}
-          {loans.length > 0 && (
+          {loans.length > 0 && showOverview && (
             <div className="card mb-4">
               <div className="card-header">
                 <h5 className="mb-0"><i className="fas fa-chart-pie me-2"></i>Loans Overview</h5>
