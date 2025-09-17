@@ -210,21 +210,6 @@ const UserLoans = () => {
                             <p className="card-text mb-1">
                               <small className="text-muted">Lender:</small> {loan.lender}
                             </p>
-                            <p className="card-text mb-1">
-                              <small className="text-muted">Type:</small> {loan.loan_type}
-                            </p>
-                            <p className="card-text mb-1">
-                              <small className="text-muted">Principal:</small> {formatCurrency(loan.principal_amount)}
-                            </p>
-                            <p className="card-text mb-1">
-                              <small className="text-muted">Interest Rate:</small> {loan.interest_rate ? `${loan.interest_rate}%` : 'N/A'}
-                            </p>
-                            <p className="card-text mb-1">
-                              <small className="text-muted">Term:</small> {loan.term_years ? `${loan.term_years} years` : 'N/A'}
-                            </p>
-                            <p className="card-text mb-1">
-                              <small className="text-muted">Monthly Payment:</small> {formatCurrency(loan.monthly_payment)}
-                            </p>
                             <hr className="my-2" />
                             <div className="d-flex justify-content-between align-items-center">
                               <div>
