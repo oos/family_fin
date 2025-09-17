@@ -9,7 +9,7 @@ const UserLoans = () => {
   const [showAddBalance, setShowAddBalance] = useState(false);
   const [selectedLoan, setSelectedLoan] = useState(null);
   const [activeTab, setActiveTab] = useState(0);
-  const [showOverview, setShowOverview] = useState(true);
+  const [showOverview, setShowOverview] = useState(false);
   const [balanceForm, setBalanceForm] = useState({
     balance: '',
     date_entered: new Date().toISOString().split('T')[0],
