@@ -29,6 +29,24 @@ const FinancialOverview = ({
     ).length;
   };
 
+  const getBestEverComparison = (itemId) => {
+    const itemBalances = balances.filter(b => 
+      type === 'loans' ? b.loan_id === itemId : b.account_id === itemId
+    ).sort((a, b) => new Date(b.date_entered) - new Date(a.date_entered));
+    
+    if (itemBalances.length === 0) return null;
+    
+    // Find the best balance (highest)
+    const bestBalance = itemBalances.reduce((best, current) => 
+      current.balance > best.balance ? current : best
+    );
+    
+    // Get the most recent balance
+    const currentBalance = itemBalances[0];
+    
+    return currentBalance.balance - bestBalance.balance;
+  };
+
   const formatCurrency = (amount) => {
     if (amount === null || amount === undefined || isNaN(amount)) {
       return 'Not set';
@@ -37,6 +55,24 @@ const FinancialOverview = ({
       style: 'currency',
       currency: 'EUR'
     }).format(amount);
+  };
+
+  const formatComparison = (amount) => {
+    if (amount === null || amount === undefined || isNaN(amount)) {
+      return { value: '-', isPositive: false, isNegative: false, isZero: true };
+    }
+    const formatted = new Intl.NumberFormat('en-IE', {
+      style: 'currency',
+      currency: 'EUR',
+      signDisplay: 'always'
+    }).format(amount);
+    
+    return {
+      value: formatted,
+      isPositive: amount > 0,
+      isNegative: amount < 0,
+      isZero: amount === 0
+    };
   };
 
   if (!items || items.length === 0) {
@@ -60,6 +96,8 @@ const FinancialOverview = ({
           const currentBalance = getCurrentBalance(item.id);
           const lastUpdated = getLastUpdated(item.id);
           const balanceCount = getBalanceCount(item.id);
+          const bestEverComparison = getBestEverComparison(item.id);
+          const comparison = formatComparison(bestEverComparison);
           
           return (
             <div key={item.id} className="col-md-6 col-lg-4 mb-3">
@@ -74,27 +112,39 @@ const FinancialOverview = ({
                     </small> {type === 'loans' ? item.lender : item.account_number}
                   </p>
                   <hr className="my-2" />
-                  <div className="d-flex justify-content-between align-items-center">
-                    <div>
-                      <small className="text-muted">Current Balance:</small><br />
-                      <span className={`fw-bold ${currentBalance ? colorClass : 'text-muted'}`}>
-                        {currentBalance ? formatCurrency(currentBalance) : 'Not set'}
+                  <div className="mb-2">
+                    <small className="text-muted">Current Balance:</small><br />
+                    <span className={`fw-bold ${currentBalance ? colorClass : 'text-muted'}`}>
+                      {currentBalance ? formatCurrency(currentBalance) : 'Not set'}
+                    </span>
+                  </div>
+                  {bestEverComparison !== null && (
+                    <div className="mb-2">
+                      <small className="text-muted">Better/Worse than Best Ever:</small><br />
+                      <span className={`fw-bold ${
+                        comparison.isPositive ? 'text-success' : 
+                        comparison.isNegative ? 'text-danger' : 
+                        'text-warning'
+                      }`}>
+                        {comparison.value}
                       </span>
                     </div>
-                    <div className="text-end">
+                  )}
+                  <div className="d-flex justify-content-between align-items-center">
+                    <div>
                       <small className="text-muted">Entries:</small><br />
                       <span className={`badge ${colorClass === 'text-danger' ? 'bg-danger' : 'bg-success'}`}>
                         {balanceCount}
                       </span>
                     </div>
+                    {lastUpdated && (
+                      <div className="text-end">
+                        <small className="text-muted">
+                          Last updated: {new Date(lastUpdated).toLocaleDateString()}
+                        </small>
+                      </div>
+                    )}
                   </div>
-                  {lastUpdated && (
-                    <div className="mt-2">
-                      <small className="text-muted">
-                        Last updated: {new Date(lastUpdated).toLocaleDateString()}
-                      </small>
-                    </div>
-                  )}
                 </div>
               </div>
             </div>
