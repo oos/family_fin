@@ -9,6 +9,7 @@ const UserAccounts = () => {
   const [showAddBalance, setShowAddBalance] = useState(false);
   const [selectedAccount, setSelectedAccount] = useState(null);
   const [activeTab, setActiveTab] = useState(0);
+  const [showOverview, setShowOverview] = useState(true);
   const [balanceForm, setBalanceForm] = useState({
     balance: '',
     date_entered: new Date().toISOString().split('T')[0],
@@ -175,12 +176,21 @@ const UserAccounts = () => {
         <div className="col-12">
           <div className="d-flex justify-content-between align-items-center mb-4">
             <h2><i className="fas fa-university me-2"></i>My Bank Accounts</h2>
-            <button 
-              className="btn btn-primary"
-              onClick={() => setShowAddBalance(true)}
-            >
-              <i className="fas fa-plus me-2"></i>Add Balance
-            </button>
+            <div className="d-flex gap-2">
+              <button 
+                className="btn btn-outline-secondary"
+                onClick={() => setShowOverview(!showOverview)}
+              >
+                <i className={`fas ${showOverview ? 'fa-eye-slash' : 'fa-eye'} me-2`}></i>
+                {showOverview ? 'Hide' : 'Show'} Overview
+              </button>
+              <button 
+                className="btn btn-primary"
+                onClick={() => setShowAddBalance(true)}
+              >
+                <i className="fas fa-plus me-2"></i>Add Balance
+              </button>
+            </div>
           </div>
 
           {error && (
@@ -190,7 +200,7 @@ const UserAccounts = () => {
           )}
 
           {/* Bank Accounts Overview Panel */}
-          {accounts.length > 0 && (
+          {accounts.length > 0 && showOverview && (
             <div className="card mb-4">
               <div className="card-header">
                 <h5 className="mb-0"><i className="fas fa-chart-pie me-2"></i>Bank Accounts Overview</h5>
@@ -208,16 +218,7 @@ const UserAccounts = () => {
                           <div className="card-body">
                             <h6 className="card-title text-success">{account.account_name}</h6>
                             <p className="card-text mb-1">
-                              <small className="text-muted">Bank:</small> {account.bank_name}
-                            </p>
-                            <p className="card-text mb-1">
                               <small className="text-muted">Account Number:</small> {account.account_number}
-                            </p>
-                            <p className="card-text mb-1">
-                              <small className="text-muted">Currency:</small> {account.currency || 'EUR'}
-                            </p>
-                            <p className="card-text mb-1">
-                              <small className="text-muted">Type:</small> {account.account_type || 'N/A'}
                             </p>
                             <hr className="my-2" />
                             <div className="d-flex justify-content-between align-items-center">
