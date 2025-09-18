@@ -5,7 +5,12 @@ from flask_migrate import Migrate
 from werkzeug.security import generate_password_hash, check_password_hash
 import hashlib
 from datetime import datetime, timedelta
-import pandas as pd
+try:
+    import pandas as pd
+    PANDAS_AVAILABLE = True
+except ImportError:
+    PANDAS_AVAILABLE = False
+    print("Warning: pandas not available - some features will be disabled")
 import json
 import re
 import math
@@ -3742,6 +3747,8 @@ def format_file_size(bytes):
 
 def process_pdf_file(file):
     """Process PDF file and extract tabular data"""
+    if not PANDAS_AVAILABLE:
+        return {"error": "PDF processing requires pandas, which is not available"}
     try:
         # Reset file pointer
         file.seek(0)
@@ -3899,6 +3906,8 @@ def process_pdf_file(file):
 @jwt_required()
 def upload_tax_return():
     """Upload a tax return CSV file"""
+    if not PANDAS_AVAILABLE:
+        return jsonify({'error': 'File upload requires pandas, which is not available'}), 400
     try:
         current_user_id = int(get_jwt_identity())
         
@@ -5409,6 +5418,8 @@ class TransactionCategoryPredictor:
     
     def extract_features(self, transaction):
         """Extract features from a bank transaction for ML prediction"""
+        if not PANDAS_AVAILABLE:
+            return {}
         features = {}
         
         # Text features from description
@@ -5466,6 +5477,8 @@ class TransactionCategoryPredictor:
     
     def train_model(self, user_id, incremental=False):
         """Train the ML model on matched transaction data"""
+        if not PANDAS_AVAILABLE:
+            return {"error": "ML training requires pandas, which is not available"}
         import time
         start_time = time.time()
         
@@ -5602,6 +5615,8 @@ class TransactionCategoryPredictor:
     
     def predict_category(self, transaction):
         """Predict category for a single transaction"""
+        if not PANDAS_AVAILABLE:
+            return None
         if not self.is_trained or not self.model:
             return None, 0.0
         
