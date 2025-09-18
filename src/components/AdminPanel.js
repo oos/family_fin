@@ -71,12 +71,18 @@ const AdminPanel = () => {
     const order = [
       'omarosullivan@gmail.com',    // Omar
       'heidiosullivan@gmail.com',   // Heidi
-      'seanosullivan@gmail.com',    // Sean O
+      'sean.osullivan@gmail.com',   // Sean (corrected email)
       'dwayneosullivan@gmail.com',  // Dwayne
       'lenamosulivan@gmail.com'     // Lena
     ];
     
-    return users.sort((a, b) => {
+    // Filter out test users and duplicates, only show real users
+    const realUsers = users.filter((user, index, self) => 
+      !user.email.includes('test@example.com') && // Exclude test users
+      index === self.findIndex(u => u.email === user.email) // Remove duplicates
+    );
+    
+    return realUsers.sort((a, b) => {
       const aIndex = order.indexOf(a.email);
       const bIndex = order.indexOf(b.email);
       

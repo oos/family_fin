@@ -11,11 +11,18 @@ const UserAccounts = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [showAddBalance, setShowAddBalance] = useState(false);
+  const [showEditBalance, setShowEditBalance] = useState(false);
   const [selectedAccount, setSelectedAccount] = useState(null);
+  const [editingBalance, setEditingBalance] = useState(null);
   const [activeTab, setActiveTab] = useState(0);
   const [balanceForm, setBalanceForm] = useState({
     balance: '',
     date_entered: new Date().toISOString().split('T')[0],
+    notes: ''
+  });
+  const [editBalanceForm, setEditBalanceForm] = useState({
+    balance: '',
+    date_entered: '',
     notes: ''
   });
 
@@ -123,16 +130,63 @@ const UserAccounts = () => {
   };
 
   const handleEditBalanceEntry = (balance) => {
-    // TODO: Implement edit balance entry functionality
-    console.log('Edit balance entry:', balance);
-    alert('Edit balance entry functionality will be implemented');
+    setEditingBalance(balance);
+    setEditBalanceForm({
+      balance: balance.balance.toString(),
+      date_entered: balance.date_entered,
+      notes: balance.notes || ''
+    });
+    setShowEditBalance(true);
   };
 
-  const handleDeleteBalanceEntry = (balance) => {
-    if (window.confirm(`Are you sure you want to delete this balance entry?`)) {
-      // TODO: Implement delete balance entry functionality
-      console.log('Delete balance entry:', balance);
-      alert('Delete balance entry functionality will be implemented');
+  const handleEditBalanceSubmit = async (e) => {
+    e.preventDefault();
+    if (!editingBalance) return;
+
+    try {
+      const response = await axios.put(`/api/account-balances/${editingBalance.id}`, {
+        balance: parseFloat(editBalanceForm.balance),
+        date_entered: editBalanceForm.date_entered,
+        notes: editBalanceForm.notes
+      });
+
+      if (response.data.success) {
+        // Update the balances state
+        setBalances(balances.map(balance => 
+          balance.id === editingBalance.id 
+            ? { ...balance, ...editBalanceForm, balance: parseFloat(editBalanceForm.balance) }
+            : balance
+        ));
+        
+        setShowEditBalance(false);
+        setEditingBalance(null);
+        setEditBalanceForm({ balance: '', date_entered: '', notes: '' });
+        alert('Balance entry updated successfully!');
+      } else {
+        alert('Error updating balance entry: ' + response.data.message);
+      }
+    } catch (error) {
+      console.error('Error updating balance entry:', error);
+      alert('Error updating balance entry. Please try again.');
+    }
+  };
+
+  const handleDeleteBalanceEntry = async (balance) => {
+    if (window.confirm(`Are you sure you want to delete this balance entry for ${balance.account_name || 'this account'}?`)) {
+      try {
+        const response = await axios.delete(`/api/account-balances/${balance.id}`);
+
+        if (response.data.success) {
+          // Remove the balance from the state
+          setBalances(balances.filter(b => b.id !== balance.id));
+          alert('Balance entry deleted successfully!');
+        } else {
+          alert('Error deleting balance entry: ' + response.data.message);
+        }
+      } catch (error) {
+        console.error('Error deleting balance entry:', error);
+        alert('Error deleting balance entry. Please try again.');
+      }
     }
   };
 
@@ -310,25 +364,6 @@ const UserAccounts = () => {
                               {getLastUpdated(account.id) ? new Date(getLastUpdated(account.id)).toLocaleDateString() : 'Never'}
                             </span>
                           </div>
-                          <div className="col-md-2">
-                            <small className="text-muted"><strong>Actions:</strong></small><br />
-                            <div className="btn-group btn-group-sm" role="group">
-                              <button 
-                                className="btn btn-outline-primary btn-sm"
-                                onClick={() => handleEditAccount(account)}
-                                title="Edit Account"
-                              >
-                                ✏️
-                              </button>
-                              <button 
-                                className="btn btn-outline-danger btn-sm"
-                                onClick={() => handleDeleteAccount(account)}
-                                title="Delete Account"
-                              >
-                                🗑️
-                              </button>
-                            </div>
-                          </div>
                         </div>
                       </div>
 
@@ -460,6 +495,92 @@ const UserAccounts = () => {
                   </button>
                   <button type="submit" className="btn btn-success">
                     Save Balance
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Edit Balance Modal */}
+      {showEditBalance && editingBalance && (
+        <div className="modal show d-block" style={{ 
+          backgroundColor: 'rgba(0,0,0,0.5)', 
+          position: 'fixed', 
+          top: 0, 
+          left: 0, 
+          width: '100%', 
+          height: '100%', 
+          zIndex: 1050,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center'
+        }}>
+          <div className="modal-dialog modal-dialog-centered">
+            <div className="modal-content">
+              <div className="modal-header">
+                <h5 className="modal-title">Edit Balance Entry</h5>
+                <button 
+                  type="button" 
+                  className="btn-close" 
+                  onClick={() => setShowEditBalance(false)}
+                ></button>
+              </div>
+              <form onSubmit={handleEditBalanceSubmit}>
+                <div className="modal-body">
+                  <div className="alert alert-info">
+                    <strong>Account:</strong> {editingBalance.account_name || 'N/A'}<br />
+                    <strong>Bank:</strong> {editingBalance.bank_name || 'N/A'}
+                  </div>
+                  
+                  <div className="mb-3">
+                    <label htmlFor="editBalance" className="form-label">Current Balance *</label>
+                    <input
+                      type="number"
+                      step="0.01"
+                      className="form-control"
+                      id="editBalance"
+                      value={editBalanceForm.balance}
+                      onChange={(e) => setEditBalanceForm({...editBalanceForm, balance: e.target.value})}
+                      required
+                    />
+                  </div>
+                  
+                  <div className="mb-3">
+                    <label htmlFor="editDate" className="form-label">Date *</label>
+                    <input
+                      type="date"
+                      className="form-control"
+                      id="editDate"
+                      value={editBalanceForm.date_entered}
+                      onChange={(e) => setEditBalanceForm({...editBalanceForm, date_entered: e.target.value})}
+                      required
+                    />
+                  </div>
+                  
+                  <div className="mb-3">
+                    <label htmlFor="editNotes" className="form-label">Notes</label>
+                    <textarea
+                      className="form-control"
+                      id="editNotes"
+                      rows="3"
+                      value={editBalanceForm.notes}
+                      onChange={(e) => setEditBalanceForm({...editBalanceForm, notes: e.target.value})}
+                      placeholder="Optional notes about this balance update..."
+                    />
+                  </div>
+                </div>
+                <div className="modal-footer">
+                  <button 
+                    type="button" 
+                    className="btn btn-secondary" 
+                    onClick={() => setShowEditBalance(false)}
+                  >
+                    Cancel
+                  </button>
+                  <button type="submit" className="btn btn-success">
+                    Update Balance
                   </button>
                 </div>
               </form>
