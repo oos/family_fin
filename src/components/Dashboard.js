@@ -4,7 +4,7 @@ import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContaine
 import { formatCurrency, formatNumber, getChartConfig } from '../utils/chartConfig';
 import FinancialOverview from './FinancialOverview';
 
-function Dashboard() {
+function Dashboard({ currentUser }) {
   const [summary, setSummary] = useState(null);
   const [properties, setProperties] = useState([]);
   const [income, setIncome] = useState([]);
@@ -106,6 +106,12 @@ function Dashboard() {
     return getTotalAccountBalance() - getTotalLoanBalance();
   };
 
+  // Check if current user is Sean (either email)
+  const isSeanUser = currentUser && (
+    currentUser.email === 'seanosullivan@gmail.com' || 
+    currentUser.email === 'sean.osullivan@gmail.com'
+  );
+
   if (loading) {
     return <div className="loading">Loading dashboard...</div>;
   }
@@ -168,8 +174,108 @@ function Dashboard() {
 
   return (
     <div>
-      <h1 style={{ marginTop: '0', marginBottom: '1rem' }}>Dashboard</h1>
-      
+      {/* Conditional Layout - New layout only for Sean */}
+      {isSeanUser ? (
+        <>
+          {/* Net Position Summary - Full width at the very top */}
+          <div className="row mb-4">
+            <div className="col-12">
+              <div className="card" style={{ backgroundColor: '#f8f9fa', border: '2px solid #dee2e6' }}>
+                <div className="card-body text-center">
+                  <h4 className="mb-3">Net Financial Position</h4>
+                  <div className="row">
+                    <div className="col-md-4">
+                      <h6 className="text-muted">Total Cash</h6>
+                      <h4 className="text-success">{formatCurrency(getTotalAccountBalance())}</h4>
+                    </div>
+                    <div className="col-md-4">
+                      <h6 className="text-muted">Total Debt</h6>
+                      <h4 className="text-danger">{formatCurrency(getTotalLoanBalance())}</h4>
+                    </div>
+                    <div className="col-md-4">
+                      <h6 className="text-muted">Net Position</h6>
+                      <h3 className={getNetPosition() >= 0 ? 'text-success' : 'text-danger'}>
+                        {formatCurrency(getNetPosition())}
+                      </h3>
+                      <small className="text-muted">
+                        {getNetPosition() >= 0 ? 'Positive (Cash > Debt)' : 'Negative (Debt > Cash)'}
+                      </small>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <h1 style={{ marginTop: '0', marginBottom: '1rem' }}>Dashboard</h1>
+
+          {/* Financial Position Overview - Split into two panels */}
+          <div className="row" style={{ marginBottom: '20px' }}>
+            {/* Left Panel - Bank Accounts & Cash */}
+            <div className="col-md-6">
+              <div className="card h-100" style={{ border: '2px solid #28a745' }}>
+                <div className="card-header" style={{ backgroundColor: '#d4edda', borderBottom: '1px solid #28a745' }}>
+                  <h3 className="mb-0 text-success">
+                    <span className="me-2" style={{ fontSize: '1.2em' }}>🏦</span>Bank Accounts & Cash
+                  </h3>
+                </div>
+                <div className="card-body">
+                  <FinancialOverview
+                    type="accounts"
+                    items={accounts}
+                    balances={accountBalances}
+                    title=""
+                    icon=""
+                    colorClass="text-success"
+                    borderClass="border-success"
+                    showHistory={false}
+                    showViewButton={true}
+                  />
+                  <div className="mt-3 pt-3" style={{ borderTop: '1px solid #dee2e6' }}>
+                    <div className="text-center">
+                      <h6 className="text-muted">Total Cash</h6>
+                      <h4 className="text-success">{formatCurrency(getTotalAccountBalance())}</h4>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Right Panel - Loans & Debt */}
+            <div className="col-md-6">
+              <div className="card h-100" style={{ border: '2px solid #dc3545' }}>
+                <div className="card-header" style={{ backgroundColor: '#f8d7da', borderBottom: '1px solid #dc3545' }}>
+                  <h3 className="mb-0 text-danger">
+                    <span className="me-2" style={{ fontSize: '1.2em' }}>💳</span>Loans & Debt
+                  </h3>
+                </div>
+                <div className="card-body">
+                  <FinancialOverview
+                    type="loans"
+                    items={loans}
+                    balances={loanBalances}
+                    title=""
+                    icon=""
+                    colorClass="text-danger"
+                    borderClass="border-danger"
+                    showHistory={false}
+                    showViewButton={true}
+                  />
+                  <div className="mt-3 pt-3" style={{ borderTop: '1px solid #dee2e6' }}>
+                    <div className="text-center">
+                      <h6 className="text-muted">Total Debt</h6>
+                      <h4 className="text-danger">{formatCurrency(getTotalLoanBalance())}</h4>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </>
+      ) : (
+        <h1 style={{ marginTop: '0', marginBottom: '1rem' }}>Dashboard</h1>
+      )}
+
       {/* Summary Cards - Single Row */}
       <div className="dashboard-single-row">
         <div className="dashboard-card">
@@ -195,64 +301,6 @@ function Dashboard() {
         <div className="dashboard-card">
           <h3>Properties Count</h3>
           <div className="value">{properties.length}</div>
-        </div>
-      </div>
-
-      {/* Financial Position Overview */}
-      <div className="card" style={{ marginBottom: '20px' }}>
-        <h3>Current Financial Position</h3>
-        <div className="row">
-          {/* Loans Section */}
-          <FinancialOverview
-            type="loans"
-            items={loans}
-            balances={loanBalances}
-            title="Loans & Debt"
-            icon="fa-credit-card"
-            colorClass="text-danger"
-            borderClass="border-danger"
-          />
-
-          {/* Bank Accounts Section */}
-          <FinancialOverview
-            type="accounts"
-            items={accounts}
-            balances={accountBalances}
-            title="Bank Accounts & Cash"
-            icon="fa-university"
-            colorClass="text-success"
-            borderClass="border-success"
-          />
-        </div>
-
-        {/* Net Position Summary */}
-        <div className="row mt-4">
-          <div className="col-12">
-            <div className="card" style={{ backgroundColor: '#f8f9fa', border: '2px solid #dee2e6' }}>
-              <div className="card-body text-center">
-                <h4 className="mb-3">Net Financial Position</h4>
-                <div className="row">
-                  <div className="col-md-4">
-                    <h6 className="text-muted">Total Cash</h6>
-                    <h4 className="text-success">{formatCurrency(getTotalAccountBalance())}</h4>
-                  </div>
-                  <div className="col-md-4">
-                    <h6 className="text-muted">Total Debt</h6>
-                    <h4 className="text-danger">{formatCurrency(getTotalLoanBalance())}</h4>
-                  </div>
-                  <div className="col-md-4">
-                    <h6 className="text-muted">Net Position</h6>
-                    <h3 className={getNetPosition() >= 0 ? 'text-success' : 'text-danger'}>
-                      {formatCurrency(getNetPosition())}
-                    </h3>
-                    <small className="text-muted">
-                      {getNetPosition() >= 0 ? 'Positive (Cash > Debt)' : 'Negative (Debt > Cash)'}
-                    </small>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
         </div>
       </div>
 

@@ -62,7 +62,7 @@ app.config['JWT_SECRET_KEY'] = os.getenv('JWT_SECRET_KEY', 'jwt-secret-string')
 app.config['JWT_ACCESS_TOKEN_EXPIRES'] = timedelta(hours=24)
 
 # Import models and db
-from models import db, User, Person, Property, Income, Loan, Family, BusinessAccount, Pension, PensionAccount, LoanERC, LoanPayment, BankTransaction, AirbnbBooking, DashboardSettings, AccountBalance, TaxReturn, TaxReturnTransaction, TransactionMatch, TransactionLearningPattern, TransactionCategoryPrediction, ModelTrainingHistory, TransactionCategory, AppSettings, UserLoanAccess, UserAccountAccess
+from models import db, User, Person, Property, Income, Loan, Family, BusinessAccount, Pension, PensionAccount, LoanERC, LoanPayment, BankTransaction, AirbnbBooking, DashboardSettings, AccountBalance, TaxReturn, TaxReturnTransaction, TransactionMatch, TransactionLearningPattern, TransactionCategoryPrediction, ModelTrainingHistory, TransactionCategory, AppSettings, UserLoanAccess, UserAccountAccess, UserPropertyAccess, UserIncomeAccess, UserPensionAccess
 
 # Initialize extensions
 db.init_app(app)
@@ -73,10 +73,6 @@ CORS(app,
      methods=['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
      allow_headers=['Content-Type', 'Authorization'],
      supports_credentials=True)
-
-@app.route('/api/health', methods=['GET'])
-def health_check():
-    return jsonify({'status': 'healthy', 'message': 'Family Finance API is running'})
 
 @app.route('/api/auth/login', methods=['POST'])
 def login():
@@ -92,7 +88,7 @@ def login():
         (User.username == username) | (User.email == username)
     ).first()
     
-    if user and user.check_password(password) and user.is_active:
+    if user and user.password == password and user.is_active:
         access_token = create_access_token(identity=str(user.id))
         return jsonify({
             'access_token': access_token,
@@ -103,6 +99,11 @@ def login():
         }), 200
     
     return jsonify({'message': 'Invalid credentials'}), 401
+
+@app.route('/api/health', methods=['GET'])
+def health_check():
+    """Health check endpoint for production deployment"""
+    return jsonify({'status': 'healthy', 'message': 'Family Finance API is running'}), 200
 
 @app.route('/api/people', methods=['GET'])
 @jwt_required()
@@ -214,7 +215,10 @@ def get_properties():
     properties = Property.query.all()
     loans = Loan.query.all()
     loans_data = [loan.to_dict() for loan in loans]
-    return jsonify([property.to_dict(loans_data) for property in properties])
+    return jsonify({
+        'success': True,
+        'properties': [property.to_dict(loans_data) for property in properties]
+    })
 
 @app.route('/api/properties', methods=['POST'])
 @jwt_required()
@@ -353,7 +357,10 @@ def delete_business_account(account_id):
 @jwt_required()
 def get_income():
     income_records = Income.query.all()
-    return jsonify([income.to_dict() for income in income_records])
+    return jsonify({
+        'success': True,
+        'incomes': [income.to_dict() for income in income_records]
+    })
 
 @app.route('/api/income', methods=['POST'])
 @jwt_required()
@@ -400,13 +407,38 @@ def get_loans():
     current_user = User.query.filter_by(id=current_user_id).first()
     
     if current_user.role == 'admin':
-        # Admin sees all loans
-        loans = Loan.query.all()
+        # Admin sees all loans, ordered by name with BOI first, HTB UK second, etc.
+        loans = Loan.query.order_by(
+            db.case(
+                (Loan.loan_name == 'BOI (mortgage)', 1),
+                (Loan.loan_name == 'HTB UK (mortgage)', 2),
+                (Loan.loan_name == 'Linked Finance 2025', 3),
+                (Loan.loan_name == 'JO\'R', 4),
+                (Loan.loan_name == 'Dad (personal)', 5),
+                (Loan.loan_name == 'Om (personal)', 6),
+                else_=7
+            ),
+            Loan.loan_name
+        ).all()
     else:
         # Regular users see only loans they have access to
         user_loan_access = UserLoanAccess.query.filter_by(user_id=current_user_id).all()
         loan_ids = [access.loan_id for access in user_loan_access]
-        loans = Loan.query.filter(Loan.id.in_(loan_ids)).all() if loan_ids else []
+        if loan_ids:
+            loans = Loan.query.filter(Loan.id.in_(loan_ids)).order_by(
+                db.case(
+                    (Loan.loan_name == 'BOI (mortgage)', 1),
+                    (Loan.loan_name == 'HTB UK (mortgage)', 2),
+                    (Loan.loan_name == 'Linked Finance 2025', 3),
+                    (Loan.loan_name == 'JO\'R', 4),
+                    (Loan.loan_name == 'Dad (personal)', 5),
+                    (Loan.loan_name == 'Om (personal)', 6),
+                    else_=7
+                ),
+                Loan.loan_name
+            ).all()
+        else:
+            loans = []
     
     return jsonify({
         'success': True,
@@ -731,7 +763,10 @@ def delete_pension(pension_id):
 @jwt_required()
 def get_pension_accounts():
     accounts = PensionAccount.query.all()
-    return jsonify([account.to_dict() for account in accounts])
+    return jsonify({
+        'success': True,
+        'pensions': [account.to_dict() for account in accounts]
+    })
 
 @app.route('/api/pension-accounts', methods=['POST'])
 @jwt_required()
@@ -2475,6 +2510,255 @@ def update_user_account_access(user_id):
         return jsonify({
             'success': False,
             'message': f'Failed to update user account access: {str(e)}'
+        }), 500
+
+@app.route('/api/user-access/properties/<int:user_id>', methods=['GET'])
+@jwt_required()
+def get_user_property_access(user_id):
+    """Get property access permissions for a specific user (admin only)"""
+    try:
+        current_user_id = int(get_jwt_identity())
+        current_user = User.query.filter_by(id=current_user_id).first()
+        
+        if not current_user or current_user.role != 'admin':
+            return jsonify({
+                'success': False,
+                'message': 'Admin access required'
+            }), 403
+        
+        # Get all properties
+        all_properties = Property.query.all()
+        
+        # Get user's current property access
+        user_property_access = UserPropertyAccess.query.filter_by(user_id=user_id).all()
+        user_property_ids = {access.property_id for access in user_property_access}
+        
+        # Format response
+        properties_data = []
+        for property in all_properties:
+            properties_data.append({
+                'id': property.id,
+                'nickname': property.nickname,
+                'address': property.address,
+                'valuation': property.valuation,
+                'has_access': property.id in user_property_ids
+            })
+        
+        return jsonify({
+            'success': True,
+            'properties': properties_data
+        })
+        
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'message': f'Failed to get user property access: {str(e)}'
+        }), 500
+
+@app.route('/api/user-access/properties/<int:user_id>', methods=['POST'])
+@jwt_required()
+def update_user_property_access(user_id):
+    """Update property access permissions for a specific user (admin only)"""
+    try:
+        current_user_id = int(get_jwt_identity())
+        current_user = User.query.filter_by(id=current_user_id).first()
+        
+        if not current_user or current_user.role != 'admin':
+            return jsonify({
+                'success': False,
+                'message': 'Admin access required'
+            }), 403
+        
+        data = request.get_json()
+        property_ids = data.get('property_ids', [])
+        
+        # Remove existing access
+        UserPropertyAccess.query.filter_by(user_id=user_id).delete()
+        
+        # Add new access
+        for property_id in property_ids:
+            access = UserPropertyAccess(user_id=user_id, property_id=property_id)
+            db.session.add(access)
+        
+        db.session.commit()
+        
+        return jsonify({
+            'success': True,
+            'message': 'Property access updated successfully'
+        })
+        
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({
+            'success': False,
+            'message': f'Failed to update user property access: {str(e)}'
+        }), 500
+
+@app.route('/api/user-access/income/<int:user_id>', methods=['GET'])
+@jwt_required()
+def get_user_income_access(user_id):
+    """Get income access permissions for a specific user (admin only)"""
+    try:
+        current_user_id = int(get_jwt_identity())
+        current_user = User.query.filter_by(id=current_user_id).first()
+        
+        if not current_user or current_user.role != 'admin':
+            return jsonify({
+                'success': False,
+                'message': 'Admin access required'
+            }), 403
+        
+        # Get all income records
+        all_incomes = Income.query.all()
+        
+        # Get user's current income access
+        user_income_access = UserIncomeAccess.query.filter_by(user_id=user_id).all()
+        user_income_ids = {access.income_id for access in user_income_access}
+        
+        # Format response
+        incomes_data = []
+        for income in all_incomes:
+            incomes_data.append({
+                'id': income.id,
+                'person_name': income.person.name if income.person else None,
+                'income_type': income.income_type,
+                'income_category': income.income_category,
+                'amount_yearly': income.amount_yearly,
+                'has_access': income.id in user_income_ids
+            })
+        
+        return jsonify({
+            'success': True,
+            'incomes': incomes_data
+        })
+        
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'message': f'Failed to get user income access: {str(e)}'
+        }), 500
+
+@app.route('/api/user-access/income/<int:user_id>', methods=['POST'])
+@jwt_required()
+def update_user_income_access(user_id):
+    """Update income access permissions for a specific user (admin only)"""
+    try:
+        current_user_id = int(get_jwt_identity())
+        current_user = User.query.filter_by(id=current_user_id).first()
+        
+        if not current_user or current_user.role != 'admin':
+            return jsonify({
+                'success': False,
+                'message': 'Admin access required'
+            }), 403
+        
+        data = request.get_json()
+        income_ids = data.get('income_ids', [])
+        
+        # Remove existing access
+        UserIncomeAccess.query.filter_by(user_id=user_id).delete()
+        
+        # Add new access
+        for income_id in income_ids:
+            access = UserIncomeAccess(user_id=user_id, income_id=income_id)
+            db.session.add(access)
+        
+        db.session.commit()
+        
+        return jsonify({
+            'success': True,
+            'message': 'Income access updated successfully'
+        })
+        
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({
+            'success': False,
+            'message': f'Failed to update user income access: {str(e)}'
+        }), 500
+
+@app.route('/api/user-access/pensions/<int:user_id>', methods=['GET'])
+@jwt_required()
+def get_user_pension_access(user_id):
+    """Get pension access permissions for a specific user (admin only)"""
+    try:
+        current_user_id = int(get_jwt_identity())
+        current_user = User.query.filter_by(id=current_user_id).first()
+        
+        if not current_user or current_user.role != 'admin':
+            return jsonify({
+                'success': False,
+                'message': 'Admin access required'
+            }), 403
+        
+        # Get all pension accounts
+        all_pensions = PensionAccount.query.all()
+        
+        # Get user's current pension access
+        user_pension_access = UserPensionAccess.query.filter_by(user_id=user_id).all()
+        user_pension_ids = {access.pension_id for access in user_pension_access}
+        
+        # Format response
+        pensions_data = []
+        for pension in all_pensions:
+            pensions_data.append({
+                'id': pension.id,
+                'person_name': pension.person.name if pension.person else None,
+                'account_name': pension.account_name,
+                'account_type': pension.account_type,
+                'provider': pension.provider,
+                'current_balance': float(pension.current_balance) if pension.current_balance else 0,
+                'has_access': pension.id in user_pension_ids
+            })
+        
+        return jsonify({
+            'success': True,
+            'pensions': pensions_data
+        })
+        
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'message': f'Failed to get user pension access: {str(e)}'
+        }), 500
+
+@app.route('/api/user-access/pensions/<int:user_id>', methods=['POST'])
+@jwt_required()
+def update_user_pension_access(user_id):
+    """Update pension access permissions for a specific user (admin only)"""
+    try:
+        current_user_id = int(get_jwt_identity())
+        current_user = User.query.filter_by(id=current_user_id).first()
+        
+        if not current_user or current_user.role != 'admin':
+            return jsonify({
+                'success': False,
+                'message': 'Admin access required'
+            }), 403
+        
+        data = request.get_json()
+        pension_ids = data.get('pension_ids', [])
+        
+        # Remove existing access
+        UserPensionAccess.query.filter_by(user_id=user_id).delete()
+        
+        # Add new access
+        for pension_id in pension_ids:
+            access = UserPensionAccess(user_id=user_id, pension_id=pension_id)
+            db.session.add(access)
+        
+        db.session.commit()
+        
+        return jsonify({
+            'success': True,
+            'message': 'Pension access updated successfully'
+        })
+        
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({
+            'success': False,
+            'message': f'Failed to update user pension access: {str(e)}'
         }), 500
 
 @app.route('/api/users/<int:user_id>/reset-password', methods=['POST'])

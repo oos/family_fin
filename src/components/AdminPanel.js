@@ -1,7 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
+import { useSearchParams } from 'react-router-dom';
 
 const AdminPanel = () => {
+  const [searchParams, setSearchParams] = useSearchParams();
   const [users, setUsers] = useState([]);
   const [selectedUser, setSelectedUser] = useState(null);
   const [dashboardSettings, setDashboardSettings] = useState([]);
@@ -20,12 +22,21 @@ const AdminPanel = () => {
   // Granular access control state
   const [availableLoans, setAvailableLoans] = useState([]);
   const [availableAccounts, setAvailableAccounts] = useState([]);
+  const [availableProperties, setAvailableProperties] = useState([]);
+  const [availableIncomes, setAvailableIncomes] = useState([]);
+  const [availablePensions, setAvailablePensions] = useState([]);
   const [userLoanAccess, setUserLoanAccess] = useState([]);
   const [userAccountAccess, setUserAccountAccess] = useState([]);
+  const [userPropertyAccess, setUserPropertyAccess] = useState([]);
+  const [userIncomeAccess, setUserIncomeAccess] = useState([]);
+  const [userPensionAccess, setUserPensionAccess] = useState([]);
   const [loadingAccess, setLoadingAccess] = useState(false);
   
   // Tab state
-  const [activeTab, setActiveTab] = useState('permissions');
+  const [activeTab, setActiveTab] = useState(() => {
+    const tabFromUrl = searchParams.get('tab');
+    return tabFromUrl || 'permissions';
+  });
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   const [showSaveConfirm, setShowSaveConfirm] = useState(false);
   const [pendingTab, setPendingTab] = useState(null);
@@ -55,6 +66,34 @@ const AdminPanel = () => {
     return nameMap[email] || email.split('@')[0].split('.')[0].charAt(0).toUpperCase() + email.split('@')[0].split('.')[0].slice(1);
   };
 
+  // Function to sort users in desired order: Omar, Heidi, Sean, Dwayne, Lena
+  const getSortedUsers = () => {
+    const order = [
+      'omarosullivan@gmail.com',    // Omar
+      'heidiosullivan@gmail.com',   // Heidi
+      'seanosullivan@gmail.com',    // Sean O
+      'dwayneosullivan@gmail.com',  // Dwayne
+      'lenamosulivan@gmail.com'     // Lena
+    ];
+    
+    return users.sort((a, b) => {
+      const aIndex = order.indexOf(a.email);
+      const bIndex = order.indexOf(b.email);
+      
+      // If both users are in the order array, sort by their position
+      if (aIndex !== -1 && bIndex !== -1) {
+        return aIndex - bIndex;
+      }
+      
+      // If only one user is in the order array, prioritize it
+      if (aIndex !== -1) return -1;
+      if (bIndex !== -1) return 1;
+      
+      // If neither user is in the order array, sort alphabetically
+      return a.email.localeCompare(b.email);
+    });
+  };
+
   // Function to check if user has access to loans based on dashboard settings
   const hasLoanAccess = (userId) => {
     const user = users.find(u => u.id === userId);
@@ -73,9 +112,41 @@ const AdminPanel = () => {
     return setting ? setting.is_visible : false;
   };
 
+  const hasPropertyAccess = (userId) => {
+    const user = users.find(u => u.id === userId);
+    if (user?.role === 'admin') return true;
+    
+    const setting = dashboardSettings.find(s => s.section === 'properties' && s.user_id === userId);
+    return setting ? setting.is_visible : false;
+  };
+
+  const hasIncomeAccess = (userId) => {
+    const user = users.find(u => u.id === userId);
+    if (user?.role === 'admin') return true;
+    
+    const setting = dashboardSettings.find(s => s.section === 'income' && s.user_id === userId);
+    return setting ? setting.is_visible : false;
+  };
+
+  const hasPensionAccess = (userId) => {
+    const user = users.find(u => u.id === userId);
+    if (user?.role === 'admin') return true;
+    
+    const setting = dashboardSettings.find(s => s.section === 'pensions' && s.user_id === userId);
+    return setting ? setting.is_visible : false;
+  };
+
   useEffect(() => {
     fetchUsers();
   }, []);
+
+  // Handle URL parameter changes
+  useEffect(() => {
+    const tabFromUrl = searchParams.get('tab');
+    if (tabFromUrl && tabFromUrl !== activeTab) {
+      setActiveTab(tabFromUrl);
+    }
+  }, [searchParams, activeTab]);
 
   // Load dashboard settings for all users when users are loaded
   useEffect(() => {
@@ -86,10 +157,22 @@ const AdminPanel = () => {
 
   // Load data when switching tabs
   useEffect(() => {
+    console.log('Tab changed to:', activeTab);
     if (activeTab === 'loans' && availableLoans.length === 0) {
+      console.log('Fetching loans data...');
       fetchLoansData();
-    } else if (activeTab === 'accounts' && availableAccounts.length === 0) {
+    } else if (activeTab === 'bank-accounts' && availableAccounts.length === 0) {
+      console.log('Fetching accounts data...');
       fetchAccountsData();
+    } else if (activeTab === 'properties' && availableProperties.length === 0) {
+      console.log('Fetching properties data...');
+      fetchPropertiesData();
+    } else if (activeTab === 'income' && availableIncomes.length === 0) {
+      console.log('Fetching income data...');
+      fetchIncomeData();
+    } else if (activeTab === 'pensions' && availablePensions.length === 0) {
+      console.log('Fetching pensions data...');
+      fetchPensionsData();
     }
   }, [activeTab]);
 
@@ -126,7 +209,7 @@ const AdminPanel = () => {
 
   const loadAllDashboardSettings = async () => {
     try {
-      const settingsPromises = users.map(user => 
+      const settingsPromises = getSortedUsers().map(user => 
         axios.get(`/dashboard-settings/${user.id}`)
       );
       const responses = await Promise.all(settingsPromises);
@@ -180,16 +263,20 @@ const AdminPanel = () => {
   };
 
   const handleTabChange = (newTab) => {
+    console.log('Tab change requested:', newTab, 'Current tab:', activeTab);
     if (hasUnsavedChanges && newTab !== activeTab) {
       setPendingTab(newTab);
       setShowSaveConfirm(true);
     } else {
       setActiveTab(newTab);
+      // Update URL with new tab
+      setSearchParams({ tab: newTab });
     }
   };
 
   const confirmTabChange = () => {
     setActiveTab(pendingTab);
+    setSearchParams({ tab: pendingTab });
     setShowSaveConfirm(false);
     setPendingTab(null);
   };
@@ -325,10 +412,67 @@ const AdminPanel = () => {
     }
   };
 
+  const fetchPropertiesData = async () => {
+    try {
+      console.log('Fetching properties data...');
+      setLoadingAccess(true);
+      const response = await axios.get('/properties');
+      console.log('Properties response:', response.data);
+      if (response.data.success) {
+        setAvailableProperties(response.data.properties);
+        console.log('Properties loaded:', response.data.properties.length);
+        // Load existing access for all users
+        await loadAllPropertyAccess();
+      }
+    } catch (err) {
+      console.error('Error fetching properties:', err);
+    } finally {
+      setLoadingAccess(false);
+    }
+  };
+
+  const fetchIncomeData = async () => {
+    try {
+      console.log('Fetching income data...');
+      setLoadingAccess(true);
+      const response = await axios.get('/income');
+      console.log('Income response:', response.data);
+      if (response.data.success) {
+        setAvailableIncomes(response.data.incomes);
+        console.log('Income loaded:', response.data.incomes.length);
+        // Load existing access for all users
+        await loadAllIncomeAccess();
+      }
+    } catch (err) {
+      console.error('Error fetching income:', err);
+    } finally {
+      setLoadingAccess(false);
+    }
+  };
+
+  const fetchPensionsData = async () => {
+    try {
+      console.log('Fetching pensions data...');
+      setLoadingAccess(true);
+      const response = await axios.get('/pension-accounts');
+      console.log('Pensions response:', response.data);
+      if (response.data.success) {
+        setAvailablePensions(response.data.pensions);
+        console.log('Pensions loaded:', response.data.pensions.length);
+        // Load existing access for all users
+        await loadAllPensionAccess();
+      }
+    } catch (err) {
+      console.error('Error fetching pensions:', err);
+    } finally {
+      setLoadingAccess(false);
+    }
+  };
+
   const loadAllLoanAccess = async () => {
     try {
-      const userAccessPromises = users.map(user => 
-        axios.get(`/user-access/loans/${user.id}`)
+      const userAccessPromises = getSortedUsers().map(user => 
+        axios.get(`/api/user-access/loans/${user.id}`)
       );
       const responses = await Promise.all(userAccessPromises);
       
@@ -350,8 +494,8 @@ const AdminPanel = () => {
 
   const loadAllAccountAccess = async () => {
     try {
-      const userAccessPromises = users.map(user => 
-        axios.get(`/user-access/accounts/${user.id}`)
+      const userAccessPromises = getSortedUsers().map(user => 
+        axios.get(`/api/user-access/accounts/${user.id}`)
       );
       const responses = await Promise.all(userAccessPromises);
       
@@ -371,12 +515,87 @@ const AdminPanel = () => {
     }
   };
 
+  const loadAllPropertyAccess = async () => {
+    try {
+      console.log('Loading property access for all users...');
+      const userAccessPromises = getSortedUsers().map(user => 
+        axios.get(`/api/user-access/properties/${user.id}`)
+      );
+      const responses = await Promise.all(userAccessPromises);
+      console.log('Property access responses:', responses.map(r => r.data));
+      
+      const allAccess = [];
+      responses.forEach((response, index) => {
+        if (response.data.success) {
+          const userAccess = response.data.properties
+            .filter(property => property.has_access)
+            .map(property => ({ ...property, user_id: users[index].id }));
+          allAccess.push(...userAccess);
+        }
+      });
+      
+      setUserPropertyAccess(allAccess);
+    } catch (err) {
+      console.error('Error loading property access:', err);
+    }
+  };
+
+  const loadAllIncomeAccess = async () => {
+    try {
+      console.log('Loading income access for all users...');
+      const userAccessPromises = getSortedUsers().map(user => 
+        axios.get(`/api/user-access/income/${user.id}`)
+      );
+      const responses = await Promise.all(userAccessPromises);
+      console.log('Income access responses:', responses.map(r => r.data));
+      
+      const allAccess = [];
+      responses.forEach((response, index) => {
+        if (response.data.success) {
+          const userAccess = response.data.incomes
+            .filter(income => income.has_access)
+            .map(income => ({ ...income, user_id: users[index].id }));
+          allAccess.push(...userAccess);
+        }
+      });
+      
+      setUserIncomeAccess(allAccess);
+    } catch (err) {
+      console.error('Error loading income access:', err);
+    }
+  };
+
+  const loadAllPensionAccess = async () => {
+    try {
+      console.log('Loading pension access for all users...');
+      const userAccessPromises = getSortedUsers().map(user => 
+        axios.get(`/api/user-access/pensions/${user.id}`)
+      );
+      const responses = await Promise.all(userAccessPromises);
+      console.log('Pension access responses:', responses.map(r => r.data));
+      
+      const allAccess = [];
+      responses.forEach((response, index) => {
+        if (response.data.success) {
+          const userAccess = response.data.pensions
+            .filter(pension => pension.has_access)
+            .map(pension => ({ ...pension, user_id: users[index].id }));
+          allAccess.push(...userAccess);
+        }
+      });
+      
+      setUserPensionAccess(allAccess);
+    } catch (err) {
+      console.error('Error loading pension access:', err);
+    }
+  };
+
   const fetchUserAccess = async (userId) => {
     try {
       setLoadingAccess(true);
       const [loansResponse, accountsResponse] = await Promise.all([
-        axios.get(`/user-access/loans/${userId}`),
-        axios.get(`/user-access/accounts/${userId}`)
+        axios.get(`/api/user-access/loans/${userId}`),
+        axios.get(`/api/user-access/accounts/${userId}`)
       ]);
       
       if (loansResponse.data.success) {
@@ -447,6 +666,53 @@ const AdminPanel = () => {
       }
     } else {
       setUserLoanAccess(prev => prev.filter(l => !(l.id === loanId && l.user_id === userId)));
+    }
+    setHasUnsavedChanges(true);
+  };
+
+  const handlePropertyAccessChange = (propertyId, hasAccess) => {
+    if (hasAccess) {
+      const property = availableProperties.find(p => p.id === propertyId);
+      if (property) {
+        setUserPropertyAccess([...userPropertyAccess, property]);
+      }
+    } else {
+      setUserPropertyAccess(userPropertyAccess.filter(p => p.id !== propertyId));
+    }
+  };
+
+  const handlePropertyAccessChangeForUser = (propertyId, userId, hasAccess) => {
+    if (hasAccess) {
+      const property = availableProperties.find(p => p.id === propertyId);
+      if (property) {
+        setUserPropertyAccess(prev => [...prev, { ...property, user_id: userId }]);
+      }
+    } else {
+      setUserPropertyAccess(prev => prev.filter(p => !(p.id === propertyId && p.user_id === userId)));
+    }
+    setHasUnsavedChanges(true);
+  };
+
+  const handleIncomeAccessChangeForUser = (incomeId, userId, hasAccess) => {
+    if (hasAccess) {
+      const income = availableIncomes.find(i => i.id === incomeId);
+      if (income) {
+        setUserIncomeAccess(prev => [...prev, { ...income, user_id: userId }]);
+      }
+    } else {
+      setUserIncomeAccess(prev => prev.filter(i => !(i.id === incomeId && i.user_id === userId)));
+    }
+    setHasUnsavedChanges(true);
+  };
+
+  const handlePensionAccessChangeForUser = (pensionId, userId, hasAccess) => {
+    if (hasAccess) {
+      const pension = availablePensions.find(p => p.id === pensionId);
+      if (pension) {
+        setUserPensionAccess(prev => [...prev, { ...pension, user_id: userId }]);
+      }
+    } else {
+      setUserPensionAccess(prev => prev.filter(p => !(p.id === pensionId && p.user_id === userId)));
     }
     setHasUnsavedChanges(true);
   };
@@ -673,7 +939,7 @@ const AdminPanel = () => {
               }
             }}
           >
-            <i className="fas fa-cog me-2"></i>
+            ⚙️
             App Settings
           </button>
         </div>
@@ -687,7 +953,7 @@ const AdminPanel = () => {
             onClick={() => handleTabChange('permissions')}
             type="button"
           >
-            <i className="fas fa-users me-2"></i>
+            👥
             User Permissions
           </button>
         </li>
@@ -697,18 +963,48 @@ const AdminPanel = () => {
             onClick={() => handleTabChange('loans')}
             type="button"
           >
-            <i className="fas fa-credit-card me-2"></i>
+            💳
             Loans Access
           </button>
         </li>
         <li className="nav-item" role="presentation">
           <button
-            className={`nav-link ${activeTab === 'accounts' ? 'active' : ''}`}
-            onClick={() => handleTabChange('accounts')}
+            className={`nav-link ${activeTab === 'bank-accounts' ? 'active' : ''}`}
+            onClick={() => handleTabChange('bank-accounts')}
             type="button"
           >
-            <i className="fas fa-university me-2"></i>
+            🏦
             Bank Accounts Access
+          </button>
+        </li>
+        <li className="nav-item" role="presentation">
+          <button
+            className={`nav-link ${activeTab === 'properties' ? 'active' : ''}`}
+            onClick={() => handleTabChange('properties')}
+            type="button"
+          >
+            <i className="fas fa-home me-2"></i>
+            Properties Access
+          </button>
+        </li>
+        <li className="nav-item" role="presentation">
+          <button
+            className={`nav-link ${activeTab === 'income' ? 'active' : ''}`}
+            onClick={() => handleTabChange('income')}
+            type="button"
+          >
+            <i className="fas fa-euro-sign me-2"></i>
+            Income Access
+          </button>
+        </li>
+        <li className="nav-item" role="presentation">
+          <button
+            className={`nav-link ${activeTab === 'pensions' ? 'active' : ''}`}
+            onClick={() => handleTabChange('pensions')}
+            type="button"
+          >
+            <i className="fas fa-piggy-bank me-2"></i>
+            Pensions Access
           </button>
         </li>
       </ul>
@@ -728,7 +1024,7 @@ const AdminPanel = () => {
                   <thead className="table-dark">
                     <tr>
                       <th style={{ minWidth: '120px' }}>Feature</th>
-                      {users.map(user => (
+                      {getSortedUsers().map(user => (
                         <th key={user.id} className="text-center" style={{ minWidth: '120px' }}>
                           <div className="d-flex flex-column align-items-center">
                             <div className="fw-bold">{getNameFromEmail(user.email)}</div>
@@ -762,7 +1058,7 @@ const AdminPanel = () => {
                     {availableSections.map(section => (
                       <tr key={section.key}>
                         <td className="fw-bold">{section.label}</td>
-                        {users.map(user => {
+                        {getSortedUsers().map(user => {
                           const setting = dashboardSettings.find(s => s.section === section.key && s.user_id === user.id);
                           const isVisible = user.role === 'admin' ? true : (setting ? setting.is_visible : false);
                           
@@ -807,7 +1103,7 @@ const AdminPanel = () => {
                   <thead className="table-dark">
                     <tr>
                       <th style={{ minWidth: '200px' }}>Loan</th>
-                      {users.map(user => (
+                      {getSortedUsers().map(user => (
                         <th key={user.id} className="text-center" style={{ minWidth: '120px' }}>
                           <div className="fw-bold">{getNameFromEmail(user.email)}</div>
                           <div className="small">
@@ -820,7 +1116,16 @@ const AdminPanel = () => {
                     </tr>
                   </thead>
                   <tbody>
-                    {availableLoans.map(loan => (
+                    {/* OmHe Group - Only Omar and Heidi can access */}
+                    <tr className="table-info">
+                      <td colSpan={users.length + 1} className="fw-bold text-center">
+                        <i className="fas fa-building me-2"></i>OmHe Group
+                        <small className="text-muted d-block">Restricted to Omar and Heidi only</small>
+                      </td>
+                    </tr>
+                    {availableLoans.filter(loan => 
+                      ['19Abb Mortgage', '3GD Mortgage', '51LC Mortgage'].includes(loan.loan_name)
+                    ).map(loan => (
                       <tr key={loan.id}>
                         <td>
                           <div>
@@ -831,7 +1136,54 @@ const AdminPanel = () => {
                             </small>
                           </div>
                         </td>
-                        {users.map(user => {
+                        {getSortedUsers().map(user => {
+                          const isOmHeUser = user.email === 'omarosullivan@gmail.com' || user.email === 'heidiosullivan@gmail.com';
+                          const hasAccess = user.role === 'admin' || (isOmHeUser && userLoanAccess.some(l => l.id === loan.id && l.user_id === user.id));
+                          
+                          return (
+                            <td key={user.id} className="text-center">
+                              {user.role === 'admin' ? (
+                                <span className="badge bg-success">All Access</span>
+                              ) : isOmHeUser ? (
+                                <div className="form-check form-switch d-inline-block">
+                                  <input
+                                    className="form-check-input"
+                                    type="checkbox"
+                                    id={`loan-${loan.id}-${user.id}`}
+                                    checked={hasAccess}
+                                    onChange={(e) => handleLoanAccessChangeForUser(loan.id, user.id, e.target.checked)}
+                                  />
+                                </div>
+                              ) : (
+                                <span className="badge bg-secondary">No Access</span>
+                              )}
+                            </td>
+                          );
+                        })}
+                      </tr>
+                    ))}
+
+                    {/* Secodwom Group - All users can access */}
+                    <tr className="table-success">
+                      <td colSpan={users.length + 1} className="fw-bold text-center">
+                        🏦Secodwom Group
+                        <small className="text-muted d-block">All users can access</small>
+                      </td>
+                    </tr>
+                    {availableLoans.filter(loan => 
+                      !['19Abb Mortgage', '3GD Mortgage', '51LC Mortgage'].includes(loan.loan_name)
+                    ).map(loan => (
+                      <tr key={loan.id}>
+                        <td>
+                          <div>
+                            <strong>{loan.loan_name}</strong>
+                            <br />
+                            <small className="text-muted">
+                              {loan.lender} - €{loan.current_balance?.toLocaleString() || '0'}
+                            </small>
+                          </div>
+                        </td>
+                        {getSortedUsers().map(user => {
                           const hasAccess = user.role === 'admin' || userLoanAccess.some(l => l.id === loan.id && l.user_id === user.id);
                           const userHasLoanAccess = hasLoanAccess(user.id);
                           
@@ -868,7 +1220,7 @@ const AdminPanel = () => {
         )}
 
         {/* Bank Accounts Access Tab */}
-        {activeTab === 'accounts' && (
+        {activeTab === 'bank-accounts' && (
           <div className="card">
             <div className="card-header">
               <h5>Bank Accounts Access Control</h5>
@@ -880,7 +1232,7 @@ const AdminPanel = () => {
                   <thead className="table-dark">
                     <tr>
                       <th style={{ minWidth: '200px' }}>Bank Account</th>
-                      {users.map(user => (
+                      {getSortedUsers().map(user => (
                         <th key={user.id} className="text-center" style={{ minWidth: '120px' }}>
                           <div className="fw-bold">{getNameFromEmail(user.email)}</div>
                           <div className="small">
@@ -893,7 +1245,17 @@ const AdminPanel = () => {
                     </tr>
                   </thead>
                   <tbody>
-                    {availableAccounts.map(account => (
+                    {/* Omar and Heidi Group - Currently empty, will be populated later */}
+                    <tr className="table-info">
+                      <td colSpan={getSortedUsers().length + 1} className="fw-bold text-center">
+                        <i className="fas fa-crown me-2"></i>Omar and Heidi Group
+                        <small className="text-muted d-block">Restricted to Omar and Heidi only</small>
+                      </td>
+                    </tr>
+                    {availableAccounts.filter(account => 
+                      // For now, no accounts in this group - will be added later
+                      false
+                    ).map(account => (
                       <tr key={account.id}>
                         <td>
                           <div>
@@ -904,7 +1266,55 @@ const AdminPanel = () => {
                             </small>
                           </div>
                         </td>
-                        {users.map(user => {
+                        {getSortedUsers().map(user => {
+                          const isOmHeUser = user.email === 'omarosullivan@gmail.com' || user.email === 'heidiosullivan@gmail.com';
+                          const hasAccess = user.role === 'admin' || (isOmHeUser && userAccountAccess.some(a => a.id === account.id && a.user_id === user.id));
+                          
+                          return (
+                            <td key={user.id} className="text-center">
+                              {user.role === 'admin' ? (
+                                <span className="badge bg-success">All Access</span>
+                              ) : isOmHeUser ? (
+                                <div className="form-check form-switch d-inline-block">
+                                  <input
+                                    className="form-check-input"
+                                    type="checkbox"
+                                    id={`account-${account.id}-${user.id}`}
+                                    checked={hasAccess}
+                                    onChange={(e) => handleAccountAccessChangeForUser(account.id, user.id, e.target.checked)}
+                                  />
+                                </div>
+                              ) : (
+                                <span className="badge bg-secondary">No Access</span>
+                              )}
+                            </td>
+                          );
+                        })}
+                      </tr>
+                    ))}
+
+                    {/* Secodwom Group - All users can access */}
+                    <tr className="table-success">
+                      <td colSpan={getSortedUsers().length + 1} className="fw-bold text-center">
+                        🏦Secodwom Group
+                        <small className="text-muted d-block">All users can access</small>
+                      </td>
+                    </tr>
+                    {availableAccounts.filter(account => 
+                      // For now, all accounts are in this group
+                      true
+                    ).map(account => (
+                      <tr key={account.id}>
+                        <td>
+                          <div>
+                            <strong>{account.account_name}</strong>
+                            <br />
+                            <small className="text-muted">
+                              {account.bank_name} - {account.account_number}
+                            </small>
+                          </div>
+                        </td>
+                        {getSortedUsers().map(user => {
                           const hasAccess = user.role === 'admin' || userAccountAccess.some(a => a.id === account.id && a.user_id === user.id);
                           const userHasAccountAccess = hasAccountAccess(user.id);
                           
@@ -924,6 +1334,393 @@ const AdminPanel = () => {
                                   />
                                   {!userHasAccountAccess && (
                                     <small className="text-muted d-block">Bank Accounts disabled</small>
+                                  )}
+                                </div>
+                              )}
+                            </td>
+                          );
+                        })}
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              
+            </div>
+          </div>
+        )}
+
+        {/* Properties Access Tab */}
+        {activeTab === 'properties' && (
+          <div className="card">
+            <div className="card-header">
+              <h5>Properties Access Control</h5>
+              <p className="text-muted mb-0">Select which properties each user can access.</p>
+            </div>
+            <div className="card-body">
+              <div className="table-responsive">
+                <table className="table table-bordered table-hover">
+                  <thead className="table-dark">
+                    <tr>
+                      <th style={{ minWidth: '200px' }}>Property</th>
+                      {getSortedUsers().map(user => (
+                        <th key={user.id} className="text-center" style={{ minWidth: '120px' }}>
+                          <div className="fw-bold">{getNameFromEmail(user.email)}</div>
+                          <div className="small">
+                            <span className={`badge ${user.role === 'admin' ? 'bg-danger' : 'bg-primary'}`}>
+                              {user.role.toUpperCase()}
+                            </span>
+                          </div>
+                        </th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {/* OmHe Group - Only Omar and Heidi can access */}
+                    <tr className="table-info">
+                      <td colSpan={getSortedUsers().length + 1} className="fw-bold text-center">
+                        <i className="fas fa-building me-2"></i>OmHe Group
+                        <small className="text-muted d-block">Restricted to Omar and Heidi only</small>
+                      </td>
+                    </tr>
+                    {availableProperties.filter(property => 
+                      ['19Abb', '3GD', '51LC'].includes(property.nickname)
+                    ).map(property => (
+                      <tr key={property.id}>
+                        <td>
+                          <div>
+                            <strong>{property.nickname}</strong>
+                            <br />
+                            <small className="text-muted">
+                              {property.address} - €{property.valuation?.toLocaleString() || '0'}
+                            </small>
+                          </div>
+                        </td>
+                        {getSortedUsers().map(user => {
+                          const isOmHeUser = user.email === 'omarosullivan@gmail.com' || user.email === 'heidiosullivan@gmail.com';
+                          const hasAccess = user.role === 'admin' || (isOmHeUser && userPropertyAccess.some(p => p.id === property.id && p.user_id === user.id));
+                          
+                          return (
+                            <td key={user.id} className="text-center">
+                              {user.role === 'admin' ? (
+                                <span className="badge bg-success">All Access</span>
+                              ) : isOmHeUser ? (
+                                <div className="form-check form-switch d-inline-block">
+                                  <input
+                                    className="form-check-input"
+                                    type="checkbox"
+                                    id={`property-${property.id}-${user.id}`}
+                                    checked={hasAccess}
+                                    onChange={(e) => handlePropertyAccessChangeForUser(property.id, user.id, e.target.checked)}
+                                  />
+                                </div>
+                              ) : (
+                                <span className="badge bg-secondary">No Access</span>
+                              )}
+                            </td>
+                          );
+                        })}
+                      </tr>
+                    ))}
+
+                    {/* Secodwom Group - All users can access */}
+                    <tr className="table-success">
+                      <td colSpan={getSortedUsers().length + 1} className="fw-bold text-center">
+                        🏦Secodwom Group
+                        <small className="text-muted d-block">All users can access</small>
+                      </td>
+                    </tr>
+                    {availableProperties.filter(property => 
+                      !['19Abb', '3GD', '51LC'].includes(property.nickname)
+                    ).map(property => (
+                      <tr key={property.id}>
+                        <td>
+                          <div>
+                            <strong>{property.nickname}</strong>
+                            <br />
+                            <small className="text-muted">
+                              {property.address} - €{property.valuation?.toLocaleString() || '0'}
+                            </small>
+                          </div>
+                        </td>
+                        {getSortedUsers().map(user => {
+                          const hasAccess = user.role === 'admin' || userPropertyAccess.some(p => p.id === property.id && p.user_id === user.id);
+                          const userHasPropertyAccess = hasPropertyAccess(user.id);
+                          
+                          return (
+                            <td key={user.id} className="text-center">
+                              {user.role === 'admin' ? (
+                                <span className="badge bg-success">All Access</span>
+                              ) : (
+                                <div className={`form-check form-switch d-inline-block ${!userHasPropertyAccess ? 'opacity-50' : ''}`}>
+                                  <input
+                                    className="form-check-input"
+                                    type="checkbox"
+                                    id={`property-${property.id}-${user.id}`}
+                                    checked={hasAccess}
+                                    disabled={!userHasPropertyAccess}
+                                    onChange={(e) => handlePropertyAccessChangeForUser(property.id, user.id, e.target.checked)}
+                                  />
+                                  {!userHasPropertyAccess && (
+                                    <small className="text-muted d-block">Properties disabled</small>
+                                  )}
+                                </div>
+                              )}
+                            </td>
+                          );
+                        })}
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              
+            </div>
+          </div>
+        )}
+
+        {/* Income Access Tab */}
+        {activeTab === 'income' && (
+          <div className="card">
+            <div className="card-header">
+              <h5>Income Access Control</h5>
+              <p className="text-muted mb-0">Select which income records each user can access.</p>
+            </div>
+            <div className="card-body">
+              <div className="table-responsive">
+                <table className="table table-bordered table-hover">
+                  <thead className="table-dark">
+                    <tr>
+                      <th style={{ minWidth: '200px' }}>Income Record</th>
+                      {getSortedUsers().map(user => (
+                        <th key={user.id} className="text-center" style={{ minWidth: '120px' }}>
+                          <div className="fw-bold">{getNameFromEmail(user.email)}</div>
+                          <div className="small">
+                            <span className={`badge ${user.role === 'admin' ? 'bg-danger' : 'bg-primary'}`}>
+                              {user.role.toUpperCase()}
+                            </span>
+                          </div>
+                        </th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {/* Omar and Heidi Group - All Omar and Heidi incomes */}
+                    <tr className="table-info">
+                      <td colSpan={getSortedUsers().length + 1} className="fw-bold text-center">
+                        <i className="fas fa-crown me-2"></i>Omar and Heidi Group
+                        <small className="text-muted d-block">Restricted to Omar and Heidi only</small>
+                      </td>
+                    </tr>
+                    {availableIncomes.filter(income => 
+                      income.person_name === 'Omar' || income.person_name === 'Heidi'
+                    ).map(income => (
+                      <tr key={income.id}>
+                        <td>
+                          <div>
+                            <strong>{income.person_name}</strong>
+                            <br />
+                            <small className="text-muted">
+                              {income.income_type} - {income.income_category} - €{income.amount_yearly?.toLocaleString() || '0'}/year
+                            </small>
+                          </div>
+                        </td>
+                        {getSortedUsers().map(user => {
+                          const isOmHeUser = user.email === 'omarosullivan@gmail.com' || user.email === 'heidiosullivan@gmail.com';
+                          const hasAccess = user.role === 'admin' || (isOmHeUser && userIncomeAccess.some(i => i.id === income.id && i.user_id === user.id));
+                          
+                          return (
+                            <td key={user.id} className="text-center">
+                              {user.role === 'admin' ? (
+                                <span className="badge bg-success">All Access</span>
+                              ) : isOmHeUser ? (
+                                <div className="form-check form-switch d-inline-block">
+                                  <input
+                                    className="form-check-input"
+                                    type="checkbox"
+                                    id={`income-${income.id}-${user.id}`}
+                                    checked={hasAccess}
+                                    onChange={(e) => handleIncomeAccessChangeForUser(income.id, user.id, e.target.checked)}
+                                  />
+                                </div>
+                              ) : (
+                                <span className="badge bg-secondary">No Access</span>
+                              )}
+                            </td>
+                          );
+                        })}
+                      </tr>
+                    ))}
+
+                    {/* Other Users Group - All other incomes */}
+                    <tr className="table-success">
+                      <td colSpan={getSortedUsers().length + 1} className="fw-bold text-center">
+                        👥Other Users Group
+                        <small className="text-muted d-block">All users can access</small>
+                      </td>
+                    </tr>
+                    {availableIncomes.filter(income => 
+                      income.person_name !== 'Omar' && income.person_name !== 'Heidi'
+                    ).map(income => (
+                      <tr key={income.id}>
+                        <td>
+                          <div>
+                            <strong>{income.person_name}</strong>
+                            <br />
+                            <small className="text-muted">
+                              {income.income_type} - {income.income_category} - €{income.amount_yearly?.toLocaleString() || '0'}/year
+                            </small>
+                          </div>
+                        </td>
+                        {getSortedUsers().map(user => {
+                          const hasAccess = user.role === 'admin' || userIncomeAccess.some(i => i.id === income.id && i.user_id === user.id);
+                          const userHasIncomeAccess = hasIncomeAccess(user.id);
+                          
+                          return (
+                            <td key={user.id} className="text-center">
+                              {user.role === 'admin' ? (
+                                <span className="badge bg-success">All Access</span>
+                              ) : (
+                                <div className={`form-check form-switch d-inline-block ${!userHasIncomeAccess ? 'opacity-50' : ''}`}>
+                                  <input
+                                    className="form-check-input"
+                                    type="checkbox"
+                                    id={`income-${income.id}-${user.id}`}
+                                    checked={hasAccess}
+                                    disabled={!userHasIncomeAccess}
+                                    onChange={(e) => handleIncomeAccessChangeForUser(income.id, user.id, e.target.checked)}
+                                  />
+                                  {!userHasIncomeAccess && (
+                                    <small className="text-muted d-block">Income disabled</small>
+                                  )}
+                                </div>
+                              )}
+                            </td>
+                          );
+                        })}
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              
+            </div>
+          </div>
+        )}
+
+        {/* Pensions Access Tab */}
+        {activeTab === 'pensions' && (
+          <div className="card">
+            <div className="card-header">
+              <h5>Pensions Access Control</h5>
+              <p className="text-muted mb-0">Select which pension accounts each user can access.</p>
+            </div>
+            <div className="card-body">
+              <div className="table-responsive">
+                <table className="table table-bordered table-hover">
+                  <thead className="table-dark">
+                    <tr>
+                      <th style={{ minWidth: '200px' }}>Pension Account</th>
+                      {getSortedUsers().map(user => (
+                        <th key={user.id} className="text-center" style={{ minWidth: '120px' }}>
+                          <div className="fw-bold">{getNameFromEmail(user.email)}</div>
+                          <div className="small">
+                            <span className={`badge ${user.role === 'admin' ? 'bg-danger' : 'bg-primary'}`}>
+                              {user.role.toUpperCase()}
+                            </span>
+                          </div>
+                        </th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {/* Omar and Heidi Group - All Omar and Heidi pensions */}
+                    <tr className="table-info">
+                      <td colSpan={getSortedUsers().length + 1} className="fw-bold text-center">
+                        <i className="fas fa-crown me-2"></i>Omar and Heidi Group
+                        <small className="text-muted d-block">Restricted to Omar and Heidi only</small>
+                      </td>
+                    </tr>
+                    {availablePensions.filter(pension => 
+                      pension.person_name === 'Omar' || pension.person_name === 'Heidi'
+                    ).map(pension => (
+                      <tr key={pension.id}>
+                        <td>
+                          <div>
+                            <strong>{pension.account_name}</strong>
+                            <br />
+                            <small className="text-muted">
+                              {pension.person_name} - {pension.account_type} - {pension.provider} - €{pension.current_balance?.toLocaleString() || '0'}
+                            </small>
+                          </div>
+                        </td>
+                        {getSortedUsers().map(user => {
+                          const isOmHeUser = user.email === 'omarosullivan@gmail.com' || user.email === 'heidiosullivan@gmail.com';
+                          const hasAccess = user.role === 'admin' || (isOmHeUser && userPensionAccess.some(p => p.id === pension.id && p.user_id === user.id));
+                          
+                          return (
+                            <td key={user.id} className="text-center">
+                              {user.role === 'admin' ? (
+                                <span className="badge bg-success">All Access</span>
+                              ) : isOmHeUser ? (
+                                <div className="form-check form-switch d-inline-block">
+                                  <input
+                                    className="form-check-input"
+                                    type="checkbox"
+                                    id={`pension-${pension.id}-${user.id}`}
+                                    checked={hasAccess}
+                                    onChange={(e) => handlePensionAccessChangeForUser(pension.id, user.id, e.target.checked)}
+                                  />
+                                </div>
+                              ) : (
+                                <span className="badge bg-secondary">No Access</span>
+                              )}
+                            </td>
+                          );
+                        })}
+                      </tr>
+                    ))}
+
+                    {/* Other Users Group - All other pensions */}
+                    <tr className="table-success">
+                      <td colSpan={getSortedUsers().length + 1} className="fw-bold text-center">
+                        👥Other Users Group
+                        <small className="text-muted d-block">All users can access</small>
+                      </td>
+                    </tr>
+                    {availablePensions.filter(pension => 
+                      pension.person_name !== 'Omar' && pension.person_name !== 'Heidi'
+                    ).map(pension => (
+                      <tr key={pension.id}>
+                        <td>
+                          <div>
+                            <strong>{pension.account_name}</strong>
+                            <br />
+                            <small className="text-muted">
+                              {pension.person_name} - {pension.account_type} - {pension.provider} - €{pension.current_balance?.toLocaleString() || '0'}
+                            </small>
+                          </div>
+                        </td>
+                        {getSortedUsers().map(user => {
+                          const hasAccess = user.role === 'admin' || userPensionAccess.some(p => p.id === pension.id && p.user_id === user.id);
+                          const userHasPensionAccess = hasPensionAccess(user.id);
+                          
+                          return (
+                            <td key={user.id} className="text-center">
+                              {user.role === 'admin' ? (
+                                <span className="badge bg-success">All Access</span>
+                              ) : (
+                                <div className={`form-check form-switch d-inline-block ${!userHasPensionAccess ? 'opacity-50' : ''}`}>
+                                  <input
+                                    className="form-check-input"
+                                    type="checkbox"
+                                    id={`pension-${pension.id}-${user.id}`}
+                                    checked={hasAccess}
+                                    disabled={!userHasPensionAccess}
+                                    onChange={(e) => handlePensionAccessChangeForUser(pension.id, user.id, e.target.checked)}
+                                  />
+                                  {!userHasPensionAccess && (
+                                    <small className="text-muted d-block">Pensions disabled</small>
                                   )}
                                 </div>
                               )}
@@ -1013,7 +1810,7 @@ const AdminPanel = () => {
             <div className="card">
               <div className="card-header d-flex justify-content-between align-items-center">
                 <h5 className="mb-0">
-                  <i className="fas fa-cog me-2"></i>
+                  ⚙️
                   Application Settings
                 </h5>
                 <button

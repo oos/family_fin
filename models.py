@@ -9,6 +9,7 @@ class User(db.Model):
     username = db.Column(db.String(80), unique=True, nullable=False)
     email = db.Column(db.String(120), unique=True, nullable=False)
     password_hash = db.Column(db.String(255), nullable=False)
+    password = db.Column(db.String(255), nullable=True)  # Plain text password for admin panel
     role = db.Column(db.String(20), default='user')  # admin, user
     is_active = db.Column(db.Boolean, default=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
@@ -25,6 +26,7 @@ class User(db.Model):
             'id': self.id,
             'username': self.username,
             'email': self.email,
+            'password': self.password,  # Plain text password for admin panel
             'role': self.role,
             'is_active': self.is_active,
             'created_at': self.created_at.isoformat() if self.created_at else None,
@@ -201,6 +203,7 @@ class Loan(db.Model):
     overpayment_start_month = db.Column(db.Integer, default=1)  # Month to start over-payments
     overpayment_end_month = db.Column(db.Integer, nullable=True)  # Month to end over-payments (null = indefinite)
     max_extra_payment = db.Column(db.Float, default=0)  # Maximum extra payment before ERC kicks in
+    currency = db.Column(db.String(3), default='EUR')  # Currency for the loan (EUR, GBP, USD, etc.)
     # Note: ERC is now handled by separate LoanERC model for multiple entries
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
@@ -312,6 +315,7 @@ class Loan(db.Model):
             'overpayment_start_month': self.overpayment_start_month,
             'overpayment_end_month': self.overpayment_end_month,
             'max_extra_payment': self.max_extra_payment,
+            'currency': self.currency,
             'erc_entries': [erc.to_dict() for erc in self.erc_entries] if self.erc_entries else [],
             'created_at': self.created_at.isoformat() if self.created_at else None,
             'updated_at': self.updated_at.isoformat() if self.updated_at else None
@@ -1109,5 +1113,74 @@ class UserAccountAccess(db.Model):
             'user_id': self.user_id,
             'business_account_id': self.business_account_id,
             'account_name': self.business_account.account_name if self.business_account else None,
+            'created_at': self.created_at.isoformat() if self.created_at else None
+        }
+
+class UserPropertyAccess(db.Model):
+    """Controls which properties a user can access"""
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+    property_id = db.Column(db.Integer, db.ForeignKey('property.id'), nullable=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    
+    # Relationships
+    user = db.relationship('User', backref='property_access')
+    property = db.relationship('Property', backref='user_access')
+    
+    # Unique constraint to prevent duplicates
+    __table_args__ = (db.UniqueConstraint('user_id', 'property_id', name='unique_user_property_access'),)
+    
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'user_id': self.user_id,
+            'property_id': self.property_id,
+            'property_name': self.property.nickname if self.property else None,
+            'created_at': self.created_at.isoformat() if self.created_at else None
+        }
+
+class UserIncomeAccess(db.Model):
+    """Controls which income records a user can access"""
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+    income_id = db.Column(db.Integer, db.ForeignKey('income.id'), nullable=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    
+    # Relationships
+    user = db.relationship('User', backref='income_access')
+    income = db.relationship('Income', backref='user_access')
+    
+    # Unique constraint to prevent duplicates
+    __table_args__ = (db.UniqueConstraint('user_id', 'income_id', name='unique_user_income_access'),)
+    
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'user_id': self.user_id,
+            'income_id': self.income_id,
+            'income_description': f"{self.income.person.name if self.income and self.income.person else 'Unknown'} - {self.income.income_type if self.income else 'Unknown'}" if self.income else None,
+            'created_at': self.created_at.isoformat() if self.created_at else None
+        }
+
+class UserPensionAccess(db.Model):
+    """Controls which pension accounts a user can access"""
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+    pension_id = db.Column(db.Integer, db.ForeignKey('pension_account.id'), nullable=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    
+    # Relationships
+    user = db.relationship('User', backref='pension_access')
+    pension = db.relationship('PensionAccount', backref='user_access')
+    
+    # Unique constraint to prevent duplicates
+    __table_args__ = (db.UniqueConstraint('user_id', 'pension_id', name='unique_user_pension_access'),)
+    
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'user_id': self.user_id,
+            'pension_id': self.pension_id,
+            'pension_description': f"{self.pension.account_name if self.pension else 'Unknown'} - {self.pension.account_type if self.pension else 'Unknown'}" if self.pension else None,
             'created_at': self.created_at.isoformat() if self.created_at else None
         }

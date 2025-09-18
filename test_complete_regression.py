@@ -35,19 +35,19 @@ class TestCompleteRegression:
                 id=998,
                 email='admin.test@example.com',
                 username='admin.test',
-                role='admin'
+                role='admin',
+                password='admin123'
             )
-            admin_user.set_password('admin123')
             db.session.add(admin_user)
-            
+
             # Create user test user
             user_user = User(
                 id=999,
                 email='user.test@example.com',
                 username='user.test',
-                role='user'
+                role='user',
+                password='user123'
             )
-            user_user.set_password('user123')
             db.session.add(user_user)
             
             # Create test family
@@ -73,9 +73,13 @@ class TestCompleteRegression:
                 id=999,
                 address='123 Test Street, Test City',
                 nickname='Test Property',
-                purchase_price=300000.00,
-                current_value=350000.00,
-                family_id=999
+                valuation=350000.00,
+                rental_income_yearly=0,
+                lender='Test Bank',
+                omar_ownership=100.0,
+                heidi_ownership=0.0,
+                dwayne_ownership=0.0,
+                sean_ownership=0.0
             )
             db.session.add(test_property)
             
@@ -186,11 +190,11 @@ class TestCompleteRegression:
             yield
             
             # Cleanup after tests
-            AccountBalance.query.filter_by(user_id__in=[998, 999]).delete()
-            UserLoanAccess.query.filter_by(user_id__in=[998, 999]).delete()
-            UserAccountAccess.query.filter_by(user_id__in=[998, 999]).delete()
-            DashboardSettings.query.filter_by(user_id__in=[998, 999]).delete()
-            User.query.filter_by(email__in=['admin.test@example.com', 'user.test@example.com']).delete()
+            AccountBalance.query.filter(AccountBalance.user_id.in_([998, 999])).delete()
+            UserLoanAccess.query.filter(UserLoanAccess.user_id.in_([998, 999])).delete()
+            UserAccountAccess.query.filter(UserAccountAccess.user_id.in_([998, 999])).delete()
+            DashboardSettings.query.filter(DashboardSettings.user_id.in_([998, 999])).delete()
+            User.query.filter(User.email.in_(['admin.test@example.com', 'user.test@example.com'])).delete()
             Family.query.filter_by(id=999).delete()
             Person.query.filter_by(id=999).delete()
             Loan.query.filter(Loan.id.in_([998, 999])).delete()

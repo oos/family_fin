@@ -179,12 +179,50 @@ const UserDashboard = () => {
   const { user, visible_sections, data } = dashboardData;
 
   return (
-    <div className="container">
-      <h1>Welcome, {user.username}!</h1>
-      
+    <div className="container-fluid px-3">
+      {/* Net Position Summary - Moved to top */}
+      <div className="row mb-1 mt-4">
+        <div className="col-12">
+          <div className="card" style={{ backgroundColor: '#f8f9fa', border: '2px solid #dee2e6' }}>
+            <div className="card-body py-1">
+              <div className="row align-items-start">
+                <div className="col-md-3">
+                  <h4 className="mb-0">Net Financial Position</h4>
+                </div>
+                <div className="col-md-3">
+                  <div className="text-center">
+                    <div className="d-flex align-items-center justify-content-center mb-0">
+                      <h6 className="text-muted mb-0 me-2">Total Cash:</h6>
+                    </div>
+                    <h4 className="text-success mb-0">{formatCurrency(getTotalAccountBalance())}</h4>
+                  </div>
+                </div>
+                <div className="col-md-3">
+                  <div className="text-center">
+                    <div className="d-flex align-items-center justify-content-center mb-0">
+                      <h6 className="text-muted mb-0 me-2">Total Debt:</h6>
+                    </div>
+                    <h4 className="text-danger mb-0">{formatCurrency(getTotalLoanBalance())}</h4>
+                  </div>
+                </div>
+                <div className="col-md-3">
+                  <div className="text-center">
+                    <div className="d-flex align-items-center justify-content-center mb-0">
+                      <h6 className="text-muted mb-0 me-2">Net Position:</h6>
+                    </div>
+                    <h3 className={getNetPosition() >= 0 ? 'text-success' : 'text-danger'} style={{ marginBottom: '0' }}>
+                      {formatCurrency(getNetPosition())}
+                    </h3>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
       {/* Financial Position Overview */}
-      <div className="card" style={{ marginBottom: '20px' }}>
-        <h3>Current Financial Position</h3>
+      <div className="card mb-1">
         <div className="row">
           {/* Loans Section */}
           <FinancialOverview
@@ -195,6 +233,8 @@ const UserDashboard = () => {
             icon="fa-credit-card"
             colorClass="text-danger"
             borderClass="border-danger"
+            showHistory={false}
+            showViewButton={true}
           />
 
           {/* Bank Accounts Section */}
@@ -206,37 +246,9 @@ const UserDashboard = () => {
             icon="fa-university"
             colorClass="text-success"
             borderClass="border-success"
+            showHistory={false}
+            showViewButton={true}
           />
-        </div>
-
-        {/* Net Position Summary */}
-        <div className="row mt-4">
-          <div className="col-12">
-            <div className="card" style={{ backgroundColor: '#f8f9fa', border: '2px solid #dee2e6' }}>
-              <div className="card-body text-center">
-                <h4 className="mb-3">Net Financial Position</h4>
-                <div className="row">
-                  <div className="col-md-4">
-                    <h6 className="text-muted">Total Cash</h6>
-                    <h4 className="text-success">{formatCurrency(getTotalAccountBalance())}</h4>
-                  </div>
-                  <div className="col-md-4">
-                    <h6 className="text-muted">Total Debt</h6>
-                    <h4 className="text-danger">{formatCurrency(getTotalLoanBalance())}</h4>
-                  </div>
-                  <div className="col-md-4">
-                    <h6 className="text-muted">Net Position</h6>
-                    <h3 className={getNetPosition() >= 0 ? 'text-success' : 'text-danger'}>
-                      {formatCurrency(getNetPosition())}
-                    </h3>
-                    <small className="text-muted">
-                      {getNetPosition() >= 0 ? 'Positive (Cash > Debt)' : 'Negative (Debt > Cash)'}
-                    </small>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
         </div>
       </div>
 
@@ -247,7 +259,7 @@ const UserDashboard = () => {
             <div className="modal-content shadow-lg" style={{ borderRadius: '12px', border: 'none' }}>
               <div className="modal-header bg-primary text-white" style={{ borderRadius: '12px 12px 0 0' }}>
                 <div className="d-flex align-items-center">
-                  <i className="fas fa-plus-circle me-2"></i>
+                  ➕
                   <h5 className="modal-title mb-0">
                     Add Balance for {selectedItem ? 
                       (itemType === 'account' ? 
@@ -276,12 +288,12 @@ const UserDashboard = () => {
                   <div className="row">
                     <div className="col-md-6 mb-4">
                       <label className="form-label fw-semibold text-dark">
-                        <i className="fas fa-euro-sign me-2 text-success"></i>
+                        💰
                         Balance Amount
                       </label>
                       <div className="input-group">
                         <span className="input-group-text bg-light">
-                          <i className="fas fa-euro-sign text-muted"></i>
+                          💰
                         </span>
                         <input 
                           type="number" 
@@ -298,12 +310,12 @@ const UserDashboard = () => {
 
                     <div className="col-md-6 mb-4">
                       <label className="form-label fw-semibold text-dark">
-                        <i className="fas fa-calendar-alt me-2 text-info"></i>
+                        📅
                         Date
                       </label>
                       <div className="input-group">
                         <span className="input-group-text bg-light">
-                          <i className="fas fa-calendar text-muted"></i>
+                          📅
                         </span>
                         <input 
                           type="date" 
@@ -319,7 +331,7 @@ const UserDashboard = () => {
 
                   <div className="mb-4">
                     <label className="form-label fw-semibold text-dark">
-                      <i className="fas fa-comment-alt me-2 text-warning"></i>
+                      💬
                       Comments
                     </label>
                     <textarea 
@@ -368,11 +380,11 @@ const UserDashboard = () => {
                       setItemType(null);
                     }}
                   >
-                    <i className="fas fa-times me-2"></i>
+                    ✕
                     Cancel
                   </button>
                   <button type="submit" className="btn btn-primary btn-lg px-4">
-                    <i className="fas fa-save me-2"></i>
+                    💾
                     Add Balance
                   </button>
                 </div>

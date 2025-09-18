@@ -1,8 +1,11 @@
 import React, { useState, useEffect } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import axios from 'axios';
 import FinancialOverview from './FinancialOverview';
+import IndividualItemHistory from './IndividualItemHistory';
 
 const UserLoans = () => {
+  const [searchParams] = useSearchParams();
   const [loans, setLoans] = useState([]);
   const [balances, setBalances] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -10,7 +13,6 @@ const UserLoans = () => {
   const [showAddBalance, setShowAddBalance] = useState(false);
   const [selectedLoan, setSelectedLoan] = useState(null);
   const [activeTab, setActiveTab] = useState(0);
-  const [showOverview, setShowOverview] = useState(false);
   const [balanceForm, setBalanceForm] = useState({
     balance: '',
     date_entered: new Date().toISOString().split('T')[0],
@@ -25,6 +27,20 @@ const UserLoans = () => {
     };
     loadData();
   }, []);
+
+  // Handle URL parameter to set active tab
+  useEffect(() => {
+    const tabParam = searchParams.get('tab');
+    if (tabParam && loans.length > 0) {
+      const tabIndex = loans.findIndex(loan => 
+        loan.loan_name === decodeURIComponent(tabParam)
+      );
+      if (tabIndex !== -1) {
+        setActiveTab(tabIndex);
+      }
+    }
+  }, [searchParams, loans]);
+
 
   const fetchLoans = async () => {
     try {
@@ -65,6 +81,23 @@ const UserLoans = () => {
     setShowAddBalance(true);
   };
 
+
+  const handleOpenModal = () => {
+    // Pre-select the current tab's loan
+    const currentLoan = loans[activeTab];
+    setSelectedLoan(currentLoan);
+    setBalanceForm({
+      balance: '',
+      date_entered: new Date().toISOString().split('T')[0],
+      notes: ''
+    });
+    setShowAddBalance(true);
+  };
+
+  const getCurrentLoan = () => {
+    return loans[activeTab] || null;
+  };
+
   const handleEditBalance = (balance) => {
     setSelectedLoan({ id: balance.loan_id, loan_name: balance.loan_name });
     setBalanceForm({
@@ -73,6 +106,34 @@ const UserLoans = () => {
       notes: balance.notes || ''
     });
     setShowAddBalance(true);
+  };
+
+  const handleEditLoan = (loan) => {
+    // TODO: Implement edit loan functionality
+    console.log('Edit loan:', loan);
+    alert('Edit loan functionality will be implemented');
+  };
+
+  const handleDeleteLoan = (loan) => {
+    if (window.confirm(`Are you sure you want to delete the loan "${loan.loan_name}"?`)) {
+      // TODO: Implement delete loan functionality
+      console.log('Delete loan:', loan);
+      alert('Delete loan functionality will be implemented');
+    }
+  };
+
+  const handleEditBalanceEntry = (balance) => {
+    // TODO: Implement edit balance entry functionality
+    console.log('Edit balance entry:', balance);
+    alert('Edit balance entry functionality will be implemented');
+  };
+
+  const handleDeleteBalanceEntry = (balance) => {
+    if (window.confirm(`Are you sure you want to delete this balance entry?`)) {
+      // TODO: Implement delete balance entry functionality
+      console.log('Delete balance entry:', balance);
+      alert('Delete balance entry functionality will be implemented');
+    }
   };
 
   const handleSubmitBalance = async (e) => {
@@ -176,20 +237,13 @@ const UserLoans = () => {
       <div className="row">
         <div className="col-12">
           <div className="d-flex justify-content-between align-items-center mb-4">
-            <h2><i className="fas fa-credit-card me-2"></i>My Loans</h2>
+            <h2>💳 Loans</h2>
             <div className="d-flex gap-2">
               <button 
-                className="btn btn-outline-secondary"
-                onClick={() => setShowOverview(!showOverview)}
-              >
-                <i className={`fas ${showOverview ? 'fa-eye-slash' : 'fa-eye'} me-2`}></i>
-                {showOverview ? 'Hide' : 'Show'} Overview
-              </button>
-              <button 
                 className="btn btn-primary"
-                onClick={() => setShowAddBalance(true)}
+                onClick={handleOpenModal}
               >
-                <i className="fas fa-plus me-2"></i>Add Balance
+                ➕ Add Balance
               </button>
             </div>
           </div>
@@ -200,25 +254,6 @@ const UserLoans = () => {
             </div>
           )}
 
-          {/* Loans Overview Panel */}
-          {loans.length > 0 && showOverview && (
-            <div className="card mb-4">
-              <div className="card-header">
-                <h5 className="mb-0"><i className="fas fa-chart-pie me-2"></i>Loans Overview</h5>
-              </div>
-              <div className="card-body">
-                <FinancialOverview
-                  type="loans"
-                  items={loans}
-                  balances={balances}
-                  title=""
-                  icon=""
-                  colorClass="text-primary"
-                  borderClass="border-primary"
-                />
-              </div>
-            </div>
-          )}
 
           {loans.length > 0 ? (
             <div className="card">
@@ -246,123 +281,47 @@ const UserLoans = () => {
                     role="tabpanel"
                   >
                     <div className="card-body">
-                      {/* Loan Details */}
-                      <div className="row mb-4">
-                        <div className="col-md-6">
-                          <h5 className="text-primary mb-3">{loan.loan_name}</h5>
-                          <div className="row">
-                            <div className="col-md-2">
-                              <small className="text-muted"><strong>Lender:</strong></small><br />
-                              <span>{loan.lender}</span>
-                            </div>
-                            <div className="col-md-2">
-                              <small className="text-muted"><strong>Type:</strong></small><br />
-                              <span>{loan.loan_type}</span>
-                            </div>
-                            <div className="col-md-2">
-                              <small className="text-muted"><strong>Principal:</strong></small><br />
-                              <span>{formatCurrency(loan.principal_amount)}</span>
-                            </div>
-                            <div className="col-md-2">
-                              <small className="text-muted"><strong>Interest Rate:</strong></small><br />
-                              <span>{loan.interest_rate ? `${loan.interest_rate}%` : 'N/A'}</span>
-                            </div>
-                            <div className="col-md-2">
-                              <small className="text-muted"><strong>Term:</strong></small><br />
-                              <span>{loan.term_years ? `${loan.term_years} years` : 'N/A'}</span>
-                            </div>
-                            <div className="col-md-2">
-                              <small className="text-muted"><strong>Monthly Payment:</strong></small><br />
-                              <span>{formatCurrency(loan.monthly_payment)}</span>
-                            </div>
+                      {/* Loan Details - All in One Row */}
+                      <div className="mb-4">
+                        <h5 className="text-primary mb-3">{loan.loan_name}</h5>
+                        <div className="row align-items-center">
+                          <div className="col-md-2">
+                            <small className="text-muted"><strong>Type:</strong></small><br />
+                            <span>{loan.loan_type}</span>
                           </div>
-                        </div>
-                        <div className="col-md-6">
-                          <div className="text-end">
-                            <button 
-                              className="btn btn-primary"
-                              onClick={() => handleAddBalance(loan)}
-                            >
-                              <i className="fas fa-plus me-2"></i>Add Balance Entry
-                            </button>
+                          <div className="col-md-2">
+                            <small className="text-muted"><strong>Principal:</strong></small><br />
+                            <span>{formatCurrency(loan.principal_amount)}</span>
+                          </div>
+                          <div className="col-md-2">
+                            <small className="text-muted"><strong>Interest Rate:</strong></small><br />
+                            <span>{loan.interest_rate ? `${loan.interest_rate}%` : 'N/A'}</span>
+                          </div>
+                          <div className="col-md-2">
+                            <small className="text-muted"><strong>Term:</strong></small><br />
+                            <span>{loan.term_years ? `${loan.term_years} years` : 'N/A'}</span>
+                          </div>
+                          <div className="col-md-2">
+                            <small className="text-muted"><strong>Monthly Payment:</strong></small><br />
+                            <span>{formatCurrency(loan.monthly_payment)}</span>
+                          </div>
+                          <div className="col-md-2">
+                            <small className="text-muted"><strong>Current Balance:</strong> <span className="text-danger fw-bold">
+                              {getCurrentBalance(loan.id) ? formatCurrency(getCurrentBalance(loan.id)) : 'Not set'}
+                            </span></small>
                           </div>
                         </div>
                       </div>
 
-                      {/* Balance History Table */}
-                      <h6 className="mb-3">Balance History</h6>
-                      {getBalancesForLoan(loan.id).length > 0 ? (
-                        <div className="table-responsive">
-                          <table className="table table-striped table-hover">
-                            <thead className="table-dark">
-                              <tr>
-                                <th>Date</th>
-                                <th>Balance</th>
-                                <th>Better/Worse than Last Entry</th>
-                                <th>Better/Worse than Best Ever</th>
-                                <th>Notes</th>
-                                <th>Actions</th>
-                              </tr>
-                            </thead>
-                            <tbody>
-                              {getBalancesForLoan(loan.id).map((balance) => {
-                                const lastComparison = formatComparison(balance.betterThanLast);
-                                const bestComparison = formatComparison(balance.betterThanBest);
-                                
-                                return (
-                                  <tr key={balance.id} className={balance.isBestEver ? 'table-warning' : ''}>
-                                    <td>
-                                      {new Date(balance.date_entered).toLocaleDateString()}
-                                      {balance.isBestEver && (
-                                        <span className="ms-2 text-warning" title="Best Ever!">
-                                          <i className="fas fa-flag"></i>
-                                        </span>
-                                      )}
-                                    </td>
-                                    <td className="fw-bold text-success">{formatCurrency(balance.balance)}</td>
-                                    <td>
-                                      {balance.betterThanLast !== null ? (
-                                        <span className={`fw-bold ${
-                                          lastComparison.isPositive ? 'text-success' : 
-                                          lastComparison.isNegative ? 'text-danger' : 
-                                          'text-muted'
-                                        }`}>
-                                          {lastComparison.value}
-                                        </span>
-                                      ) : (
-                                        <span className="text-muted">-</span>
-                                      )}
-                                    </td>
-                                    <td>
-                                      <span className={`fw-bold ${
-                                        bestComparison.isPositive ? 'text-success' : 
-                                        bestComparison.isNegative ? 'text-danger' : 
-                                        'text-warning'
-                                      }`}>
-                                        {bestComparison.value}
-                                      </span>
-                                    </td>
-                                    <td>{balance.notes || '-'}</td>
-                                    <td>
-                                      <button 
-                                        className="btn btn-sm btn-outline-primary"
-                                        onClick={() => handleEditBalance(balance)}
-                                      >
-                                        <i className="fas fa-edit"></i>
-                                      </button>
-                                    </td>
-                                  </tr>
-                                );
-                              })}
-                            </tbody>
-                          </table>
-                        </div>
-                      ) : (
-                        <div className="text-center py-4">
-                          <i className="fas fa-chart-line fa-2x text-muted mb-2"></i>
-                          <p className="text-muted">No balance entries yet. Click "Add Balance Entry" to get started.</p>
-                        </div>
-                      )}
+                      {/* Balance History - Using IndividualItemHistory Component */}
+        <IndividualItemHistory
+          type="loans"
+          item={loan}
+          balances={balances}
+          colorClass="text-danger"
+          onEditBalance={handleEditBalanceEntry}
+          onDeleteBalance={handleDeleteBalanceEntry}
+        />
                     </div>
                   </div>
                 ))}
@@ -372,7 +331,7 @@ const UserLoans = () => {
 
           {loans.length === 0 && (
             <div className="text-center py-5">
-              <i className="fas fa-credit-card fa-3x text-muted mb-3"></i>
+              <div className="text-muted mb-3" style={{ fontSize: '3rem' }}>💳</div>
               <h4 className="text-muted">No loans found</h4>
               <p className="text-muted">Contact an administrator to add loans to your account.</p>
             </div>
@@ -382,13 +341,22 @@ const UserLoans = () => {
 
       {/* Add Balance Modal */}
       {showAddBalance && (
-        <div className="modal show d-block" style={{ backgroundColor: 'rgba(0,0,0,0.5)' }}>
-          <div className="modal-dialog">
+        <div className="modal show d-block" style={{ 
+          backgroundColor: 'rgba(0,0,0,0.5)', 
+          position: 'fixed', 
+          top: 0, 
+          left: 0, 
+          width: '100%', 
+          height: '100%', 
+          zIndex: 1050,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center'
+        }}>
+          <div className="modal-dialog modal-dialog-centered">
             <div className="modal-content">
               <div className="modal-header">
-                <h5 className="modal-title">
-                  {selectedLoan ? `Update Balance - ${selectedLoan.loan_name}` : 'Add Loan Balance'}
-                </h5>
+                <h5 className="modal-title">Add Loan Balance</h5>
                 <button 
                   type="button" 
                   className="btn-close" 
@@ -397,6 +365,27 @@ const UserLoans = () => {
               </div>
               <form onSubmit={handleSubmitBalance}>
                 <div className="modal-body">
+                  <div className="mb-3">
+                    <label htmlFor="loanSelect" className="form-label">Select Loan *</label>
+                    <select
+                      className="form-select"
+                      id="loanSelect"
+                      value={selectedLoan?.id || ''}
+                      onChange={(e) => {
+                        const loan = loans.find(ln => ln.id === parseInt(e.target.value));
+                        setSelectedLoan(loan);
+                      }}
+                      required
+                    >
+                      <option value="">Choose a loan...</option>
+                      {loans.map((loan) => (
+                        <option key={loan.id} value={loan.id}>
+                          {loan.loan_name} ({loan.lender})
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
                   {selectedLoan && (
                     <div className="alert alert-info">
                       <strong>Loan:</strong> {selectedLoan.loan_name}<br />

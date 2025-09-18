@@ -83,9 +83,9 @@ function ProtectedRoute({ children, userRole, requiredRole, fallbackPath }) {
 }
 
 // Role-based Dashboard Component
-function RoleBasedDashboard({ userRole }) {
+function RoleBasedDashboard({ userRole, currentUser }) {
   if (userRole === 'admin') {
-    return <Dashboard />;
+    return <Dashboard currentUser={currentUser} />;
   } else if (userRole === 'user') {
     return <Navigate to="/user-dashboard" replace />;
   } else {
@@ -96,29 +96,29 @@ function RoleBasedDashboard({ userRole }) {
 
 function Sidebar({ userRole, sidebarOpen, setSidebarOpen }) {
   const adminMenuItems = [
-    { path: '/', icon: 'fas fa-tachometer-alt', label: 'Dashboard' },
-    { path: '/entities', icon: 'fas fa-database', label: 'Entities' },
-    { path: '/networth', icon: 'fas fa-chart-line', label: 'Net Worth' },
-    { path: '/income', icon: 'fas fa-euro-sign', label: 'Family Incomes' },
-    { path: '/loan-calculator', icon: 'fas fa-calculator', label: 'Loan Calculator' },
-    { path: '/taxation', icon: 'fas fa-file-invoice-dollar', label: 'Family Taxation' },
-    { path: '/company-taxation', icon: 'fas fa-building', label: 'Company Taxation' },
-    { path: '/pension', icon: 'fas fa-piggy-bank', label: 'Pension' },
-    { path: '/company-pension', icon: 'fas fa-building', label: 'Company Pension' },
-        { path: '/transactions', icon: 'fas fa-exchange-alt', label: 'Transactions' },
-        { path: '/gl-transactions', icon: 'fas fa-book', label: 'GL Transactions' },
-        { path: '/tax-returns', icon: 'fas fa-file-invoice', label: 'Tax Returns' },
-        { path: '/transaction-matching', icon: 'fas fa-link', label: 'Transaction Matching' },
-        { path: '/transaction-predictions', icon: 'fas fa-brain', label: 'ML Predictions' },
-        { path: '/bookings', icon: 'fas fa-calendar-check', label: 'Bookings' },
-        { path: '/files', icon: 'fas fa-folder-open', label: 'File Viewer' },
-    { path: '/admin', icon: 'fas fa-cog', label: 'Admin Panel' }
+    { path: '/', icon: '📊', label: 'Dashboard' },
+    { path: '/entities', icon: '🗄️', label: 'Entities' },
+    { path: '/networth', icon: '📈', label: 'Net Worth' },
+    { path: '/income', icon: '💰', label: 'Family Incomes' },
+    { path: '/loan-calculator', icon: '🧮', label: 'Loan Calculator' },
+    { path: '/taxation', icon: '📋', label: 'Family Taxation' },
+    { path: '/company-taxation', icon: '🏢', label: 'Company Taxation' },
+    { path: '/pension', icon: '🐷', label: 'Pension' },
+    { path: '/company-pension', icon: '🏢', label: 'Company Pension' },
+        { path: '/transactions', icon: '🔄', label: 'Transactions' },
+        { path: '/gl-transactions', icon: '📚', label: 'GL Transactions' },
+        { path: '/tax-returns', icon: '📄', label: 'Tax Returns' },
+        { path: '/transaction-matching', icon: '🔗', label: 'Transaction Matching' },
+        { path: '/transaction-predictions', icon: '🧠', label: 'ML Predictions' },
+        { path: '/bookings', icon: '📅', label: 'Bookings' },
+        { path: '/files', icon: '📁', label: 'File Viewer' },
+    { path: '/admin', icon: '⚙️', label: 'Admin Panel' }
   ];
 
   const userMenuItems = [
-    { path: '/user-dashboard', icon: 'fas fa-tachometer-alt', label: 'My Dashboard' },
-    { path: '/user-loans', icon: 'fas fa-credit-card', label: 'My Loans' },
-    { path: '/user-accounts', icon: 'fas fa-university', label: 'My Bank Accounts' }
+    { path: '/user-dashboard', icon: '📊', label: 'My Dashboard' },
+    { path: '/user-loans', icon: '💳', label: 'My Loans' },
+    { path: '/user-accounts', icon: '🏦', label: 'My Bank Accounts' }
   ];
 
   const menuItems = userRole === 'admin' ? adminMenuItems : userMenuItems;
@@ -150,7 +150,7 @@ function Sidebar({ userRole, sidebarOpen, setSidebarOpen }) {
             className="btn btn-sm btn-outline-light" 
             onClick={() => setSidebarOpen(false)}
           >
-            <i className="fas fa-times"></i>
+            ✕
           </button>
         </div>
         
@@ -163,7 +163,7 @@ function Sidebar({ userRole, sidebarOpen, setSidebarOpen }) {
                   className="nav-link"
                   onClick={() => setSidebarOpen(false)}
                 >
-                  <i className={`${item.icon} me-2`}></i>
+                  <span className="me-2">{item.icon}</span>
                   {item.label}
                 </Link>
               </li>
@@ -284,7 +284,7 @@ function App() {
               <div className="container-fluid mt-1">
                 <Routes>
                   {/* Root route - role-based dashboard */}
-                  <Route path="/" element={<RoleBasedDashboard userRole={userRole} />} />
+                  <Route path="/" element={<RoleBasedDashboard userRole={userRole} currentUser={currentUser} />} />
               
               {/* Admin-only routes */}
               <Route path="/entities" element={
@@ -430,19 +430,23 @@ function Navbar({ onLogout, userRole, currentUser, sidebarOpen, setSidebarOpen }
   return (
     <nav className="navbar navbar-expand-lg navbar-dark bg-dark fixed-top">
       <div className="container-fluid">
-        <button 
-          className="btn btn-outline-light me-3" 
-          onClick={() => setSidebarOpen(!sidebarOpen)}
-          aria-label="Toggle sidebar"
-        >
-          <i className="fas fa-bars"></i>
-        </button>
+          <button 
+            className="btn btn-outline-light me-3" 
+            onClick={() => setSidebarOpen(!sidebarOpen)}
+            aria-label="Toggle sidebar"
+          >
+            ☰
+          </button>
         
         <h1 className="navbar-brand mb-0">Family Finance Management</h1>
         
         <div className="d-flex align-items-center ms-auto">
           {currentUser && (
-            <div className="dropdown profile-dropdown" key={`profile-${currentUser.id}`}>
+            <>
+              <span className="text-light me-3">
+                Welcome, {currentUser.username}!
+              </span>
+              <div className="dropdown profile-dropdown" key={`profile-${currentUser.id}`}>
               <button 
                 className="btn btn-outline-light dropdown-toggle d-flex align-items-center" 
                 type="button" 
@@ -450,27 +454,25 @@ function Navbar({ onLogout, userRole, currentUser, sidebarOpen, setSidebarOpen }
                 aria-expanded={profileDropdownOpen}
                 title={`${currentUser.email} (${userRole?.toUpperCase()})`}
               >
-                <i className="fas fa-user-circle fs-4"></i>
+                👤
               </button>
               <ul className={`dropdown-menu dropdown-menu-end ${profileDropdownOpen ? 'show' : ''}`}>
                 <li><h6 className="dropdown-header">Account</h6></li>
                 <li><span className="dropdown-item-text">
-                  <i className="fas fa-envelope me-2"></i>
-                  {currentUser.email}
+                  📧 {currentUser.email}
                 </span></li>
                 <li><span className="dropdown-item-text">
-                  <i className="fas fa-shield-alt me-2"></i>
-                  Role: {userRole?.toUpperCase()}
+                  🛡️ Role: {userRole?.toUpperCase()}
                 </span></li>
                 <li><hr className="dropdown-divider" /></li>
                 <li>
                   <button className="dropdown-item" onClick={handleLogoutClick}>
-                    <i className="fas fa-sign-out-alt me-2"></i>
-                    Logout
+                    🚪 Logout
                   </button>
                 </li>
               </ul>
-            </div>
+              </div>
+            </>
           )}
         </div>
       </div>

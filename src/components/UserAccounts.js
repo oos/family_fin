@@ -1,8 +1,11 @@
 import React, { useState, useEffect } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import axios from 'axios';
 import FinancialOverview from './FinancialOverview';
+import IndividualItemHistory from './IndividualItemHistory';
 
 const UserAccounts = () => {
+  const [searchParams] = useSearchParams();
   const [accounts, setAccounts] = useState([]);
   const [balances, setBalances] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -10,7 +13,6 @@ const UserAccounts = () => {
   const [showAddBalance, setShowAddBalance] = useState(false);
   const [selectedAccount, setSelectedAccount] = useState(null);
   const [activeTab, setActiveTab] = useState(0);
-  const [showOverview, setShowOverview] = useState(false);
   const [balanceForm, setBalanceForm] = useState({
     balance: '',
     date_entered: new Date().toISOString().split('T')[0],
@@ -25,6 +27,20 @@ const UserAccounts = () => {
     };
     loadData();
   }, []);
+
+  // Handle URL parameter to set active tab
+  useEffect(() => {
+    const tabParam = searchParams.get('tab');
+    if (tabParam && accounts.length > 0) {
+      const tabIndex = accounts.findIndex(account => 
+        account.account_name === decodeURIComponent(tabParam)
+      );
+      if (tabIndex !== -1) {
+        setActiveTab(tabIndex);
+      }
+    }
+  }, [searchParams, accounts]);
+
 
   const fetchAccounts = async () => {
     try {
@@ -65,6 +81,23 @@ const UserAccounts = () => {
     setShowAddBalance(true);
   };
 
+
+  const handleOpenModal = () => {
+    // Pre-select the current tab's account
+    const currentAccount = accounts[activeTab];
+    setSelectedAccount(currentAccount);
+    setBalanceForm({
+      balance: '',
+      date_entered: new Date().toISOString().split('T')[0],
+      notes: ''
+    });
+    setShowAddBalance(true);
+  };
+
+  const getCurrentAccount = () => {
+    return accounts[activeTab] || null;
+  };
+
   const handleEditBalance = (balance) => {
     setSelectedAccount({ id: balance.account_id, account_name: balance.account_name });
     setBalanceForm({
@@ -73,6 +106,34 @@ const UserAccounts = () => {
       notes: balance.notes || ''
     });
     setShowAddBalance(true);
+  };
+
+  const handleEditAccount = (account) => {
+    // TODO: Implement edit account functionality
+    console.log('Edit account:', account);
+    alert('Edit account functionality will be implemented');
+  };
+
+  const handleDeleteAccount = (account) => {
+    if (window.confirm(`Are you sure you want to delete the account "${account.account_name}"?`)) {
+      // TODO: Implement delete account functionality
+      console.log('Delete account:', account);
+      alert('Delete account functionality will be implemented');
+    }
+  };
+
+  const handleEditBalanceEntry = (balance) => {
+    // TODO: Implement edit balance entry functionality
+    console.log('Edit balance entry:', balance);
+    alert('Edit balance entry functionality will be implemented');
+  };
+
+  const handleDeleteBalanceEntry = (balance) => {
+    if (window.confirm(`Are you sure you want to delete this balance entry?`)) {
+      // TODO: Implement delete balance entry functionality
+      console.log('Delete balance entry:', balance);
+      alert('Delete balance entry functionality will be implemented');
+    }
   };
 
   const handleSubmitBalance = async (e) => {
@@ -176,20 +237,13 @@ const UserAccounts = () => {
       <div className="row">
         <div className="col-12">
           <div className="d-flex justify-content-between align-items-center mb-4">
-            <h2><i className="fas fa-university me-2"></i>My Bank Accounts</h2>
+            <h2>🏦 My Bank Accounts</h2>
             <div className="d-flex gap-2">
               <button 
-                className="btn btn-outline-secondary"
-                onClick={() => setShowOverview(!showOverview)}
-              >
-                <i className={`fas ${showOverview ? 'fa-eye-slash' : 'fa-eye'} me-2`}></i>
-                {showOverview ? 'Hide' : 'Show'} Overview
-              </button>
-              <button 
                 className="btn btn-primary"
-                onClick={() => setShowAddBalance(true)}
+                onClick={handleOpenModal}
               >
-                <i className="fas fa-plus me-2"></i>Add Balance
+                ➕ Add Balance
               </button>
             </div>
           </div>
@@ -200,25 +254,6 @@ const UserAccounts = () => {
             </div>
           )}
 
-          {/* Bank Accounts Overview Panel */}
-          {accounts.length > 0 && showOverview && (
-            <div className="card mb-4">
-              <div className="card-header">
-                <h5 className="mb-0"><i className="fas fa-chart-pie me-2"></i>Bank Accounts Overview</h5>
-              </div>
-              <div className="card-body">
-                <FinancialOverview
-                  type="accounts"
-                  items={accounts}
-                  balances={balances}
-                  title=""
-                  icon=""
-                  colorClass="text-success"
-                  borderClass="border-success"
-                />
-              </div>
-            </div>
-          )}
 
           {accounts.length > 0 ? (
             <div className="card">
@@ -246,115 +281,66 @@ const UserAccounts = () => {
                     role="tabpanel"
                   >
                     <div className="card-body">
-                      {/* Account Details */}
-                      <div className="row mb-4">
-                        <div className="col-md-6">
-                          <h5 className="text-primary mb-3">{account.account_name}</h5>
-                          <div className="row">
-                            <div className="col-md-3">
-                              <small className="text-muted"><strong>Bank:</strong></small><br />
-                              <span>{account.bank_name}</span>
-                            </div>
-                            <div className="col-md-3">
-                              <small className="text-muted"><strong>Account Number:</strong></small><br />
-                              <span>{account.account_number}</span>
-                            </div>
-                            <div className="col-md-3">
-                              <small className="text-muted"><strong>Currency:</strong></small><br />
-                              <span>{account.currency || 'EUR'}</span>
-                            </div>
-                            <div className="col-md-3">
-                              <small className="text-muted"><strong>Type:</strong></small><br />
-                              <span>{account.account_type || 'N/A'}</span>
-                            </div>
+                      {/* Account Details - All in One Row */}
+                      <div className="mb-4">
+                        <h5 className="text-primary mb-3">
+                          {account.account_name} ({account.account_number ? account.account_number.slice(-3) : ''})
+                        </h5>
+                        <div className="row align-items-center">
+                          <div className="col-md-2">
+                            <small className="text-muted"><strong>Bank:</strong></small><br />
+                            <span>{account.bank_name}</span>
                           </div>
-                        </div>
-                        <div className="col-md-6">
-                          <div className="text-end">
-                            <button 
-                              className="btn btn-primary"
-                              onClick={() => handleAddBalance(account)}
-                            >
-                              <i className="fas fa-plus me-2"></i>Add Balance Entry
-                            </button>
+                          <div className="col-md-2">
+                            <small className="text-muted"><strong>Currency:</strong></small><br />
+                            <span>{account.currency || 'EUR'}</span>
+                          </div>
+                          <div className="col-md-2">
+                            <small className="text-muted"><strong>Type:</strong></small><br />
+                            <span>{account.account_type || 'N/A'}</span>
+                          </div>
+                          <div className="col-md-2">
+                            <small className="text-muted"><strong>Current Balance:</strong> <span className="text-success fw-bold">
+                              {getCurrentBalance(account.id) ? formatCurrency(getCurrentBalance(account.id)) : 'Not set'}
+                            </span></small>
+                          </div>
+                          <div className="col-md-2">
+                            <small className="text-muted"><strong>Last Updated:</strong></small><br />
+                            <span>
+                              {getLastUpdated(account.id) ? new Date(getLastUpdated(account.id)).toLocaleDateString() : 'Never'}
+                            </span>
+                          </div>
+                          <div className="col-md-2">
+                            <small className="text-muted"><strong>Actions:</strong></small><br />
+                            <div className="btn-group btn-group-sm" role="group">
+                              <button 
+                                className="btn btn-outline-primary btn-sm"
+                                onClick={() => handleEditAccount(account)}
+                                title="Edit Account"
+                              >
+                                ✏️
+                              </button>
+                              <button 
+                                className="btn btn-outline-danger btn-sm"
+                                onClick={() => handleDeleteAccount(account)}
+                                title="Delete Account"
+                              >
+                                🗑️
+                              </button>
+                            </div>
                           </div>
                         </div>
                       </div>
 
-                      {/* Balance History Table */}
-                      <h6 className="mb-3">Balance History</h6>
-                      {getBalancesForAccount(account.id).length > 0 ? (
-                        <div className="table-responsive">
-                          <table className="table table-striped table-hover">
-                            <thead className="table-dark">
-                              <tr>
-                                <th>Date</th>
-                                <th>Balance</th>
-                                <th>Better/Worse than Last Entry</th>
-                                <th>Better/Worse than Best Ever</th>
-                                <th>Notes</th>
-                                <th>Actions</th>
-                              </tr>
-                            </thead>
-                            <tbody>
-                              {getBalancesForAccount(account.id).map((balance) => {
-                                const lastComparison = formatComparison(balance.betterThanLast);
-                                const bestComparison = formatComparison(balance.betterThanBest);
-                                
-                                return (
-                                  <tr key={balance.id} className={balance.isBestEver ? 'table-warning' : ''}>
-                                    <td>
-                                      {new Date(balance.date_entered).toLocaleDateString()}
-                                      {balance.isBestEver && (
-                                        <span className="ms-2 text-warning" title="Best Ever!">
-                                          <i className="fas fa-flag"></i>
-                                        </span>
-                                      )}
-                                    </td>
-                                    <td className="fw-bold text-success">{formatCurrency(balance.balance)}</td>
-                                    <td>
-                                      {balance.betterThanLast !== null ? (
-                                        <span className={`fw-bold ${
-                                          lastComparison.isPositive ? 'text-success' : 
-                                          lastComparison.isNegative ? 'text-danger' : 
-                                          'text-muted'
-                                        }`}>
-                                          {lastComparison.value}
-                                        </span>
-                                      ) : (
-                                        <span className="text-muted">-</span>
-                                      )}
-                                    </td>
-                                    <td>
-                                      <span className={`fw-bold ${
-                                        bestComparison.isPositive ? 'text-success' : 
-                                        bestComparison.isNegative ? 'text-danger' : 
-                                        'text-warning'
-                                      }`}>
-                                        {bestComparison.value}
-                                      </span>
-                                    </td>
-                                    <td>{balance.notes || '-'}</td>
-                                    <td>
-                                      <button 
-                                        className="btn btn-sm btn-outline-primary"
-                                        onClick={() => handleEditBalance(balance)}
-                                      >
-                                        <i className="fas fa-edit"></i>
-                                      </button>
-                                    </td>
-                                  </tr>
-                                );
-                              })}
-                            </tbody>
-                          </table>
-                        </div>
-                      ) : (
-                        <div className="text-center py-4">
-                          <i className="fas fa-chart-line fa-2x text-muted mb-2"></i>
-                          <p className="text-muted">No balance entries yet. Click "Add Balance Entry" to get started.</p>
-                        </div>
-                      )}
+                      {/* Balance History - Using IndividualItemHistory Component */}
+        <IndividualItemHistory
+          type="accounts"
+          item={account}
+          balances={balances}
+          colorClass="text-success"
+          onEditBalance={handleEditBalanceEntry}
+          onDeleteBalance={handleDeleteBalanceEntry}
+        />
                     </div>
                   </div>
                 ))}
@@ -364,7 +350,7 @@ const UserAccounts = () => {
 
           {accounts.length === 0 && (
             <div className="text-center py-5">
-              <i className="fas fa-university fa-3x text-muted mb-3"></i>
+              <div className="text-muted mb-3" style={{ fontSize: '3rem' }}>🏦</div>
               <h4 className="text-muted">No bank accounts found</h4>
               <p className="text-muted">Contact an administrator to add bank accounts to your account.</p>
             </div>
@@ -374,13 +360,22 @@ const UserAccounts = () => {
 
       {/* Add Balance Modal */}
       {showAddBalance && (
-        <div className="modal show d-block" style={{ backgroundColor: 'rgba(0,0,0,0.5)' }}>
-          <div className="modal-dialog">
+        <div className="modal show d-block" style={{ 
+          backgroundColor: 'rgba(0,0,0,0.5)', 
+          position: 'fixed', 
+          top: 0, 
+          left: 0, 
+          width: '100%', 
+          height: '100%', 
+          zIndex: 1050,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center'
+        }}>
+          <div className="modal-dialog modal-dialog-centered">
             <div className="modal-content">
               <div className="modal-header">
-                <h5 className="modal-title">
-                  {selectedAccount ? `Update Balance - ${selectedAccount.account_name}` : 'Add Account Balance'}
-                </h5>
+                <h5 className="modal-title">Add Account Balance</h5>
                 <button 
                   type="button" 
                   className="btn-close" 
@@ -389,6 +384,27 @@ const UserAccounts = () => {
               </div>
               <form onSubmit={handleSubmitBalance}>
                 <div className="modal-body">
+                  <div className="mb-3">
+                    <label htmlFor="accountSelect" className="form-label">Select Account *</label>
+                    <select
+                      className="form-select"
+                      id="accountSelect"
+                      value={selectedAccount?.id || ''}
+                      onChange={(e) => {
+                        const account = accounts.find(acc => acc.id === parseInt(e.target.value));
+                        setSelectedAccount(account);
+                      }}
+                      required
+                    >
+                      <option value="">Choose an account...</option>
+                      {accounts.map((account) => (
+                        <option key={account.id} value={account.id}>
+                          {account.account_name} ({account.bank_name})
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
                   {selectedAccount && (
                     <div className="alert alert-info">
                       <strong>Account:</strong> {selectedAccount.account_name}<br />
