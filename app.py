@@ -27,7 +27,12 @@ import io
 import requests
 import re
 from difflib import SequenceMatcher
-from icalendar import Calendar
+try:
+    from icalendar import Calendar
+    ICALENDAR_AVAILABLE = True
+except ImportError:
+    ICALENDAR_AVAILABLE = False
+    print("Warning: icalendar not available - calendar features will be disabled")
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -1168,6 +1173,8 @@ def _parse_airbnb_ical(ical_url, airbnb_listing_id):
         response = requests.get(ical_url, timeout=30)
         response.raise_for_status()
         
+        if not ICALENDAR_AVAILABLE:
+            return jsonify({'error': 'Calendar processing requires icalendar, which is not available'}), 400
         cal = Calendar.from_ical(response.content)
         bookings = []
         
@@ -1426,6 +1433,8 @@ def _parse_vrbo_ical(ical_url, listing_id):
         response = requests.get(ical_url, timeout=30)
         response.raise_for_status()
         
+        if not ICALENDAR_AVAILABLE:
+            return jsonify({'error': 'Calendar processing requires icalendar, which is not available'}), 400
         cal = Calendar.from_ical(response.content)
         bookings = []
         
