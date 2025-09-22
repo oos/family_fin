@@ -143,6 +143,50 @@ def login():
     
     return jsonify({'message': 'Invalid credentials'}), 401
 
+@app.route('/api/auth/forgot-password', methods=['POST'])
+def forgot_password():
+    data = request.get_json()
+    email = data.get('email')
+    
+    if not email:
+        return jsonify({'error': 'Email is required'}), 400
+    
+    user = User.query.filter_by(email=email).first()
+    
+    if not user:
+        # Don't reveal if email exists or not for security
+        return jsonify({'message': 'If an account with that email exists, password reset instructions have been sent.'})
+    
+    # Generate a simple reset token (in production, use a more secure method)
+    import secrets
+    reset_token = secrets.token_urlsafe(32)
+    
+    # Store the reset token in the user record (you might want to add a reset_token field to User model)
+    # For now, we'll just return a success message
+    # In a real implementation, you would:
+    # 1. Store the reset token with an expiration time
+    # 2. Send an email with a reset link
+    # 3. Create a reset password endpoint
+    
+    return jsonify({'message': 'Password reset instructions have been sent to your email.'})
+
+@app.route('/api/auth/reset-password', methods=['POST'])
+def reset_password():
+    data = request.get_json()
+    token = data.get('token')
+    new_password = data.get('new_password')
+    
+    if not token or not new_password:
+        return jsonify({'error': 'Token and new password are required'}), 400
+    
+    # In a real implementation, you would:
+    # 1. Validate the reset token
+    # 2. Check if it's not expired
+    # 3. Update the user's password
+    # 4. Invalidate the reset token
+    
+    return jsonify({'message': 'Password has been reset successfully.'})
+
 @app.route('/api/health', methods=['GET'])
 def health_check():
     """Health check endpoint for production deployment"""

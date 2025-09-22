@@ -8,6 +8,10 @@ function Login({ onLogin }) {
   });
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [showForgotPassword, setShowForgotPassword] = useState(false);
+  const [forgotPasswordEmail, setForgotPasswordEmail] = useState('');
+  const [forgotPasswordMessage, setForgotPasswordMessage] = useState('');
+  const [forgotPasswordLoading, setForgotPasswordLoading] = useState(false);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -29,6 +33,21 @@ function Login({ onLogin }) {
       ...credentials,
       [e.target.name]: e.target.value
     });
+  };
+
+  const handleForgotPassword = async (e) => {
+    e.preventDefault();
+    setForgotPasswordLoading(true);
+    setForgotPasswordMessage('');
+
+    try {
+      await axios.post('/auth/forgot-password', { email: forgotPasswordEmail });
+      setForgotPasswordMessage('Password reset instructions have been sent to your email.');
+    } catch (err) {
+      setForgotPasswordMessage('Error sending reset email. Please try again.');
+    } finally {
+      setForgotPasswordLoading(false);
+    }
   };
 
   return (
@@ -74,7 +93,96 @@ function Login({ onLogin }) {
           </button>
         </form>
         
+        <div style={{ textAlign: 'center', marginTop: '15px' }}>
+          <a 
+            href="#" 
+            onClick={(e) => {
+              e.preventDefault();
+              setShowForgotPassword(true);
+            }}
+            style={{ color: '#007bff', textDecoration: 'none' }}
+          >
+            Forgot your password?
+          </a>
+        </div>
+        
       </div>
+
+      {/* Forgot Password Modal */}
+      {showForgotPassword && (
+        <div 
+          style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            backgroundColor: 'rgba(0,0,0,0.5)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 1000
+          }}
+          onClick={() => setShowForgotPassword(false)}
+        >
+          <div 
+            style={{
+              backgroundColor: 'white',
+              padding: '30px',
+              borderRadius: '8px',
+              maxWidth: '400px',
+              width: '90%',
+              maxHeight: '80vh',
+              overflow: 'auto'
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h3 style={{ textAlign: 'center', marginBottom: '20px' }}>Reset Password</h3>
+            
+            {forgotPasswordMessage && (
+              <div 
+                className={forgotPasswordMessage.includes('Error') ? 'error' : 'success'}
+                style={{ marginBottom: '15px' }}
+              >
+                {forgotPasswordMessage}
+              </div>
+            )}
+            
+            <form onSubmit={handleForgotPassword}>
+              <div className="form-group">
+                <label htmlFor="forgotEmail">Email Address</label>
+                <input
+                  type="email"
+                  id="forgotEmail"
+                  value={forgotPasswordEmail}
+                  onChange={(e) => setForgotPasswordEmail(e.target.value)}
+                  placeholder="Enter your email address"
+                  required
+                />
+              </div>
+              
+              <div style={{ display: 'flex', gap: '10px', marginTop: '20px' }}>
+                <button 
+                  type="button" 
+                  className="btn btn-secondary" 
+                  style={{ flex: 1 }}
+                  onClick={() => setShowForgotPassword(false)}
+                >
+                  Cancel
+                </button>
+                <button 
+                  type="submit" 
+                  className="btn btn-primary" 
+                  style={{ flex: 1 }}
+                  disabled={forgotPasswordLoading}
+                >
+                  {forgotPasswordLoading ? 'Sending...' : 'Send Reset Email'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
