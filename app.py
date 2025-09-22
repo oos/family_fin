@@ -195,6 +195,35 @@ def health_check():
     """Health check endpoint for production deployment"""
     return jsonify({'status': 'healthy', 'message': 'Family Finance API is running'}), 200
 
+@app.route('/api/admin/update-sean-password', methods=['POST'])
+def update_sean_password():
+    """Update Sean's password (temporary admin endpoint)"""
+    try:
+        # Find Sean's user
+        sean_user = User.query.filter_by(email='sean.osullivan@gmail.com').first()
+        
+        if not sean_user:
+            return jsonify({'success': False, 'message': 'Sean user not found'}), 404
+        
+        # Update password
+        new_password = 'Secodwom01'
+        sean_user.set_password(new_password)
+        sean_user.password = new_password
+        sean_user.updated_at = datetime.utcnow()
+        
+        db.session.commit()
+        
+        return jsonify({
+            'success': True, 
+            'message': 'Sean password updated successfully',
+            'user_id': sean_user.id,
+            'updated_at': sean_user.updated_at.isoformat()
+        })
+        
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'success': False, 'message': f'Error: {str(e)}'}), 500
+
 @app.route('/api/people', methods=['GET'])
 @jwt_required()
 def get_people():
