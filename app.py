@@ -195,6 +195,33 @@ def health_check():
     """Health check endpoint for production deployment"""
     return jsonify({'status': 'healthy', 'message': 'Family Finance API is running'}), 200
 
+@app.route('/api/debug/users', methods=['GET'])
+def debug_users():
+    """Debug endpoint to check users in production database"""
+    try:
+        users = User.query.all()
+        user_list = []
+        for user in users:
+            user_list.append({
+                'id': user.id,
+                'email': user.email,
+                'username': user.username,
+                'role': user.role,
+                'is_active': user.is_active,
+                'created_at': user.created_at.isoformat() if user.created_at else None
+            })
+        
+        return jsonify({
+            'success': True,
+            'user_count': len(user_list),
+            'users': user_list
+        })
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
 @app.route('/api/admin/update-sean-password', methods=['POST'])
 def update_sean_password():
     """Update Sean's password (temporary admin endpoint)"""
