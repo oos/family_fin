@@ -222,22 +222,26 @@ def debug_users():
             'error': str(e)
         }), 500
 
-@app.route('/api/admin/init-sean-user', methods=['POST'])
-def init_sean_user():
-    """Initialize Sean's user in production database"""
+@app.route('/api/admin/init-database', methods=['POST'])
+def init_database():
+    """Initialize production database with basic data"""
     try:
+        # Create all tables first
+        db.create_all()
+        
         # Check if Sean already exists
         sean_user = User.query.filter_by(email='sean.osullivan@gmail.com').first()
         
         if sean_user:
             return jsonify({
                 'success': True,
-                'message': 'Sean user already exists',
-                'user_id': sean_user.id
+                'message': 'Database already initialized - Sean user exists',
+                'user_id': sean_user.id,
+                'user_email': sean_user.email
             })
         
         # Create Sean's user
-        new_user = User(
+        sean_user = User(
             username='sean',
             email='sean.osullivan@gmail.com',
             role='user',
@@ -247,24 +251,54 @@ def init_sean_user():
         )
         
         # Set password
-        new_user.set_password('Secodwom01')
-        new_user.password = 'Secodwom01'
+        sean_user.set_password('Secodwom01')
+        sean_user.password = 'Secodwom01'
         
         # Add to database
-        db.session.add(new_user)
+        db.session.add(sean_user)
+        
+        # Create a basic family
+        family = Family(
+            name='O\'Sullivan Family',
+            code='OSULLIVAN',
+            description='Main family group',
+            created_at=datetime.utcnow(),
+            updated_at=datetime.utcnow()
+        )
+        db.session.add(family)
+        
+        # Create Sean as a person
+        sean_person = Person(
+            name='Sean O\'Sullivan',
+            relationship='Father',
+            is_director=True,
+            family_id=family.id,
+            created_at=datetime.utcnow(),
+            updated_at=datetime.utcnow()
+        )
+        db.session.add(sean_person)
+        
+        # Commit all changes
         db.session.commit()
         
         return jsonify({
             'success': True,
-            'message': 'Sean user created successfully',
-            'user_id': new_user.id
+            'message': 'Database initialized successfully',
+            'sean_user_id': sean_user.id,
+            'family_id': family.id,
+            'person_id': sean_person.id,
+            'login_credentials': {
+                'email': 'sean.osullivan@gmail.com',
+                'password': 'Secodwom01'
+            }
         })
         
     except Exception as e:
         db.session.rollback()
         return jsonify({
             'success': False,
-            'error': str(e)
+            'error': str(e),
+            'traceback': str(e.__traceback__)
         }), 500
 
 @app.route('/api/admin/update-sean-password', methods=['POST'])
