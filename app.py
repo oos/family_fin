@@ -131,7 +131,7 @@ def login():
         (User.username == username) | (User.email == username)
     ).first()
     
-    if user and user.password == password and user.is_active:
+    if user and user.check_password(password) and user.is_active:
         access_token = create_access_token(identity=str(user.id))
         return jsonify({
             'access_token': access_token,
