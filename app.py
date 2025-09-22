@@ -40,7 +40,12 @@ except ImportError:
 import os
 import csv
 import io
-import requests
+try:
+    import requests
+    REQUESTS_AVAILABLE = True
+except ImportError:
+    REQUESTS_AVAILABLE = False
+    print("Warning: requests not available - external API features will be disabled")
 import re
 from difflib import SequenceMatcher
 try:
@@ -1012,6 +1017,8 @@ def delete_loan_payment(payment_id):
 @jwt_required()
 def refresh_account_transactions(account_id):
     """Refresh transactions for a specific business account via Revolut Business API"""
+    if not REQUESTS_AVAILABLE:
+        return jsonify({'success': False, 'message': 'External API features require requests, which is not available'}), 400
     try:
         account = BusinessAccount.query.get_or_404(account_id)
         
@@ -1105,6 +1112,8 @@ def refresh_account_transactions(account_id):
 @jwt_required()
 def refresh_all_accounts():
     """Refresh transactions for all business accounts"""
+    if not REQUESTS_AVAILABLE:
+        return jsonify({'success': False, 'message': 'External API features require requests, which is not available'}), 400
     try:
         accounts = BusinessAccount.query.filter_by(is_active=True).all()
         
@@ -1185,6 +1194,8 @@ def _safe_float(value):
 
 def _parse_airbnb_ical(ical_url, airbnb_listing_id):
     """Parse Airbnb iCal feed and return booking data with maximum extraction"""
+    if not REQUESTS_AVAILABLE:
+        return {"error": "iCal parsing requires requests, which is not available"}
     try:
         response = requests.get(ical_url, timeout=30)
         response.raise_for_status()
@@ -1445,6 +1456,8 @@ def _parse_airbnb_ical(ical_url, airbnb_listing_id):
 
 def _parse_vrbo_ical(ical_url, listing_id):
     """Parse VRBO iCal feed and return booking data with maximum extraction"""
+    if not REQUESTS_AVAILABLE:
+        return {"error": "iCal parsing requires requests, which is not available"}
     try:
         response = requests.get(ical_url, timeout=30)
         response.raise_for_status()
