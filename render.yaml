@@ -33,9 +33,3 @@ services:
     envVars:
       - key: REACT_APP_API_URL
         value: https://family-finance-api.onrender.com
-
-  # Database
-  - type: pserv
-    name: family-finance-db
-    plan: starter
-    startCommand: echo "PostgreSQL database service"
