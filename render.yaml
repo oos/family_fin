@@ -38,3 +38,4 @@ services:
   - type: pserv
     name: family-finance-db
     plan: starter
+    startCommand: echo "PostgreSQL database service"
