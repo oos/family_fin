@@ -21,7 +21,7 @@ function Login({ onLogin }) {
     setError('');
 
     try {
-      const response = await axios.post('/auth/login', credentials);
+      const response = await axios.post('/api/auth/login', credentials);
       onLogin(response.data.access_token, response.data.user);
     } catch (err) {
       setError('Invalid credentials. Please try again.');
@@ -43,7 +43,7 @@ function Login({ onLogin }) {
     setForgotPasswordMessage('');
 
     try {
-      await axios.post('/auth/forgot-password', { email: forgotPasswordEmail });
+      await axios.post('/api/auth/forgot-password', { email: forgotPasswordEmail });
       setForgotPasswordMessage('Password reset instructions have been sent to your email.');
     } catch (err) {
       setForgotPasswordMessage('Error sending reset email. Please try again.');
