@@ -1,7 +1,7 @@
 from flask import Flask, request, jsonify, Response
 from flask_jwt_extended import JWTManager, create_access_token, jwt_required, get_jwt_identity
 from flask_cors import CORS
-# from flask_migrate import Migrate  # Disabled for production deployment
+from flask_migrate import Migrate
 from werkzeug.security import generate_password_hash, check_password_hash
 import hashlib
 from datetime import datetime, timedelta
@@ -99,8 +99,8 @@ from models import db, User, Person, Property, Income, Loan, Family, BusinessAcc
 db.init_app(app)
 jwt = JWTManager(app)
 
-# Flask-Migrate disabled for production deployment
-migrate = None
+# Initialize Flask-Migrate but don't run migrations
+migrate = Migrate(app, db)
 
 # Create tables if they don't exist (for production deployment)
 # Only run this in production, not during build
