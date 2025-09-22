@@ -8,10 +8,12 @@ function Login({ onLogin }) {
   });
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
   const [showForgotPassword, setShowForgotPassword] = useState(false);
   const [forgotPasswordEmail, setForgotPasswordEmail] = useState('');
   const [forgotPasswordMessage, setForgotPasswordMessage] = useState('');
   const [forgotPasswordLoading, setForgotPasswordLoading] = useState(false);
+  const [showForgotPasswordEmail, setShowForgotPasswordEmail] = useState(false);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -73,14 +75,36 @@ function Login({ onLogin }) {
           
           <div className="form-group">
             <label htmlFor="password">Password</label>
-            <input
-              type="password"
-              id="password"
-              name="password"
-              value={credentials.password}
-              onChange={handleChange}
-              required
-            />
+            <div style={{ position: 'relative' }}>
+              <input
+                type={showPassword ? 'text' : 'password'}
+                id="password"
+                name="password"
+                value={credentials.password}
+                onChange={handleChange}
+                required
+                style={{ paddingRight: '40px' }}
+              />
+              <button
+                type="button"
+                onClick={() => setShowPassword(!showPassword)}
+                style={{
+                  position: 'absolute',
+                  right: '10px',
+                  top: '50%',
+                  transform: 'translateY(-50%)',
+                  background: 'none',
+                  border: 'none',
+                  cursor: 'pointer',
+                  padding: '5px',
+                  color: '#666',
+                  fontSize: '16px'
+                }}
+                title={showPassword ? 'Hide password' : 'Show password'}
+              >
+                {showPassword ? '👁️' : '👁️‍🗨️'}
+              </button>
+            </div>
           </div>
           
           <button 
@@ -151,14 +175,36 @@ function Login({ onLogin }) {
             <form onSubmit={handleForgotPassword}>
               <div className="form-group">
                 <label htmlFor="forgotEmail">Email Address</label>
-                <input
-                  type="email"
-                  id="forgotEmail"
-                  value={forgotPasswordEmail}
-                  onChange={(e) => setForgotPasswordEmail(e.target.value)}
-                  placeholder="Enter your email address"
-                  required
-                />
+                <div style={{ position: 'relative' }}>
+                  <input
+                    type={showForgotPasswordEmail ? 'text' : 'email'}
+                    id="forgotEmail"
+                    value={forgotPasswordEmail}
+                    onChange={(e) => setForgotPasswordEmail(e.target.value)}
+                    placeholder="Enter your email address"
+                    required
+                    style={{ paddingRight: '40px' }}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowForgotPasswordEmail(!showForgotPasswordEmail)}
+                    style={{
+                      position: 'absolute',
+                      right: '10px',
+                      top: '50%',
+                      transform: 'translateY(-50%)',
+                      background: 'none',
+                      border: 'none',
+                      cursor: 'pointer',
+                      padding: '5px',
+                      color: '#666',
+                      fontSize: '16px'
+                    }}
+                    title={showForgotPasswordEmail ? 'Hide email' : 'Show email'}
+                  >
+                    {showForgotPasswordEmail ? '👁️' : '👁️‍🗨️'}
+                  </button>
+                </div>
               </div>
               
               <div style={{ display: 'flex', gap: '10px', marginTop: '20px' }}>
