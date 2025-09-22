@@ -8,11 +8,7 @@ class ProductionConfig:
     """Production configuration class"""
     
     # Database
-    # Convert postgresql:// to postgresql+psycopg:// for psycopg3 compatibility
-    database_url = os.environ.get('DATABASE_URL', 'postgresql://localhost/family_finance')
-    if database_url.startswith('postgresql://'):
-        database_url = database_url.replace('postgresql://', 'postgresql+psycopg://', 1)
-    SQLALCHEMY_DATABASE_URI = database_url
+    SQLALCHEMY_DATABASE_URI = os.environ.get('DATABASE_URL', 'postgresql://localhost/family_finance')
     SQLALCHEMY_TRACK_MODIFICATIONS = False
     
     # Security
