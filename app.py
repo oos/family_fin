@@ -195,31 +195,27 @@ def health_check():
     """Health check endpoint for production deployment"""
     return jsonify({'status': 'healthy', 'message': 'Family Finance API is running'}), 200
 
-@app.route('/api/debug/users', methods=['GET'])
-def debug_users():
-    """Debug endpoint to check users in production database"""
+@app.route('/api/debug/db-test', methods=['GET'])
+def debug_db_test():
+    """Test database connection and basic operations"""
     try:
-        users = User.query.all()
-        user_list = []
-        for user in users:
-            user_list.append({
-                'id': user.id,
-                'email': user.email,
-                'username': user.username,
-                'role': user.role,
-                'is_active': user.is_active,
-                'created_at': user.created_at.isoformat() if user.created_at else None
-            })
+        # Test database connection
+        db.session.execute('SELECT 1')
+        
+        # Try to get user count
+        user_count = User.query.count()
         
         return jsonify({
             'success': True,
-            'user_count': len(user_list),
-            'users': user_list
+            'message': 'Database connection successful',
+            'user_count': user_count,
+            'database_url': app.config.get('SQLALCHEMY_DATABASE_URI', 'Not set')[:50] + '...'
         })
     except Exception as e:
         return jsonify({
             'success': False,
-            'error': str(e)
+            'error': str(e),
+            'database_url': app.config.get('SQLALCHEMY_DATABASE_URI', 'Not set')[:50] + '...'
         }), 500
 
 @app.route('/api/admin/init-database', methods=['POST'])
