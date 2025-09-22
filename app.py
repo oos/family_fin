@@ -14,13 +14,29 @@ except ImportError:
 import json
 import re
 import math
-import pdfplumber
-import PyPDF2
-from sklearn.feature_extraction.text import TfidfVectorizer
-from sklearn.ensemble import RandomForestClassifier
-from sklearn.model_selection import train_test_split
-from sklearn.metrics import classification_report, accuracy_score, precision_recall_fscore_support
-import numpy as np
+try:
+    import pdfplumber
+    PDFPLUMBER_AVAILABLE = True
+except ImportError:
+    PDFPLUMBER_AVAILABLE = False
+    print("Warning: pdfplumber not available - PDF processing will be disabled")
+
+try:
+    import PyPDF2
+    PYPDF2_AVAILABLE = True
+except ImportError:
+    PYPDF2_AVAILABLE = False
+    print("Warning: PyPDF2 not available - PDF processing will be disabled")
+try:
+    from sklearn.feature_extraction.text import TfidfVectorizer
+    from sklearn.ensemble import RandomForestClassifier
+    from sklearn.model_selection import train_test_split
+    from sklearn.metrics import classification_report, accuracy_score, precision_recall_fscore_support
+    import numpy as np
+    SKLEARN_AVAILABLE = True
+except ImportError:
+    SKLEARN_AVAILABLE = False
+    print("Warning: scikit-learn not available - ML features will be disabled")
 import os
 import csv
 import io
@@ -3758,6 +3774,8 @@ def process_pdf_file(file):
     """Process PDF file and extract tabular data"""
     if not PANDAS_AVAILABLE:
         return {"error": "PDF processing requires pandas, which is not available"}
+    if not PDFPLUMBER_AVAILABLE and not PYPDF2_AVAILABLE:
+        return {"error": "PDF processing requires pdfplumber or PyPDF2, which are not available"}
     try:
         # Reset file pointer
         file.seek(0)
@@ -5427,7 +5445,7 @@ class TransactionCategoryPredictor:
     
     def extract_features(self, transaction):
         """Extract features from a bank transaction for ML prediction"""
-        if not PANDAS_AVAILABLE:
+        if not PANDAS_AVAILABLE or not SKLEARN_AVAILABLE:
             return {}
         features = {}
         
@@ -5486,8 +5504,8 @@ class TransactionCategoryPredictor:
     
     def train_model(self, user_id, incremental=False):
         """Train the ML model on matched transaction data"""
-        if not PANDAS_AVAILABLE:
-            return {"error": "ML training requires pandas, which is not available"}
+        if not PANDAS_AVAILABLE or not SKLEARN_AVAILABLE:
+            return {"error": "ML training requires pandas and scikit-learn, which are not available"}
         import time
         start_time = time.time()
         
@@ -5624,7 +5642,7 @@ class TransactionCategoryPredictor:
     
     def predict_category(self, transaction):
         """Predict category for a single transaction"""
-        if not PANDAS_AVAILABLE:
+        if not PANDAS_AVAILABLE or not SKLEARN_AVAILABLE:
             return None
         if not self.is_trained or not self.model:
             return None, 0.0
