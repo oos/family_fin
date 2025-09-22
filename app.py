@@ -99,6 +99,14 @@ from models import db, User, Person, Property, Income, Loan, Family, BusinessAcc
 db.init_app(app)
 jwt = JWTManager(app)
 migrate = Migrate(app, db)
+
+# Create tables if they don't exist (for production deployment)
+with app.app_context():
+    try:
+        db.create_all()
+        print("Database tables created successfully")
+    except Exception as e:
+        print(f"Warning: Could not create database tables: {e}")
 CORS(app, 
      origins=['http://localhost:3007'],
      methods=['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
