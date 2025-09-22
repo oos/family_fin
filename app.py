@@ -98,15 +98,23 @@ from models import db, User, Person, Property, Income, Loan, Family, BusinessAcc
 # Initialize extensions
 db.init_app(app)
 jwt = JWTManager(app)
-migrate = Migrate(app, db)
+
+# Initialize migration only if not in build environment
+try:
+    migrate = Migrate(app, db)
+except Exception as e:
+    print(f"Warning: Could not initialize Flask-Migrate: {e}")
+    migrate = None
 
 # Create tables if they don't exist (for production deployment)
-with app.app_context():
-    try:
-        db.create_all()
-        print("Database tables created successfully")
-    except Exception as e:
-        print(f"Warning: Could not create database tables: {e}")
+# Only run this in production, not during build
+if os.environ.get('FLASK_ENV') == 'production':
+    with app.app_context():
+        try:
+            db.create_all()
+            print("Database tables created successfully")
+        except Exception as e:
+            print(f"Warning: Could not create database tables: {e}")
 CORS(app, 
      origins=['http://localhost:3007'],
      methods=['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
