@@ -4,6 +4,7 @@ from flask_cors import CORS
 # from flask_migrate import Migrate  # Disabled for production deployment
 from werkzeug.security import generate_password_hash, check_password_hash
 import hashlib
+import os
 from datetime import datetime, timedelta
 try:
     import pandas as pd
@@ -111,8 +112,10 @@ if os.environ.get('FLASK_ENV') == 'production':
             print("Database tables created successfully")
         except Exception as e:
             print(f"Warning: Could not create database tables: {e}")
+# CORS configuration - use environment variable if available
+cors_origins = os.environ.get('CORS_ORIGINS', 'http://localhost:3007,https://family-finance-frontend.onrender.com').split(',')
 CORS(app, 
-     origins=['http://localhost:3007', 'https://family-finance-frontend.onrender.com'],
+     origins=cors_origins,
      methods=['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
      allow_headers=['Content-Type', 'Authorization'],
      supports_credentials=True)
@@ -6325,13 +6328,8 @@ if __name__ == '__main__':
         frontend_port = get_app_setting('frontend_port', '3007')
         backend_port = int(get_app_setting('backend_port', '5002'))
         
-        # Update CORS configuration with the configured frontend port
-        from flask_cors import CORS
-        CORS(app, 
-             origins=[f'http://localhost:{frontend_port}'],
-             methods=['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-             allow_headers=['Content-Type', 'Authorization'],
-             supports_credentials=True)
+        # CORS is already configured at the top of the file
+        print(f"CORS configured for origins: {cors_origins}")
         
         print(f"Starting Flask server on port {backend_port}")
         print(f"Frontend should be running on port {frontend_port}")
