@@ -222,6 +222,51 @@ def debug_users():
             'error': str(e)
         }), 500
 
+@app.route('/api/admin/init-sean-user', methods=['POST'])
+def init_sean_user():
+    """Initialize Sean's user in production database"""
+    try:
+        # Check if Sean already exists
+        sean_user = User.query.filter_by(email='sean.osullivan@gmail.com').first()
+        
+        if sean_user:
+            return jsonify({
+                'success': True,
+                'message': 'Sean user already exists',
+                'user_id': sean_user.id
+            })
+        
+        # Create Sean's user
+        new_user = User(
+            username='sean',
+            email='sean.osullivan@gmail.com',
+            role='user',
+            is_active=True,
+            created_at=datetime.utcnow(),
+            updated_at=datetime.utcnow()
+        )
+        
+        # Set password
+        new_user.set_password('Secodwom01')
+        new_user.password = 'Secodwom01'
+        
+        # Add to database
+        db.session.add(new_user)
+        db.session.commit()
+        
+        return jsonify({
+            'success': True,
+            'message': 'Sean user created successfully',
+            'user_id': new_user.id
+        })
+        
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
 @app.route('/api/admin/update-sean-password', methods=['POST'])
 def update_sean_password():
     """Update Sean's password (temporary admin endpoint)"""
