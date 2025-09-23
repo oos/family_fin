@@ -19,8 +19,8 @@ function Taxation() {
         axios.get('/api/income'),
         axios.get('/api/people')
       ]);
-      setIncome(incomeRes.data);
-      setPeople(peopleRes.data);
+      setIncome(incomeRes.data.success ? incomeRes.data.incomes : []);
+      setPeople(peopleRes.data); // /api/people returns direct array
     } catch (err) {
       setError('Failed to load taxation data');
       console.error(err);
