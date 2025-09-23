@@ -89,7 +89,7 @@ function NetWorth() {
   const fetchPeople = async () => {
     try {
       setLoading(true);
-      const response = await axios.get('/people');
+      const response = await axios.get('/api/people');
       setPeople(response.data);
     } catch (err) {
       setError('Failed to load people');

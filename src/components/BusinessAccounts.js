@@ -48,7 +48,7 @@ function BusinessAccounts() {
       if (editingAccount) {
         await axios.put(`/business-accounts/${editingAccount.id}`, formData);
       } else {
-        await axios.post('/business-accounts', formData);
+        await axios.post('/api/business-accounts', formData);
       }
       setShowModal(false);
       setEditingAccount(null);

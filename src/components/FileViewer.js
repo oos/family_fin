@@ -17,7 +17,7 @@ const FileViewer = () => {
     try {
       setLoading(true);
       const token = localStorage.getItem('token');
-      const response = await axios.get('/files', {
+      const response = await axios.get('/api/files', {
         headers: {
           'Authorization': `Bearer ${token}`
         }

@@ -70,7 +70,7 @@ function Income() {
       if (editingIncome) {
         await axios.put(`/income/${editingIncome.id}`, data);
       } else {
-        await axios.post('/income', data);
+        await axios.post('/api/income', data);
       }
       setShowModal(false);
       setEditingIncome(null);
@@ -148,7 +148,7 @@ function Income() {
         await axios.put(`/pensions/${editingPension.id}`, data);
         setPensions(pensions.map(p => p.id === editingPension.id ? { ...p, ...data } : p));
       } else {
-        const response = await axios.post('/pensions', data);
+        const response = await axios.post('/api/pensions', data);
         setPensions([...pensions, response.data]);
       }
 

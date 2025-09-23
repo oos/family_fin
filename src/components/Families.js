@@ -81,10 +81,10 @@ function Families() {
       };
 
       if (editingPerson) {
-        await axios.put(`/people/${editingPerson.id}`, data);
+        await axios.put(`/api/people/${editingPerson.id}`, data);
         setPeople(people.map(p => p.id === editingPerson.id ? { ...p, ...data } : p));
       } else {
-        const response = await axios.post('/people', data);
+        const response = await axios.post('/api/people', data);
         setPeople([...people, response.data]);
       }
 
@@ -104,7 +104,7 @@ function Families() {
         await axios.put(`/families/${editingFamily.id}`, familyFormData);
         setFamilies(families.map(f => f.id === editingFamily.id ? { ...f, ...familyFormData } : f));
       } else {
-        const response = await axios.post('/families', familyFormData);
+        const response = await axios.post('/api/families', familyFormData);
         setFamilies([...families, response.data]);
       }
 

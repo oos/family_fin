@@ -72,7 +72,7 @@ function People() {
         await axios.put(`/people/${editingPerson.id}`, formData);
         setPeople(people.map(p => p.id === editingPerson.id ? { ...p, ...formData } : p));
       } else {
-        const response = await axios.post('/people', formData);
+        const response = await axios.post('/api/people', formData);
         setPeople([...people, response.data]);
       }
       setShowModal(false);

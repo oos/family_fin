@@ -25,9 +25,9 @@ function LoanCalculator() {
   const fetchData = async () => {
     try {
       const [propertiesRes, incomeRes, peopleRes] = await Promise.all([
-        axios.get('/properties'),
-        axios.get('/income'),
-        axios.get('/people')
+        axios.get('/api/properties'),
+        axios.get('/api/income'),
+        axios.get('/api/people')
       ]);
       setProperties(propertiesRes.data);
       setIncome(incomeRes.data);

@@ -43,7 +43,7 @@ const TransactionPredictions = () => {
   const fetchTrainingHistory = async () => {
     try {
       const token = localStorage.getItem('token');
-      const response = await axios.get('/training-history', {
+      const response = await axios.get('/api/training-history', {
         headers: { Authorization: `Bearer ${token}` }
       });
       setTrainingHistory(response.data.training_history);
@@ -55,7 +55,7 @@ const TransactionPredictions = () => {
   const fetchModelPerformance = async () => {
     try {
       const token = localStorage.getItem('token');
-      const response = await axios.get('/model-performance', {
+      const response = await axios.get('/api/model-performance', {
         headers: { Authorization: `Bearer ${token}` }
       });
       setModelPerformance(response.data);
@@ -74,7 +74,7 @@ const TransactionPredictions = () => {
     setError(null);
     try {
       const token = localStorage.getItem('token');
-      const response = await axios.post('/train-category-model', { incremental }, {
+      const response = await axios.post('/api/train-category-model', { incremental }, {
         headers: { Authorization: `Bearer ${token}` }
       });
       
@@ -100,7 +100,7 @@ const TransactionPredictions = () => {
     setError(null);
     try {
       const token = localStorage.getItem('token');
-      const response = await axios.post('/predict-all-transactions', {}, {
+      const response = await axios.post('/api/predict-all-transactions', {}, {
         headers: { Authorization: `Bearer ${token}` }
       });
       

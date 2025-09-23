@@ -15,8 +15,8 @@ function CompanyTaxation() {
     try {
       setLoading(true);
       const [propertiesRes, incomeRes] = await Promise.all([
-        axios.get('/properties'),
-        axios.get('/income')
+        axios.get('/api/properties'),
+        axios.get('/api/income')
       ]);
       setProperties(propertiesRes.data);
       setIncome(incomeRes.data);

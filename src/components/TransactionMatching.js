@@ -29,7 +29,7 @@ const TransactionMatching = () => {
     setError(null);
     try {
       const token = localStorage.getItem('token');
-      const response = await axios.get('/tax-returns', {
+      const response = await axios.get('/api/tax-returns', {
         headers: { Authorization: `Bearer ${token}` }
       });
       setTaxReturns(response.data);
@@ -44,7 +44,7 @@ const TransactionMatching = () => {
   const fetchAvailableCategories = async () => {
     try {
       const token = localStorage.getItem('token');
-      const response = await axios.get('/transaction-categories', {
+      const response = await axios.get('/api/transaction-categories', {
         headers: { Authorization: `Bearer ${token}` }
       });
       setAvailableCategories(response.data);
@@ -110,7 +110,7 @@ const TransactionMatching = () => {
     
     try {
       const token = localStorage.getItem('token');
-      const response = await axios.post('/transaction-matches', {
+      const response = await axios.post('/api/transaction-matches', {
         tax_return_transaction_id: taxTransactionId,
         bank_transaction_id: bankTransactionId,
         match_method: 'manual',

@@ -16,8 +16,8 @@ function Taxation() {
     try {
       setLoading(true);
       const [incomeRes, peopleRes] = await Promise.all([
-        axios.get('/income'),
-        axios.get('/people')
+        axios.get('/api/income'),
+        axios.get('/api/people')
       ]);
       setIncome(incomeRes.data);
       setPeople(peopleRes.data);

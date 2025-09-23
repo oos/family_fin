@@ -123,7 +123,7 @@ const UserDashboard = () => {
         [itemType === 'account' ? 'account_id' : 'loan_id']: selectedItem.id
       };
 
-      const response = await axios.post('/account-balances', formData);
+      const response = await axios.post('/api/account-balances', formData);
       
       if (response.data.success) {
         fetchDashboardData(); // Refresh data

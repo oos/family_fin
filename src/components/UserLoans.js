@@ -193,7 +193,7 @@ const UserLoans = () => {
   const handleSubmitBalance = async (e) => {
     e.preventDefault();
     try {
-      const response = await axios.post('/user-loan-balances', {
+      const response = await axios.post('/api/user-loan-balances', {
         loan_id: selectedLoan.id,
         balance: parseFloat(balanceForm.balance),
         date_entered: balanceForm.date_entered,

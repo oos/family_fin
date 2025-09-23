@@ -56,7 +56,7 @@ function Properties() {
       if (editingProperty) {
         await axios.put(`/properties/${editingProperty.id}`, data);
       } else {
-        await axios.post('/properties', data);
+        await axios.post('/api/properties', data);
       }
       setShowModal(false);
       setEditingProperty(null);

@@ -15,9 +15,9 @@ const Pension = () => {
   const fetchData = async () => {
     try {
       const [incomeRes, propertiesRes, peopleRes] = await Promise.all([
-        axios.get('/income'),
-        axios.get('/properties'),
-        axios.get('/people')
+        axios.get('/api/income'),
+        axios.get('/api/properties'),
+        axios.get('/api/people')
       ]);
       console.log('Income data:', incomeRes.data);
       console.log('Properties data:', propertiesRes.data);

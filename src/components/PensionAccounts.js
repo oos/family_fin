@@ -28,8 +28,8 @@ function PensionAccounts() {
     try {
       setLoading(true);
       const [accountsRes, peopleRes] = await Promise.all([
-        axios.get('/pension-accounts'),
-        axios.get('/people')
+        axios.get('/api/pension-accounts'),
+        axios.get('/api/people')
       ]);
       setAccounts(accountsRes.data);
       setPeople(peopleRes.data);
@@ -54,7 +54,7 @@ function PensionAccounts() {
         await axios.put(`/pension-accounts/${editingAccount.id}`, data);
         setAccounts(accounts.map(acc => acc.id === editingAccount.id ? { ...acc, ...data } : acc));
       } else {
-        const response = await axios.post('/pension-accounts', data);
+        const response = await axios.post('/api/pension-accounts', data);
         setAccounts([...accounts, response.data]);
       }
 

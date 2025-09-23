@@ -39,7 +39,7 @@ const TaxReturns = () => {
         return;
       }
       
-      const response = await axios.get('/tax-returns', {
+      const response = await axios.get('/api/tax-returns', {
         headers: { Authorization: `Bearer ${token}` }
       });
       setTaxReturns(response.data);
@@ -98,7 +98,7 @@ const TaxReturns = () => {
       formData.append('year', selectedYear);
 
       const token = localStorage.getItem('token');
-      const response = await axios.post('/tax-returns/upload', formData, {
+      const response = await axios.post('/api/tax-returns/upload', formData, {
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'multipart/form-data'
@@ -209,7 +209,7 @@ const TaxReturns = () => {
     setAnalyticsLoading(true);
     try {
       const token = localStorage.getItem('token');
-      const response = await axios.get('/tax-returns/analytics', {
+      const response = await axios.get('/api/tax-returns/analytics', {
         headers: { Authorization: `Bearer ${token}` }
       });
       setAnalyticsData(response.data);

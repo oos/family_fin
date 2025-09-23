@@ -140,7 +140,7 @@ function Loans() {
       if (editingLoan) {
         await axios.put(`/loans/${editingLoan.id}`, data);
       } else {
-        await axios.post('/loans', data);
+        await axios.post('/api/loans', data);
       }
       
       setShowModal(false);

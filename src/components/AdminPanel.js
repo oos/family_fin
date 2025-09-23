@@ -865,7 +865,7 @@ const AdminPanel = () => {
   const fetchAppSettings = async () => {
     try {
       setSettingsLoading(true);
-      const response = await axios.get('/app-settings');
+      const response = await axios.get('/api/app-settings');
       if (response.data.success) {
         setAppSettings(response.data.settings);
       } else {
@@ -892,7 +892,7 @@ const AdminPanel = () => {
   const handleSaveAppSettings = async () => {
     try {
       setSettingsLoading(true);
-      const response = await axios.put('/app-settings', {
+      const response = await axios.put('/api/app-settings', {
         settings: appSettings
       });
 
