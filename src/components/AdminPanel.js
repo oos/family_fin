@@ -185,7 +185,7 @@ const AdminPanel = () => {
   const fetchUsers = async () => {
     try {
       setLoading(true);
-      const response = await axios.get('/users');
+      const response = await axios.get('/api/users');
       if (response.data.success) {
         setUsers(response.data.users);
       } else {
@@ -389,7 +389,7 @@ const AdminPanel = () => {
   const fetchLoansData = async () => {
     try {
       setLoadingAccess(true);
-      const response = await axios.get('/loans');
+      const response = await axios.get('/api/loans');
       if (response.data.success) {
         setAvailableLoans(response.data.loans);
         // Load existing access for all users
@@ -405,7 +405,7 @@ const AdminPanel = () => {
   const fetchAccountsData = async () => {
     try {
       setLoadingAccess(true);
-      const response = await axios.get('/business-accounts');
+      const response = await axios.get('/api/business-accounts');
       if (response.data.success) {
         setAvailableAccounts(response.data.accounts);
         // Load existing access for all users
@@ -422,7 +422,7 @@ const AdminPanel = () => {
     try {
       console.log('Fetching properties data...');
       setLoadingAccess(true);
-      const response = await axios.get('/properties');
+      const response = await axios.get('/api/properties');
       console.log('Properties response:', response.data);
       if (response.data.success) {
         setAvailableProperties(response.data.properties);
@@ -441,7 +441,7 @@ const AdminPanel = () => {
     try {
       console.log('Fetching income data...');
       setLoadingAccess(true);
-      const response = await axios.get('/income');
+      const response = await axios.get('/api/income');
       console.log('Income response:', response.data);
       if (response.data.success) {
         setAvailableIncomes(response.data.incomes);
@@ -460,7 +460,7 @@ const AdminPanel = () => {
     try {
       console.log('Fetching pensions data...');
       setLoadingAccess(true);
-      const response = await axios.get('/pension-accounts');
+      const response = await axios.get('/api/pension-accounts');
       console.log('Pensions response:', response.data);
       if (response.data.success) {
         setAvailablePensions(response.data.pensions);

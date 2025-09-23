@@ -32,7 +32,7 @@ function BusinessAccounts() {
   const fetchAccounts = async () => {
     try {
       setLoading(true);
-      const response = await axios.get('/business-accounts');
+      const response = await axios.get('/api/business-accounts');
       setAccounts(response.data);
     } catch (err) {
       setError('Failed to load bank accounts');

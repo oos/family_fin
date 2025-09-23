@@ -73,8 +73,8 @@ function Loans() {
       setLoading(true);
       console.log('Fetching loans data...');
       const [loansRes, propertiesRes] = await Promise.all([
-        axios.get('/loans'),
-        axios.get('/properties')
+        axios.get('/api/loans'),
+        axios.get('/api/properties')
       ]);
       console.log('Loans fetched:', loansRes.data.length, 'loans');
       setLoans(loansRes.data);

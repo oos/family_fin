@@ -31,8 +31,8 @@ function Families() {
     try {
       setLoading(true);
       const [familiesRes, peopleRes] = await Promise.all([
-        axios.get('/families'),
-        axios.get('/people')
+        axios.get('/api/families'),
+        axios.get('/api/people')
       ]);
       setFamilies(familiesRes.data);
       setPeople(peopleRes.data);

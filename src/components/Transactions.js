@@ -88,7 +88,7 @@ const Transactions = () => {
         return;
       }
       
-      const response = await axios.get('/business-accounts', {
+      const response = await axios.get('/api/business-accounts', {
         headers: { Authorization: `Bearer ${token}` }
       });
       console.log('Business accounts response:', response.data);
