@@ -52,7 +52,7 @@ const UserLoans = () => {
   const fetchLoans = async () => {
     try {
       console.log('Fetching loans...');
-      const response = await axios.get('/loans');
+      const response = await axios.get('/api/loans');
       console.log('Loans response:', response.data);
       if (response.data.success) {
         setLoans(response.data.loans);
@@ -69,7 +69,7 @@ const UserLoans = () => {
 
   const fetchBalances = async () => {
     try {
-      const response = await axios.get('/user-loan-balances');
+      const response = await axios.get('/api/user-loan-balances');
       if (response.data.success) {
         setBalances(response.data.balances);
       }

@@ -52,7 +52,7 @@ const UserAccounts = () => {
   const fetchAccounts = async () => {
     try {
       console.log('Fetching accounts...');
-      const response = await axios.get('/business-accounts');
+      const response = await axios.get('/api/business-accounts');
       console.log('Accounts response:', response.data);
       if (response.data.success) {
         setAccounts(response.data.accounts);
@@ -69,7 +69,7 @@ const UserAccounts = () => {
 
   const fetchBalances = async () => {
     try {
-      const response = await axios.get('/user-account-balances');
+      const response = await axios.get('/api/user-account-balances');
       if (response.data.success) {
         setBalances(response.data.balances);
       }
