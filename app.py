@@ -294,6 +294,35 @@ def debug_test_login():
             'results': results
         }), 500
 
+@app.route('/api/debug/simple-test', methods=['POST'])
+def debug_simple_test():
+    """Simple debug endpoint without any cryptographic operations"""
+    try:
+        data = request.get_json()
+        email = data.get('email')
+        
+        # Simple database query without any crypto operations
+        user = User.query.filter_by(email=email).first()
+        
+        if user:
+            return jsonify({
+                'success': True,
+                'user_id': user.id,
+                'email': user.email,
+                'role': user.role,
+                'message': 'User found successfully'
+            })
+        else:
+            return jsonify({
+                'success': False,
+                'message': 'User not found'
+            })
+            
+    except Exception as e:
+        return jsonify({
+            'error': f'Simple test failed: {str(e)}'
+        }), 500
+
 @app.route('/api/admin/init-database', methods=['POST'])
 def init_database():
     """Initialize production database with basic data"""
