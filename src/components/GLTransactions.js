@@ -123,7 +123,7 @@ const GLTransactions = () => {
         ...filters
       });
 
-      const response = await axios.get(`/gl-transactions?${params}`, {
+      const response = await axios.get(`/api/gl-transactions?${params}`, {
         headers: { Authorization: `Bearer ${token}` }
       });
 
@@ -149,7 +149,7 @@ const GLTransactions = () => {
       if (!token) return;
 
       // Fetch filter options from dedicated endpoint
-      const response = await axios.get('/gl-transactions/filter-options', {
+      const response = await axios.get('/api/gl-transactions/filter-options', {
         headers: { Authorization: `Bearer ${token}` }
       });
 
@@ -171,7 +171,7 @@ const GLTransactions = () => {
       const token = localStorage.getItem('token');
       if (!token) return;
 
-      const response = await axios.get('/transactions', {
+      const response = await axios.get('/api/transactions', {
         headers: { Authorization: `Bearer ${token}` }
       });
       setBankTransactions(response.data.transactions || []);
@@ -236,7 +236,7 @@ const GLTransactions = () => {
         params.append('year', filters.year);
       }
 
-      const response = await axios.get(`/gl-transactions/summary-counts?${params.toString()}`, {
+      const response = await axios.get(`/api/gl-transactions/summary-counts?${params.toString()}`, {
         headers: { Authorization: `Bearer ${token}` }
       });
       
@@ -583,7 +583,7 @@ const GLTransactions = () => {
       const token = localStorage.getItem('token');
       if (!token) return;
 
-      const response = await axios.get(`/gl-transactions?per_page=10000&year=${filters.year}&sort_field=id&sort_direction=asc`, {
+      const response = await axios.get(`/api/gl-transactions?per_page=10000&year=${filters.year}&sort_field=id&sort_direction=asc`, {
         headers: { Authorization: `Bearer ${token}` }
       });
       
