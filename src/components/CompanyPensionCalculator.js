@@ -16,13 +16,13 @@ function CompanyPensionCalculator() {
   const fetchData = async () => {
     try {
       const [incomeRes, propertiesRes, peopleRes] = await Promise.all([
-        axios.get('/income'),
-        axios.get('/properties'),
-        axios.get('/people')
+        axios.get('/api/income'),
+        axios.get('/api/properties'),
+        axios.get('/api/people')
       ]);
-      setIncome(incomeRes.data);
-      setProperties(propertiesRes.data);
-      setPeople(peopleRes.data);
+      setIncome(incomeRes.data.success ? incomeRes.data.incomes : []);
+      setProperties(propertiesRes.data.success ? propertiesRes.data.properties : []);
+      setPeople(peopleRes.data); // /api/people returns direct array
     } catch (err) {
       console.error('Error fetching data:', err);
       setError('Failed to load data');
