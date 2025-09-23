@@ -240,15 +240,29 @@ def debug_test_login():
         # Test password check
         password_valid = user.check_password(password)
         
-        # Test JWT creation
+        # Test JWT creation with different approaches
+        jwt_results = {}
+        
+        # Test 1: Standard JWT creation
         try:
             access_token = create_access_token(identity=str(user.id))
-            jwt_success = True
-            jwt_error = None
+            jwt_results['standard'] = {'success': True, 'token': access_token[:50] + '...'}
         except Exception as e:
-            jwt_success = False
-            jwt_error = str(e)
-            access_token = None
+            jwt_results['standard'] = {'success': False, 'error': str(e)}
+        
+        # Test 2: JWT creation with integer ID
+        try:
+            access_token = create_access_token(identity=user.id)
+            jwt_results['integer_id'] = {'success': True, 'token': access_token[:50] + '...'}
+        except Exception as e:
+            jwt_results['integer_id'] = {'success': False, 'error': str(e)}
+        
+        # Test 3: JWT creation with minimal payload
+        try:
+            access_token = create_access_token(identity=str(user.id), additional_claims={})
+            jwt_results['minimal'] = {'success': True, 'token': access_token[:50] + '...'}
+        except Exception as e:
+            jwt_results['minimal'] = {'success': False, 'error': str(e)}
         
         return jsonify({
             'user_found': True,
@@ -258,9 +272,8 @@ def debug_test_login():
             'role': user.role,
             'is_active': user.is_active,
             'password_valid': password_valid,
-            'jwt_creation_success': jwt_success,
-            'jwt_error': jwt_error,
-            'access_token': access_token
+            'jwt_results': jwt_results,
+            'jwt_secret_key': app.config.get('JWT_SECRET_KEY', 'Not set')[:20] + '...'
         })
         
     except Exception as e:
