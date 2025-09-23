@@ -47,7 +47,7 @@ function Income() {
         axios.get('/api/people'),
         axios.get('/api/pensions')
       ]);
-      setIncome(incomeRes.data);
+      setIncome(incomeRes.data.success ? incomeRes.data.incomes : []);
       setPeople(peopleRes.data);
       setPensions(pensionsRes.data);
     } catch (err) {
