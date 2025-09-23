@@ -628,8 +628,8 @@ def get_loans():
     current_user = User.query.filter_by(id=current_user_id).first()
     
     if current_user.role == 'admin':
-        # Admin sees all loans, ordered by name with BOI first, HTB UK second, etc.
-        loans = Loan.query.order_by(
+        # Admin sees all loans with property data joined to avoid N+1 queries
+        loans = db.session.query(Loan, Property).outerjoin(Property, Loan.property_id == Property.id).order_by(
             db.case(
                 (Loan.loan_name == 'BOI (mortgage)', 1),
                 (Loan.loan_name == 'HTB UK (mortgage)', 2),
@@ -646,7 +646,7 @@ def get_loans():
         user_loan_access = UserLoanAccess.query.filter_by(user_id=current_user_id).all()
         loan_ids = [access.loan_id for access in user_loan_access]
         if loan_ids:
-            loans = Loan.query.filter(Loan.id.in_(loan_ids)).order_by(
+            loans = db.session.query(Loan, Property).outerjoin(Property, Loan.property_id == Property.id).filter(Loan.id.in_(loan_ids)).order_by(
                 db.case(
                     (Loan.loan_name == 'BOI (mortgage)', 1),
                     (Loan.loan_name == 'HTB UK (mortgage)', 2),
@@ -661,9 +661,17 @@ def get_loans():
         else:
             loans = []
     
+    # Convert joined query results to loan dictionaries with property data
+    loan_data = []
+    for loan, property in loans:
+        loan_dict = loan.to_dict()
+        if property:
+            loan_dict['property_name'] = property.nickname
+        loan_data.append(loan_dict)
+    
     return jsonify({
         'success': True,
-        'loans': [loan.to_dict() for loan in loans]
+        'loans': loan_data
     })
 
 @app.route('/api/loans', methods=['POST'])
@@ -6269,13 +6277,25 @@ def get_user_loan_balances():
     try:
         current_user_id = int(get_jwt_identity())
         
-        balances = AccountBalance.query.filter_by(
-            user_id=current_user_id
-        ).filter(AccountBalance.loan_id.isnot(None)).all()
+        # Use join query to avoid N+1 queries
+        balances = db.session.query(AccountBalance, BusinessAccount).outerjoin(
+            BusinessAccount, AccountBalance.account_id == BusinessAccount.id
+        ).filter(
+            AccountBalance.user_id == current_user_id,
+            AccountBalance.loan_id.isnot(None)
+        ).all()
+        
+        # Convert to dictionaries with account data
+        balance_data = []
+        for balance, account in balances:
+            balance_dict = balance.to_dict()
+            if account:
+                balance_dict['account_name'] = account.account_name
+            balance_data.append(balance_dict)
         
         return jsonify({
             'success': True,
-            'balances': [balance.to_dict() for balance in balances]
+            'balances': balance_data
         })
         
     except Exception as e:
@@ -6342,13 +6362,25 @@ def get_user_account_balances():
     try:
         current_user_id = int(get_jwt_identity())
         
-        balances = AccountBalance.query.filter_by(
-            user_id=current_user_id
-        ).filter(AccountBalance.account_id.isnot(None)).all()
+        # Use join query to avoid N+1 queries
+        balances = db.session.query(AccountBalance, BusinessAccount).outerjoin(
+            BusinessAccount, AccountBalance.account_id == BusinessAccount.id
+        ).filter(
+            AccountBalance.user_id == current_user_id,
+            AccountBalance.account_id.isnot(None)
+        ).all()
+        
+        # Convert to dictionaries with account data
+        balance_data = []
+        for balance, account in balances:
+            balance_dict = balance.to_dict()
+            if account:
+                balance_dict['account_name'] = account.account_name
+            balance_data.append(balance_dict)
         
         return jsonify({
             'success': True,
-            'balances': [balance.to_dict() for balance in balances]
+            'balances': balance_data
         })
         
     except Exception as e:
