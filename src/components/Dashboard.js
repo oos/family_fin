@@ -35,8 +35,8 @@ function Dashboard({ currentUser }) {
       ]);
       
       setSummary(summaryRes.data);
-      setProperties(propertiesRes.data);
-      setIncome(incomeRes.data);
+      setProperties(propertiesRes.data.success ? propertiesRes.data.properties : []);
+      setIncome(incomeRes.data.success ? incomeRes.data.incomes : []);
       setLoans(loansRes.data.success ? loansRes.data.loans : []);
       setAccounts(accountsRes.data.success ? accountsRes.data.accounts : []);
       setLoanBalances(loanBalancesRes.data.success ? loanBalancesRes.data.balances : []);
