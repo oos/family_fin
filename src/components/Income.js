@@ -43,9 +43,9 @@ function Income() {
     try {
       setLoading(true);
       const [incomeRes, peopleRes, pensionsRes] = await Promise.all([
-        axios.get('/income'),
-        axios.get('/people'),
-        axios.get('/pensions')
+        axios.get('/api/income'),
+        axios.get('/api/people'),
+        axios.get('/api/pensions')
       ]);
       setIncome(incomeRes.data);
       setPeople(peopleRes.data);

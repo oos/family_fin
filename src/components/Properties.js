@@ -29,7 +29,7 @@ function Properties() {
   const fetchProperties = async () => {
     try {
       setLoading(true);
-      const response = await axios.get('/properties');
+      const response = await axios.get('/api/properties');
       setProperties(response.data);
     } catch (err) {
       setError('Failed to load properties');
