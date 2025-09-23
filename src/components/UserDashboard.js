@@ -27,7 +27,7 @@ const UserDashboard = () => {
     try {
       setLoading(true);
       const [dashboardRes, loansRes, accountsRes, loanBalancesRes, accountBalancesRes] = await Promise.all([
-        axios.get('/user-dashboard'),
+        axios.get('/api/user-dashboard'),
         axios.get('/loans'),
         axios.get('/business-accounts'),
         axios.get('/user-loan-balances'),

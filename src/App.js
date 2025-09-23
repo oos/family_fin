@@ -38,7 +38,7 @@ const validateToken = async () => {
   
   try {
     // Test the token with a simple API call
-    await axios.get('/user-dashboard');
+    await axios.get('/api/user-dashboard');
     return true;
   } catch (error) {
     // Token is invalid, clear it
@@ -194,7 +194,7 @@ function App() {
           // Fetch user data for already logged in users
           try {
             setRoleLoading(true);
-            const response = await axios.get('/user-dashboard');
+            const response = await axios.get('/api/user-dashboard');
             if (response.data.success) {
               setUserRole(response.data.dashboard.user.role);
               setCurrentUser(response.data.dashboard.user);
@@ -228,7 +228,7 @@ function App() {
     
     // Fetch user role
     try {
-      const response = await axios.get('/user-dashboard');
+      const response = await axios.get('/api/user-dashboard');
       if (response.data.success) {
         setUserRole(response.data.dashboard.user.role);
         setCurrentUser(response.data.dashboard.user);
