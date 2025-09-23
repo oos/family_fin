@@ -220,65 +220,78 @@ def debug_db_test():
 
 @app.route('/api/debug/test-login', methods=['POST'])
 def debug_test_login():
-    """Debug endpoint to test login functionality"""
+    """Debug endpoint to test login functionality step by step"""
+    results = {}
+    
     try:
+        # Step 1: Parse JSON
         data = request.get_json()
+        results['step1_json'] = {'success': True, 'data': data}
+        
         email = data.get('email')
         password = data.get('password')
         
         if not email or not password:
             return jsonify({'error': 'Email and password required'}), 400
         
-        # Find user
-        user = User.query.filter(
-            (User.username == email) | (User.email == email)
-        ).first()
+        # Step 2: Database query
+        try:
+            user = User.query.filter(
+                (User.username == email) | (User.email == email)
+            ).first()
+            results['step2_query'] = {'success': True, 'user_found': user is not None}
+        except Exception as e:
+            results['step2_query'] = {'success': False, 'error': str(e)}
+            return jsonify({'results': results}), 500
         
         if not user:
-            return jsonify({'error': 'User not found'}), 404
+            return jsonify({'error': 'User not found', 'results': results}), 404
         
-        # Test password check
-        password_valid = user.check_password(password)
+        # Step 3: Access user properties
+        try:
+            user_id = user.id
+            username = user.username
+            user_email = user.email
+            role = user.role
+            is_active = user.is_active
+            results['step3_properties'] = {
+                'success': True,
+                'user_id': user_id,
+                'username': username,
+                'email': user_email,
+                'role': role,
+                'is_active': is_active
+            }
+        except Exception as e:
+            results['step3_properties'] = {'success': False, 'error': str(e)}
+            return jsonify({'results': results}), 500
         
-        # Test JWT creation with different approaches
-        jwt_results = {}
+        # Step 4: Password check
+        try:
+            password_valid = user.check_password(password)
+            results['step4_password'] = {'success': True, 'valid': password_valid}
+        except Exception as e:
+            results['step4_password'] = {'success': False, 'error': str(e)}
+            return jsonify({'results': results}), 500
         
-        # Test 1: Standard JWT creation
+        # Step 5: JWT creation
         try:
             access_token = create_access_token(identity=str(user.id))
-            jwt_results['standard'] = {'success': True, 'token': access_token[:50] + '...'}
+            results['step5_jwt'] = {'success': True, 'token': access_token[:50] + '...'}
         except Exception as e:
-            jwt_results['standard'] = {'success': False, 'error': str(e)}
-        
-        # Test 2: JWT creation with integer ID
-        try:
-            access_token = create_access_token(identity=user.id)
-            jwt_results['integer_id'] = {'success': True, 'token': access_token[:50] + '...'}
-        except Exception as e:
-            jwt_results['integer_id'] = {'success': False, 'error': str(e)}
-        
-        # Test 3: JWT creation with minimal payload
-        try:
-            access_token = create_access_token(identity=str(user.id), additional_claims={})
-            jwt_results['minimal'] = {'success': True, 'token': access_token[:50] + '...'}
-        except Exception as e:
-            jwt_results['minimal'] = {'success': False, 'error': str(e)}
+            results['step5_jwt'] = {'success': False, 'error': str(e)}
+            return jsonify({'results': results}), 500
         
         return jsonify({
-            'user_found': True,
-            'user_id': user.id,
-            'username': user.username,
-            'email': user.email,
-            'role': user.role,
-            'is_active': user.is_active,
-            'password_valid': password_valid,
-            'jwt_results': jwt_results,
-            'jwt_secret_key': app.config.get('JWT_SECRET_KEY', 'Not set')[:20] + '...'
+            'success': True,
+            'results': results,
+            'final_token': access_token
         })
         
     except Exception as e:
         return jsonify({
-            'error': f'Debug test failed: {str(e)}'
+            'error': f'Debug test failed: {str(e)}',
+            'results': results
         }), 500
 
 @app.route('/api/admin/init-database', methods=['POST'])
