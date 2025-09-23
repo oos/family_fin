@@ -25,13 +25,13 @@ function Dashboard({ currentUser }) {
     try {
       setLoading(true);
       const [summaryRes, propertiesRes, incomeRes, loansRes, accountsRes, loanBalancesRes, accountBalancesRes] = await Promise.all([
-        axios.get('/dashboard/summary'),
-        axios.get('/properties'),
-        axios.get('/income'),
-        axios.get('/loans'),
-        axios.get('/business-accounts'),
-        axios.get('/user-loan-balances'),
-        axios.get('/user-account-balances')
+        axios.get('/api/dashboard/summary'),
+        axios.get('/api/properties'),
+        axios.get('/api/income'),
+        axios.get('/api/loans'),
+        axios.get('/api/business-accounts'),
+        axios.get('/api/user-loan-balances'),
+        axios.get('/api/user-account-balances')
       ]);
       
       setSummary(summaryRes.data);
