@@ -22,9 +22,9 @@ const Pension = () => {
       console.log('Income data:', incomeRes.data);
       console.log('Properties data:', propertiesRes.data);
       console.log('People data:', peopleRes.data);
-      setIncome(incomeRes.data);
-      setProperties(propertiesRes.data);
-      setPeople(peopleRes.data);
+      setIncome(incomeRes.data.success ? incomeRes.data.incomes : []);
+      setProperties(propertiesRes.data.success ? propertiesRes.data.properties : []);
+      setPeople(peopleRes.data); // /api/people returns direct array
     } catch (err) {
       setError('Failed to fetch data');
       console.error('Fetch error:', err);
