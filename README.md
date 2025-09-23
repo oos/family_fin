@@ -492,4 +492,4 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 **Family Finance Application** - Comprehensive financial management for families and businesses.
 
-For more information, visit the [documentation](docs/) or contact support.
+For more information, visit the [documentation](docs/) or contact support.# Force deployment Tue Sep 23 22:58:25 IST 2025
