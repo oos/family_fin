@@ -201,7 +201,7 @@ const AdminPanel = () => {
 
   const fetchDashboardSettings = async (userId) => {
     try {
-      const response = await axios.get(`/dashboard-settings/${userId}`);
+      const response = await axios.get(`/api/dashboard-settings/${userId}`);
       if (response.data.success) {
         setDashboardSettings(response.data.settings);
       } else {
@@ -216,7 +216,7 @@ const AdminPanel = () => {
   const loadAllDashboardSettings = async () => {
     try {
       const settingsPromises = getSortedUsers().map(user => 
-        axios.get(`/dashboard-settings/${user.id}`)
+        axios.get(`/api/dashboard-settings/${user.id}`)
       );
       const responses = await Promise.all(settingsPromises);
       
@@ -312,7 +312,7 @@ const AdminPanel = () => {
           is_visible: s.is_visible
         }));
         
-        return axios.put(`/dashboard-settings/${userId}`, { settings: settingsData });
+        return axios.put(`/api/dashboard-settings/${userId}`, { settings: settingsData });
       });
       
       await Promise.all(savePromises);
@@ -344,7 +344,7 @@ const AdminPanel = () => {
           section: s.section,
           is_visible: s.is_visible
         }));
-        return axios.put(`/dashboard-settings/${userId}`, { settings: settingsData });
+        return axios.put(`/api/dashboard-settings/${userId}`, { settings: settingsData });
       });
 
       // Save loan access
@@ -357,7 +357,7 @@ const AdminPanel = () => {
       });
       
       const loanPromises = Object.entries(loanAccessByUser).map(([userId, loanIds]) => {
-        return axios.post(`/user-access/loans/${userId}`, { loan_ids: loanIds });
+        return axios.post(`/api/user-access/loans/${userId}`, { loan_ids: loanIds });
       });
 
       // Save account access
@@ -370,7 +370,7 @@ const AdminPanel = () => {
       });
       
       const accountPromises = Object.entries(accountAccessByUser).map(([userId, accountIds]) => {
-        return axios.post(`/user-access/accounts/${userId}`, { account_ids: accountIds });
+        return axios.post(`/api/user-access/accounts/${userId}`, { account_ids: accountIds });
       });
 
       // Execute all saves
@@ -651,8 +651,8 @@ const AdminPanel = () => {
       const accountIds = userAccountAccess.map(account => account.id);
       
       await Promise.all([
-        axios.post(`/user-access/loans/${selectedUser.id}`, { loan_ids: loanIds }),
-        axios.post(`/user-access/accounts/${selectedUser.id}`, { account_ids: accountIds })
+        axios.post(`/api/user-access/loans/${selectedUser.id}`, { loan_ids: loanIds }),
+        axios.post(`/api/user-access/accounts/${selectedUser.id}`, { account_ids: accountIds })
       ]);
       
       alert('User access permissions saved successfully!');
@@ -750,7 +750,7 @@ const AdminPanel = () => {
       
       // Save access for each user
       const savePromises = Object.entries(accessByUser).map(([userId, loanIds]) => {
-        return axios.post(`/user-access/loans/${userId}`, { loan_ids: loanIds });
+        return axios.post(`/api/user-access/loans/${userId}`, { loan_ids: loanIds });
       });
       
       await Promise.all(savePromises);
@@ -778,7 +778,7 @@ const AdminPanel = () => {
       
       // Save access for each user
       const savePromises = Object.entries(accessByUser).map(([userId, accountIds]) => {
-        return axios.post(`/user-access/accounts/${userId}`, { account_ids: accountIds });
+        return axios.post(`/api/user-access/accounts/${userId}`, { account_ids: accountIds });
       });
       
       await Promise.all(savePromises);
@@ -808,7 +808,7 @@ const AdminPanel = () => {
         is_visible: dashboardSettings.find(s => s.section === section.key)?.is_visible ?? true
       }));
 
-      const response = await axios.put(`/dashboard-settings/${selectedUser.id}`, {
+      const response = await axios.put(`/api/dashboard-settings/${selectedUser.id}`, {
         settings
       });
 
@@ -838,7 +838,7 @@ const AdminPanel = () => {
 
   const confirmPasswordReset = async () => {
     try {
-      const response = await axios.post(`/users/${resettingUser.id}/reset-password`, {
+      const response = await axios.post(`/api/users/${resettingUser.id}/reset-password`, {
         password: resetPassword
       });
 
