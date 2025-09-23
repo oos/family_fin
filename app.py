@@ -218,6 +218,56 @@ def debug_db_test():
             'database_url': app.config.get('SQLALCHEMY_DATABASE_URI', 'Not set')[:50] + '...'
         }), 500
 
+@app.route('/api/debug/test-login', methods=['POST'])
+def debug_test_login():
+    """Debug endpoint to test login functionality"""
+    try:
+        data = request.get_json()
+        email = data.get('email')
+        password = data.get('password')
+        
+        if not email or not password:
+            return jsonify({'error': 'Email and password required'}), 400
+        
+        # Find user
+        user = User.query.filter(
+            (User.username == email) | (User.email == email)
+        ).first()
+        
+        if not user:
+            return jsonify({'error': 'User not found'}), 404
+        
+        # Test password check
+        password_valid = user.check_password(password)
+        
+        # Test JWT creation
+        try:
+            access_token = create_access_token(identity=str(user.id))
+            jwt_success = True
+            jwt_error = None
+        except Exception as e:
+            jwt_success = False
+            jwt_error = str(e)
+            access_token = None
+        
+        return jsonify({
+            'user_found': True,
+            'user_id': user.id,
+            'username': user.username,
+            'email': user.email,
+            'role': user.role,
+            'is_active': user.is_active,
+            'password_valid': password_valid,
+            'jwt_creation_success': jwt_success,
+            'jwt_error': jwt_error,
+            'access_token': access_token
+        })
+        
+    except Exception as e:
+        return jsonify({
+            'error': f'Debug test failed: {str(e)}'
+        }), 500
+
 @app.route('/api/admin/init-database', methods=['POST'])
 def init_database():
     """Initialize production database with basic data"""
