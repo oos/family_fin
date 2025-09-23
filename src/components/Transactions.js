@@ -116,7 +116,7 @@ const Transactions = () => {
     
     try {
       const token = localStorage.getItem('token');
-      const response = await axios.get(`/business-accounts/${selectedAccount}/transactions`, {
+      const response = await axios.get(`/api/business-accounts/${selectedAccount}/transactions`, {
         headers: { Authorization: `Bearer ${token}` }
       });
       // Handle the response structure - it might be an object with transactions array or directly an array
@@ -428,7 +428,7 @@ const Transactions = () => {
       formData.append('file', file);
 
       const token = localStorage.getItem('token');
-      const response = await axios.post(`/business-accounts/${selectedAccount}/import-csv`, formData, {
+      const response = await axios.post(`/api/business-accounts/${selectedAccount}/import-csv`, formData, {
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'multipart/form-data'
@@ -452,7 +452,7 @@ const Transactions = () => {
 
     try {
       const token = localStorage.getItem('token');
-      const response = await axios.post(`/business-accounts/${selectedAccount}/refresh-transactions`, {}, {
+      const response = await axios.post(`/api/business-accounts/${selectedAccount}/refresh-transactions`, {}, {
         headers: { Authorization: `Bearer ${token}` }
       });
 
