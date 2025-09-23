@@ -101,7 +101,7 @@ const Bookings = () => {
           // Sync Airbnb if available
           if (property.platforms.airbnb.ical_url) {
             syncPromises.push(
-              axios.post('/bookings/sync', {
+              axios.post('/api/bookings/sync', {
                 ical_url: property.platforms.airbnb.ical_url,
                 listing_id: property.platforms.airbnb.listing_id,
                 platform: 'airbnb',
@@ -113,7 +113,7 @@ const Bookings = () => {
           // Sync VRBO if available
           if (property.platforms.vrbo.ical_url) {
             syncPromises.push(
-              axios.post('/bookings/sync', {
+              axios.post('/api/bookings/sync', {
                 ical_url: property.platforms.vrbo.ical_url,
                 listing_id: property.platforms.vrbo.listing_id,
                 platform: 'vrbo',
@@ -150,7 +150,7 @@ const Bookings = () => {
   const fetchBookings = async () => {
     try {
       setLoading(true);
-      const response = await axios.get('/bookings');
+      const response = await axios.get('/api/bookings');
       if (response.data.success) {
         setBookings(response.data.bookings);
       } else {
@@ -253,7 +253,7 @@ const Bookings = () => {
         // Sync Airbnb if available
         if (property.platforms.airbnb.ical_url) {
           syncPromises.push(
-            axios.post('/bookings/sync', {
+            axios.post('/api/bookings/sync', {
               ical_url: property.platforms.airbnb.ical_url,
               listing_id: property.platforms.airbnb.listing_id,
               platform: 'airbnb',
@@ -265,7 +265,7 @@ const Bookings = () => {
         // Sync VRBO if available
         if (property.platforms.vrbo.ical_url) {
           syncPromises.push(
-            axios.post('/bookings/sync', {
+            axios.post('/api/bookings/sync', {
               ical_url: property.platforms.vrbo.ical_url,
               listing_id: property.platforms.vrbo.listing_id,
               platform: 'vrbo',
