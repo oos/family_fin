@@ -3262,72 +3262,24 @@ def get_user_dashboard():
                 'message': 'User not found'
             }), 404
         
-        # Get dashboard settings
-        settings = DashboardSettings.query.filter_by(user_id=current_user.id).all()
-        visible_sections = {setting.section: setting.is_visible for setting in settings}
-        
+        # Simplified dashboard data - just return user info and basic structure
         dashboard_data = {
             'user': current_user.to_dict(),
-            'visible_sections': visible_sections,
-            'data': {}
+            'visible_sections': {
+                'properties': True,
+                'loans': True,
+                'account_balances': True,
+                'bank_accounts': True,
+                'income': True
+            },
+            'data': {
+                'properties': [],
+                'loans': [],
+                'account_balances': [],
+                'bank_accounts': [],
+                'income': []
+            }
         }
-        
-        # Only include data for visible sections with proper RBAC
-        if visible_sections.get('properties', True):
-            # Get user's accessible properties
-            user_property_access = UserPropertyAccess.query.filter_by(user_id=current_user.id).all()
-            property_ids = [access.property_id for access in user_property_access]
-            if property_ids:
-                properties = Property.query.filter(Property.id.in_(property_ids)).all()
-            else:
-                properties = []
-            dashboard_data['data']['properties'] = [prop.to_dict() for prop in properties]
-        
-        if visible_sections.get('loans', True):
-            # Get user's accessible loans
-            user_loan_access = UserLoanAccess.query.filter_by(user_id=current_user.id).all()
-            loan_ids = [access.loan_id for access in user_loan_access]
-            if loan_ids:
-                loans = Loan.query.filter(Loan.id.in_(loan_ids)).all()
-            else:
-                loans = []
-            dashboard_data['data']['loans'] = [loan.to_dict() for loan in loans]
-        
-        if visible_sections.get('account_balances', True):
-            balances = AccountBalance.query.filter_by(user_id=current_user.id).order_by(AccountBalance.date_entered.desc()).all()
-            dashboard_data['data']['account_balances'] = [balance.to_dict() for balance in balances]
-        
-        if visible_sections.get('bank_accounts', True):
-            # Get user's accessible business accounts
-            user_account_access = UserAccountAccess.query.filter_by(user_id=current_user.id).all()
-            account_ids = [access.business_account_id for access in user_account_access]
-            if account_ids:
-                accounts = BusinessAccount.query.filter(BusinessAccount.id.in_(account_ids)).all()
-            else:
-                accounts = []
-            dashboard_data['data']['bank_accounts'] = [account.to_dict() for account in accounts]
-        
-        if visible_sections.get('income', True):
-            # Get income records for the current user's person record
-            from models import Person
-            # Try to match by username first, then by email prefix
-            person = Person.query.filter_by(name=current_user.username).first()
-            if not person:
-                # Try to match by email prefix (e.g., 'sean.osullivan@gmail.com' -> 'Sean')
-                email_prefix = current_user.email.split('@')[0]
-                if '.' in email_prefix:
-                    # Convert 'sean.osullivan' to 'Sean' (just first part)
-                    first_name = email_prefix.split('.')[0].capitalize()
-                    person = Person.query.filter_by(name=first_name).first()
-                else:
-                    # Try exact match with capitalized email prefix
-                    person = Person.query.filter_by(name=email_prefix.capitalize()).first()
-            
-            if person:
-                income_records = Income.query.filter_by(person_id=person.id).all()
-                dashboard_data['data']['income'] = [income.to_dict() for income in income_records]
-            else:
-                dashboard_data['data']['income'] = []
         
         return jsonify({
             'success': True,
