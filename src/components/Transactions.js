@@ -92,7 +92,7 @@ const Transactions = () => {
         headers: { Authorization: `Bearer ${token}` }
       });
       console.log('Business accounts response:', response.data);
-      setBusinessAccounts(response.data);
+      setBusinessAccounts(response.data.success ? response.data.accounts : []);
       setError(null); // Clear any previous errors
     } catch (err) {
       console.error('Error fetching business accounts:', err);
