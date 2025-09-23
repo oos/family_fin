@@ -3272,13 +3272,25 @@ def get_user_dashboard():
             'data': {}
         }
         
-        # Only include data for visible sections
+        # Only include data for visible sections with proper RBAC
         if visible_sections.get('properties', True):
-            properties = Property.query.all()
+            # Get user's accessible properties
+            user_property_access = UserPropertyAccess.query.filter_by(user_id=current_user.id).all()
+            property_ids = [access.property_id for access in user_property_access]
+            if property_ids:
+                properties = Property.query.filter(Property.id.in_(property_ids)).all()
+            else:
+                properties = []
             dashboard_data['data']['properties'] = [prop.to_dict() for prop in properties]
         
         if visible_sections.get('loans', True):
-            loans = Loan.query.all()
+            # Get user's accessible loans
+            user_loan_access = UserLoanAccess.query.filter_by(user_id=current_user.id).all()
+            loan_ids = [access.loan_id for access in user_loan_access]
+            if loan_ids:
+                loans = Loan.query.filter(Loan.id.in_(loan_ids)).all()
+            else:
+                loans = []
             dashboard_data['data']['loans'] = [loan.to_dict() for loan in loans]
         
         if visible_sections.get('account_balances', True):
@@ -3286,19 +3298,13 @@ def get_user_dashboard():
             dashboard_data['data']['account_balances'] = [balance.to_dict() for balance in balances]
         
         if visible_sections.get('bank_accounts', True):
-            # Note: BusinessAccount model may not have user_id field yet
-            try:
-                # First try to check if the user_id column exists
-                from sqlalchemy import inspect
-                inspector = inspect(db.engine)
-                columns = [col['name'] for col in inspector.get_columns('business_account')]
-                if 'user_id' in columns:
-                    accounts = BusinessAccount.query.filter_by(user_id=current_user.id).all()
-                else:
-                    accounts = BusinessAccount.query.all()
-            except Exception as e:
-                # Fallback: get all accounts if user_id field doesn't exist
-                accounts = BusinessAccount.query.all()
+            # Get user's accessible business accounts
+            user_account_access = UserAccountAccess.query.filter_by(user_id=current_user.id).all()
+            account_ids = [access.business_account_id for access in user_account_access]
+            if account_ids:
+                accounts = BusinessAccount.query.filter(BusinessAccount.id.in_(account_ids)).all()
+            else:
+                accounts = []
             dashboard_data['data']['bank_accounts'] = [account.to_dict() for account in accounts]
         
         if visible_sections.get('income', True):
