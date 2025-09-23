@@ -28,10 +28,10 @@ const UserDashboard = () => {
       setLoading(true);
       const [dashboardRes, loansRes, accountsRes, loanBalancesRes, accountBalancesRes] = await Promise.all([
         axios.get('/api/user-dashboard'),
-        axios.get('/loans'),
-        axios.get('/business-accounts'),
-        axios.get('/user-loan-balances'),
-        axios.get('/user-account-balances')
+        axios.get('/api/loans'),
+        axios.get('/api/business-accounts'),
+        axios.get('/api/user-loan-balances'),
+        axios.get('/api/user-account-balances')
       ]);
       
       if (dashboardRes.data.success) {
