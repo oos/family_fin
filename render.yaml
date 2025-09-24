@@ -36,4 +36,4 @@ services:
         destination: /index.html
     envVars:
       - key: REACT_APP_API_URL
-        value: https://family-finance-api-ycku.onrender.com/api
+        value: https://family-finance-api-ycku.onrender.com
