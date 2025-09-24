@@ -1,0 +1,149 @@
+[
+  {
+    "page": "Login Page",
+    "test": "Email Input Present",
+    "success": true,
+    "message": "Email input found",
+    "timestamp": "2025-09-24T10:53:29.588Z"
+  },
+  {
+    "page": "Login Page",
+    "test": "Password Input Present",
+    "success": true,
+    "message": "Password input found",
+    "timestamp": "2025-09-24T10:53:29.594Z"
+  },
+  {
+    "page": "Login Page",
+    "test": "Login Button Present",
+    "success": true,
+    "message": "Login button found",
+    "timestamp": "2025-09-24T10:53:29.594Z"
+  },
+  {
+    "page": "Login Page",
+    "test": "Eye Button Present",
+    "success": false,
+    "message": "Eye button not found",
+    "timestamp": "2025-09-24T10:53:29.594Z"
+  },
+  {
+    "page": "Login Page",
+    "test": "Form Submission",
+    "success": false,
+    "message": "Form submission failed - still on login page",
+    "timestamp": "2025-09-24T10:53:34.227Z"
+  },
+  {
+    "page": "Dashboard",
+    "test": "Page Access",
+    "success": false,
+    "message": "Redirected to login - authentication required",
+    "timestamp": "2025-09-24T10:53:37.017Z"
+  },
+  {
+    "page": "Admin Panel",
+    "test": "Page Access",
+    "success": false,
+    "message": "Redirected to login - authentication required",
+    "timestamp": "2025-09-24T10:53:39.773Z"
+  },
+  {
+    "page": "Income",
+    "test": "Page Access",
+    "success": false,
+    "message": "Redirected to login - authentication required",
+    "timestamp": "2025-09-24T10:53:42.502Z"
+  },
+  {
+    "page": "Properties",
+    "test": "Page Access",
+    "success": false,
+    "message": "Redirected to login - authentication required",
+    "timestamp": "2025-09-24T10:53:45.260Z"
+  },
+  {
+    "page": "Loans",
+    "test": "Page Access",
+    "success": false,
+    "message": "Redirected to login - authentication required",
+    "timestamp": "2025-09-24T10:53:48.015Z"
+  },
+  {
+    "page": "Business Accounts",
+    "test": "Page Access",
+    "success": false,
+    "message": "Redirected to login - authentication required",
+    "timestamp": "2025-09-24T10:53:50.753Z"
+  },
+  {
+    "page": "Transactions",
+    "test": "Page Access",
+    "success": false,
+    "message": "Redirected to login - authentication required",
+    "timestamp": "2025-09-24T10:53:53.487Z"
+  },
+  {
+    "page": "GL Transactions",
+    "test": "Page Access",
+    "success": false,
+    "message": "Redirected to login - authentication required",
+    "timestamp": "2025-09-24T10:53:56.250Z"
+  },
+  {
+    "page": "Taxation",
+    "test": "Page Access",
+    "success": false,
+    "message": "Redirected to login - authentication required",
+    "timestamp": "2025-09-24T10:53:59.003Z"
+  },
+  {
+    "page": "Pension",
+    "test": "Page Access",
+    "success": false,
+    "message": "Redirected to login - authentication required",
+    "timestamp": "2025-09-24T10:54:01.724Z"
+  },
+  {
+    "page": "Company Pension",
+    "test": "Page Access",
+    "success": false,
+    "message": "Redirected to login - authentication required",
+    "timestamp": "2025-09-24T10:54:04.715Z"
+  },
+  {
+    "page": "Tax Returns",
+    "test": "Page Access",
+    "success": false,
+    "message": "Redirected to login - authentication required",
+    "timestamp": "2025-09-24T10:54:07.955Z"
+  },
+  {
+    "page": "Transaction Matching",
+    "test": "Page Access",
+    "success": false,
+    "message": "Redirected to login - authentication required",
+    "timestamp": "2025-09-24T10:54:10.994Z"
+  },
+  {
+    "page": "Transaction Predictions",
+    "test": "Page Access",
+    "success": false,
+    "message": "Redirected to login - authentication required",
+    "timestamp": "2025-09-24T10:54:14.253Z"
+  },
+  {
+    "page": "Bookings",
+    "test": "Page Access",
+    "success": false,
+    "message": "Redirected to login - authentication required",
+    "timestamp": "2025-09-24T10:54:17.489Z"
+  },
+  {
+    "page": "File Viewer",
+    "test": "Page Access",
+    "success": false,
+    "message": "Redirected to login - authentication required",
+    "timestamp": "2025-09-24T10:54:20.456Z"
+  }
+]
