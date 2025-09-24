@@ -21,9 +21,14 @@ function Login({ onLogin }) {
     setError('');
 
     try {
+      console.log('🔐 Login form submitting...');
       const response = await axios.post('/api/auth/login', credentials);
+      console.log('🔐 Login API response:', response.data);
+      console.log('🔐 Calling onLogin with:', { token: response.data.access_token ? 'Present' : 'Missing', user: response.data.user });
       onLogin(response.data.access_token, response.data.user);
+      console.log('🔐 onLogin called successfully');
     } catch (err) {
+      console.error('🔐 Login error:', err);
       setError('Invalid credentials. Please try again.');
     } finally {
       setLoading(false);
