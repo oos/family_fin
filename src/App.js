@@ -29,7 +29,8 @@ import Login from './components/Login';
 import './sidebar.css';
 
 // Set up axios defaults
-axios.defaults.baseURL = process.env.REACT_APP_API_URL || 'http://localhost:5002/api';
+const API_BASE_URL = 'https://family-finance-api-ycku.onrender.com/api';
+axios.defaults.baseURL = API_BASE_URL;
 
 // Function to validate and refresh token if needed
 const validateToken = async () => {
