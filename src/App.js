@@ -224,19 +224,35 @@ function App() {
     localStorage.setItem('token', token);
     setIsAuthenticated(true);
     setCurrentUser(userData);
-    setRoleLoading(true);
     
-    // Fetch user role
-    try {
-      const response = await axios.get('/api/user-dashboard');
-      if (response.data.success) {
-        setUserRole(response.data.dashboard.user.role);
-        setCurrentUser(response.data.dashboard.user);
-      }
-    } catch (err) {
-      console.error('Error fetching user role:', err);
-    } finally {
+    // Use role from login response if available
+    if (userData && userData.role) {
+      setUserRole(userData.role);
       setRoleLoading(false);
+    } else {
+      // Fallback: fetch user role if not provided in login response
+      setRoleLoading(true);
+      try {
+        const response = await Promise.race([
+          axios.get('/api/user-dashboard'),
+          new Promise((_, reject) => 
+            setTimeout(() => reject(new Error('Timeout')), 10000)
+          )
+        ]);
+        
+        if (response.data.success) {
+          setUserRole(response.data.dashboard.user.role);
+          setCurrentUser(response.data.dashboard.user);
+        } else {
+          console.error('User dashboard response not successful:', response.data);
+          setUserRole('user'); // Default fallback
+        }
+      } catch (err) {
+        console.error('Error fetching user role:', err);
+        setUserRole('user'); // Default fallback
+      } finally {
+        setRoleLoading(false);
+      }
     }
     
     // Redirect to dashboard after successful login
