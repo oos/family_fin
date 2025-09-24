@@ -33,6 +33,7 @@ const AdminPanel = () => {
   const [userIncomeAccess, setUserIncomeAccess] = useState([]);
   const [userPensionAccess, setUserPensionAccess] = useState([]);
   const [loadingAccess, setLoadingAccess] = useState(false);
+  const [loadingProgress, setLoadingProgress] = useState('');
   
   // Tab state
   const [activeTab, setActiveTab] = useState(() => {
@@ -163,23 +164,96 @@ const AdminPanel = () => {
     }
   }, [users]);
 
-  // Load all data upfront for better performance
+  // Load all data upfront for better performance - batched approach
   useEffect(() => {
     if (users.length > 0) {
-      console.log('Loading all admin data in parallel...');
-      Promise.all([
-        fetchLoansData(),
-        fetchAccountsData(),
-        fetchPropertiesData(),
-        fetchIncomeData(),
-        fetchPensionsData()
-      ]).then(() => {
-        console.log('All admin data loaded successfully');
-      }).catch(err => {
-        console.error('Error loading admin data:', err);
-      });
+      console.log('Loading all admin data in batches...');
+      loadAllAdminDataBatched();
     }
   }, [users]);
+
+  const loadAllAdminDataBatched = async () => {
+    try {
+      setLoadingAccess(true);
+      
+      // First batch: Load all master data
+      setLoadingProgress('Loading master data...');
+      console.log('Batch 1: Loading master data...');
+      const [loansRes, accountsRes, propertiesRes, incomeRes, pensionsRes] = await Promise.all([
+        axios.get('/api/loans'),
+        axios.get('/api/business-accounts'),
+        axios.get('/api/properties'),
+        axios.get('/api/income'),
+        axios.get('/api/pension-accounts')
+      ]);
+
+      // Set master data
+      if (loansRes.data.success) setAvailableLoans(loansRes.data.loans);
+      if (accountsRes.data.success) setAvailableAccounts(accountsRes.data.accounts);
+      if (propertiesRes.data.success) setAvailableProperties(propertiesRes.data.properties);
+      if (incomeRes.data.success) setAvailableIncomes(incomeRes.data.incomes);
+      if (pensionsRes.data.success) setAvailablePensions(pensionsRes.data.pensions);
+
+      // Second batch: Load all user access data (limit concurrent requests)
+      setLoadingProgress('Loading user access data...');
+      console.log('Batch 2: Loading user access data...');
+      const sortedUsers = getSortedUsers();
+      const batchSize = 2; // Reduced batch size to avoid overwhelming the server
+      
+      for (let i = 0; i < sortedUsers.length; i += batchSize) {
+        const userBatch = sortedUsers.slice(i, i + batchSize);
+        const batchPromises = [];
+        
+        setLoadingProgress(`Loading user access data... (${i + 1}-${Math.min(i + batchSize, sortedUsers.length)}/${sortedUsers.length})`);
+        
+        for (const user of userBatch) {
+          batchPromises.push(
+            axios.get(`/api/user-access/loans/${user.id}`).catch(err => {
+              console.error(`Error loading loan access for user ${user.id}:`, err);
+              return { data: { success: false, loans: [] } };
+            }),
+            axios.get(`/api/user-access/accounts/${user.id}`).catch(err => {
+              console.error(`Error loading account access for user ${user.id}:`, err);
+              return { data: { success: false, accounts: [] } };
+            }),
+            axios.get(`/api/user-access/properties/${user.id}`).catch(err => {
+              console.error(`Error loading property access for user ${user.id}:`, err);
+              return { data: { success: false, properties: [] } };
+            }),
+            axios.get(`/api/user-access/income/${user.id}`).catch(err => {
+              console.error(`Error loading income access for user ${user.id}:`, err);
+              return { data: { success: false, incomes: [] } };
+            }),
+            axios.get(`/api/user-access/pensions/${user.id}`).catch(err => {
+              console.error(`Error loading pension access for user ${user.id}:`, err);
+              return { data: { success: false, pensions: [] } };
+            })
+          );
+        }
+        
+        await Promise.all(batchPromises);
+        console.log(`Processed users ${i + 1}-${Math.min(i + batchSize, sortedUsers.length)}`);
+        
+        // Small delay between batches to avoid overwhelming the server
+        if (i + batchSize < sortedUsers.length) {
+          await new Promise(resolve => setTimeout(resolve, 100));
+        }
+      }
+
+      // Third batch: Load dashboard settings
+      setLoadingProgress('Loading dashboard settings...');
+      console.log('Batch 3: Loading dashboard settings...');
+      await loadAllDashboardSettings();
+      
+      setLoadingProgress('');
+      setLoadingAccess(false);
+      console.log('All admin data loaded successfully');
+    } catch (err) {
+      console.error('Error loading admin data:', err);
+      setLoadingAccess(false);
+      setLoadingProgress('');
+    }
+  };
 
   const fetchUsers = async () => {
     try {
@@ -900,6 +974,11 @@ const AdminPanel = () => {
           <div className="spinner-border" role="status">
             <span className="visually-hidden">Loading...</span>
           </div>
+          {loadingProgress && (
+            <div className="mt-2">
+              <small className="text-muted">{loadingProgress}</small>
+            </div>
+          )}
         </div>
       </div>
     );
@@ -1816,6 +1895,11 @@ const AdminPanel = () => {
                     <div className="spinner-border" role="status">
                       <span className="visually-hidden">Loading...</span>
                     </div>
+                    {loadingProgress && (
+                      <div className="mt-2">
+                        <small className="text-muted">{loadingProgress}</small>
+                      </div>
+                    )}
                   </div>
                 ) : (
                   <div>
