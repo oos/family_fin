@@ -25,8 +25,14 @@ function Login({ onLogin }) {
       const response = await axios.post('/api/auth/login', credentials);
       console.log('🔐 Login API response:', response.data);
       console.log('🔐 Calling onLogin with:', { token: response.data.access_token ? 'Present' : 'Missing', user: response.data.user });
-      onLogin(response.data.access_token, response.data.user);
-      console.log('🔐 onLogin called successfully');
+      
+      if (typeof onLogin === 'function') {
+        console.log('🔐 onLogin is a function, calling it...');
+        onLogin(response.data.access_token, response.data.user);
+        console.log('🔐 onLogin called successfully');
+      } else {
+        console.error('🔐 onLogin is not a function:', typeof onLogin);
+      }
     } catch (err) {
       console.error('🔐 Login error:', err);
       setError('Invalid credentials. Please try again.');
