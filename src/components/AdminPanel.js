@@ -166,8 +166,15 @@ const AdminPanel = () => {
 
   // Load all data upfront for better performance - batched approach
   useEffect(() => {
+    // Start loading data immediately, don't wait for users
+    console.log('Loading all admin data in batches...');
+    loadAllAdminDataBatched();
+  }, []);
+
+  // Also load data when users are available (in case users load later)
+  useEffect(() => {
     if (users.length > 0) {
-      console.log('Loading all admin data in batches...');
+      console.log('Users loaded, ensuring all data is loaded...');
       loadAllAdminDataBatched();
     }
   }, [users]);
@@ -198,46 +205,51 @@ const AdminPanel = () => {
       setLoadingProgress('Loading user access data...');
       console.log('Batch 2: Loading user access data...');
       const sortedUsers = getSortedUsers();
-      const batchSize = 2; // Reduced batch size to avoid overwhelming the server
       
-      for (let i = 0; i < sortedUsers.length; i += batchSize) {
-        const userBatch = sortedUsers.slice(i, i + batchSize);
-        const batchPromises = [];
+      if (sortedUsers.length > 0) {
+        const batchSize = 2; // Reduced batch size to avoid overwhelming the server
         
-        setLoadingProgress(`Loading user access data... (${i + 1}-${Math.min(i + batchSize, sortedUsers.length)}/${sortedUsers.length})`);
-        
-        for (const user of userBatch) {
-          batchPromises.push(
-            axios.get(`/api/user-access/loans/${user.id}`).catch(err => {
-              console.error(`Error loading loan access for user ${user.id}:`, err);
-              return { data: { success: false, loans: [] } };
-            }),
-            axios.get(`/api/user-access/accounts/${user.id}`).catch(err => {
-              console.error(`Error loading account access for user ${user.id}:`, err);
-              return { data: { success: false, accounts: [] } };
-            }),
-            axios.get(`/api/user-access/properties/${user.id}`).catch(err => {
-              console.error(`Error loading property access for user ${user.id}:`, err);
-              return { data: { success: false, properties: [] } };
-            }),
-            axios.get(`/api/user-access/income/${user.id}`).catch(err => {
-              console.error(`Error loading income access for user ${user.id}:`, err);
-              return { data: { success: false, incomes: [] } };
-            }),
-            axios.get(`/api/user-access/pensions/${user.id}`).catch(err => {
-              console.error(`Error loading pension access for user ${user.id}:`, err);
-              return { data: { success: false, pensions: [] } };
-            })
-          );
+        for (let i = 0; i < sortedUsers.length; i += batchSize) {
+          const userBatch = sortedUsers.slice(i, i + batchSize);
+          const batchPromises = [];
+          
+          setLoadingProgress(`Loading user access data... (${i + 1}-${Math.min(i + batchSize, sortedUsers.length)}/${sortedUsers.length})`);
+          
+          for (const user of userBatch) {
+            batchPromises.push(
+              axios.get(`/api/user-access/loans/${user.id}`).catch(err => {
+                console.error(`Error loading loan access for user ${user.id}:`, err);
+                return { data: { success: false, loans: [] } };
+              }),
+              axios.get(`/api/user-access/accounts/${user.id}`).catch(err => {
+                console.error(`Error loading account access for user ${user.id}:`, err);
+                return { data: { success: false, accounts: [] } };
+              }),
+              axios.get(`/api/user-access/properties/${user.id}`).catch(err => {
+                console.error(`Error loading property access for user ${user.id}:`, err);
+                return { data: { success: false, properties: [] } };
+              }),
+              axios.get(`/api/user-access/income/${user.id}`).catch(err => {
+                console.error(`Error loading income access for user ${user.id}:`, err);
+                return { data: { success: false, incomes: [] } };
+              }),
+              axios.get(`/api/user-access/pensions/${user.id}`).catch(err => {
+                console.error(`Error loading pension access for user ${user.id}:`, err);
+                return { data: { success: false, pensions: [] } };
+              })
+            );
+          }
+          
+          await Promise.all(batchPromises);
+          console.log(`Processed users ${i + 1}-${Math.min(i + batchSize, sortedUsers.length)}`);
+          
+          // Small delay between batches to avoid overwhelming the server
+          if (i + batchSize < sortedUsers.length) {
+            await new Promise(resolve => setTimeout(resolve, 100));
+          }
         }
-        
-        await Promise.all(batchPromises);
-        console.log(`Processed users ${i + 1}-${Math.min(i + batchSize, sortedUsers.length)}`);
-        
-        // Small delay between batches to avoid overwhelming the server
-        if (i + batchSize < sortedUsers.length) {
-          await new Promise(resolve => setTimeout(resolve, 100));
-        }
+      } else {
+        console.log('No users available yet, skipping user access data loading');
       }
 
       // Third batch: Load dashboard settings

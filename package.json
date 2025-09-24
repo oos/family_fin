@@ -21,7 +21,12 @@
     "start": "PORT=3007 react-scripts start",
     "build": "react-scripts build && echo 'Build completed at $(date)'",
     "test": "react-scripts test",
-    "eject": "react-scripts eject"
+    "eject": "react-scripts eject",
+    "test:performance": "npx playwright test tests/performance.spec.js",
+    "test:performance:headed": "npx playwright test tests/performance.spec.js --headed",
+    "test:performance:monitor": "node tests/performance-monitor.js",
+    "test:performance:ci": "node scripts/performance-ci.js",
+    "test:performance:report": "npx playwright show-report"
   },
   "eslintConfig": {
     "extends": [
@@ -41,5 +46,27 @@
       "last 1 safari version"
     ]
   },
-  "proxy": "http://localhost:5002"
+  "proxy": "http://localhost:5002",
+  "description": "A comprehensive financial management system built with Flask (Python) backend and React frontend, designed for family financial tracking, tax management, and business analytics.",
+  "main": "index.js",
+  "directories": {
+    "test": "tests"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.55.1",
+    "jest": "^27.5.1",
+    "playwright": "^1.55.1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/oos/family_fin.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "bugs": {
+    "url": "https://github.com/oos/family_fin/issues"
+  },
+  "homepage": "https://github.com/oos/family_fin#readme"
 }
