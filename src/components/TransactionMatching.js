@@ -28,10 +28,7 @@ const TransactionMatching = () => {
     setLoading(true);
     setError(null);
     try {
-      const token = localStorage.getItem('token');
-      const response = await axios.get('/api/tax-returns', {
-        headers: { Authorization: `Bearer ${token}` }
-      });
+      const response = await axios.get('/tax-returns');
       setTaxReturns(response.data);
     } catch (err) {
       console.error('Error fetching tax returns:', err);

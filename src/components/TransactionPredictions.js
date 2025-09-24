@@ -26,10 +26,7 @@ const TransactionPredictions = () => {
     setLoading(true);
     setError(null);
     try {
-      const token = localStorage.getItem('token');
-      const response = await axios.get(`/transaction-predictions?page=${currentPage}&status=${selectedStatus}`, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
+      const response = await axios.get(`/transaction-predictions?page=${currentPage}&status=${selectedStatus}`);
       setPredictions(response.data.predictions);
       setPagination(response.data.pagination);
     } catch (err) {
@@ -42,10 +39,7 @@ const TransactionPredictions = () => {
 
   const fetchTrainingHistory = async () => {
     try {
-      const token = localStorage.getItem('token');
-      const response = await axios.get('/api/training-history', {
-        headers: { Authorization: `Bearer ${token}` }
-      });
+      const response = await axios.get('/training-history');
       setTrainingHistory(response.data.training_history);
     } catch (err) {
       console.error('Error fetching training history:', err);
@@ -54,10 +48,7 @@ const TransactionPredictions = () => {
 
   const fetchModelPerformance = async () => {
     try {
-      const token = localStorage.getItem('token');
-      const response = await axios.get('/api/model-performance', {
-        headers: { Authorization: `Bearer ${token}` }
-      });
+      const response = await axios.get('/model-performance');
       setModelPerformance(response.data);
       setModelStatus({
         is_trained: response.data.model_version !== null,
@@ -73,10 +64,7 @@ const TransactionPredictions = () => {
     setTraining(true);
     setError(null);
     try {
-      const token = localStorage.getItem('token');
-      const response = await axios.post('/api/train-category-model', { incremental }, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
+      const response = await axios.post('/train-category-model', { incremental });
       
       alert(`🎉 ${response.data.message}`);
       setModelStatus({
@@ -99,10 +87,7 @@ const TransactionPredictions = () => {
     setPredicting(true);
     setError(null);
     try {
-      const token = localStorage.getItem('token');
-      const response = await axios.post('/api/predict-all-transactions', {}, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
+      const response = await axios.post('/predict-all-transactions', {});
       
       alert(`🎯 ${response.data.message}\nCreated: ${response.data.predictions_created}\nUpdated: ${response.data.predictions_updated}\nTotal: ${response.data.total_transactions}`);
       fetchPredictions();
@@ -118,13 +103,10 @@ const TransactionPredictions = () => {
     setValidating(true);
     setError(null);
     try {
-      const token = localStorage.getItem('token');
       const response = await axios.put(`/transaction-predictions/${predictionId}/validate`, {
         validated_category: validatedCategory,
         validation_status: validationStatus,
         validation_notes: notes
-      }, {
-        headers: { Authorization: `Bearer ${token}` }
       });
       
       // Update local state
