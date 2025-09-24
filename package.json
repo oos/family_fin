@@ -26,6 +26,8 @@
     "test:performance:headed": "npx playwright test tests/performance.spec.js --headed",
     "test:performance:monitor": "node tests/performance-monitor.js",
     "test:performance:ci": "node scripts/performance-ci.js",
+    "test:performance:api": "node tests/api-performance-test.js",
+    "test:performance:final": "node tests/final-performance-test.js",
     "test:performance:report": "npx playwright show-report"
   },
   "eslintConfig": {
