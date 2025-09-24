@@ -183,6 +183,15 @@ function App() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [roleLoading, setRoleLoading] = useState(true);
 
+  // Expose authentication state to window for debugging
+  useEffect(() => {
+    window.isAuthenticated = isAuthenticated;
+    window.userRole = userRole;
+    window.currentUser = currentUser;
+    window.roleLoading = roleLoading;
+    window.loading = loading;
+  }, [isAuthenticated, userRole, currentUser, roleLoading, loading]);
+
   useEffect(() => {
     const initializeAuth = async () => {
       const token = localStorage.getItem('token');
@@ -221,15 +230,18 @@ function App() {
   }, []);
 
   const handleLogin = async (token, userData) => {
+    console.log('🔐 handleLogin called with:', { token: token ? 'Present' : 'Missing', userData });
     localStorage.setItem('token', token);
     setIsAuthenticated(true);
     setCurrentUser(userData);
     
     // Use role from login response if available
     if (userData && userData.role) {
+      console.log('🔐 Using role from login response:', userData.role);
       setUserRole(userData.role);
       setRoleLoading(false);
     } else {
+      console.log('🔐 Fetching user role from API...');
       // Fallback: fetch user role if not provided in login response
       setRoleLoading(true);
       try {
@@ -243,6 +255,7 @@ function App() {
         if (response.data.success) {
           setUserRole(response.data.dashboard.user.role);
           setCurrentUser(response.data.dashboard.user);
+          console.log('🔐 User role fetched:', response.data.dashboard.user.role);
         } else {
           console.error('User dashboard response not successful:', response.data);
           setUserRole('user'); // Default fallback
@@ -255,6 +268,7 @@ function App() {
       }
     }
     
+    console.log('🔐 Authentication state set, redirecting to dashboard...');
     // Redirect to dashboard after successful login
     window.location.href = '/';
   };
