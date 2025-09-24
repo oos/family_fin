@@ -2708,8 +2708,10 @@ def get_user_loan_access(user_id):
                 'message': 'Admin access required'
             }), 403
         
-        # Get all loans
-        all_loans = Loan.query.all()
+        # Get all loans with property data joined to avoid N+1 queries
+        loans_with_properties = db.session.query(Loan, Property).outerjoin(
+            Property, Loan.property_id == Property.id
+        ).all()
         
         # Get user's current loan access
         user_loan_access = UserLoanAccess.query.filter_by(user_id=user_id).all()
@@ -2717,12 +2719,13 @@ def get_user_loan_access(user_id):
         
         # Format response
         loans_data = []
-        for loan in all_loans:
+        for loan, property in loans_with_properties:
             loans_data.append({
                 'id': loan.id,
                 'loan_name': loan.loan_name,
                 'lender': loan.lender,
                 'current_balance': loan.current_balance,
+                'property_name': property.nickname if property else None,
                 'has_access': loan.id in user_loan_ids
             })
         

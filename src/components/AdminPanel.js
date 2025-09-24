@@ -163,26 +163,23 @@ const AdminPanel = () => {
     }
   }, [users]);
 
-  // Load data when switching tabs
+  // Load all data upfront for better performance
   useEffect(() => {
-    console.log('Tab changed to:', activeTab);
-    if (activeTab === 'loans' && availableLoans.length === 0) {
-      console.log('Fetching loans data...');
-      fetchLoansData();
-    } else if (activeTab === 'bank-accounts' && availableAccounts.length === 0) {
-      console.log('Fetching accounts data...');
-      fetchAccountsData();
-    } else if (activeTab === 'properties' && availableProperties.length === 0) {
-      console.log('Fetching properties data...');
-      fetchPropertiesData();
-    } else if (activeTab === 'income' && availableIncomes.length === 0) {
-      console.log('Fetching income data...');
-      fetchIncomeData();
-    } else if (activeTab === 'pensions' && availablePensions.length === 0) {
-      console.log('Fetching pensions data...');
-      fetchPensionsData();
+    if (users.length > 0) {
+      console.log('Loading all admin data in parallel...');
+      Promise.all([
+        fetchLoansData(),
+        fetchAccountsData(),
+        fetchPropertiesData(),
+        fetchIncomeData(),
+        fetchPensionsData()
+      ]).then(() => {
+        console.log('All admin data loaded successfully');
+      }).catch(err => {
+        console.error('Error loading admin data:', err);
+      });
     }
-  }, [activeTab]);
+  }, [users]);
 
   const fetchUsers = async () => {
     try {
@@ -390,7 +387,6 @@ const AdminPanel = () => {
 
   const fetchLoansData = async () => {
     try {
-      setLoadingAccess(true);
       const response = await axios.get('/api/loans');
       if (response.data.success) {
         setAvailableLoans(response.data.loans);
@@ -399,14 +395,11 @@ const AdminPanel = () => {
       }
     } catch (err) {
       console.error('Error fetching loans:', err);
-    } finally {
-      setLoadingAccess(false);
     }
   };
 
   const fetchAccountsData = async () => {
     try {
-      setLoadingAccess(true);
       const response = await axios.get('/api/business-accounts');
       if (response.data.success) {
         setAvailableAccounts(response.data.accounts);
@@ -415,15 +408,12 @@ const AdminPanel = () => {
       }
     } catch (err) {
       console.error('Error fetching accounts:', err);
-    } finally {
-      setLoadingAccess(false);
     }
   };
 
   const fetchPropertiesData = async () => {
     try {
       console.log('Fetching properties data...');
-      setLoadingAccess(true);
       const response = await axios.get('/api/properties');
       console.log('Properties response:', response.data);
       if (response.data.success) {
@@ -434,15 +424,12 @@ const AdminPanel = () => {
       }
     } catch (err) {
       console.error('Error fetching properties:', err);
-    } finally {
-      setLoadingAccess(false);
     }
   };
 
   const fetchIncomeData = async () => {
     try {
       console.log('Fetching income data...');
-      setLoadingAccess(true);
       const response = await axios.get('/api/income');
       console.log('Income response:', response.data);
       if (response.data.success) {
@@ -453,15 +440,12 @@ const AdminPanel = () => {
       }
     } catch (err) {
       console.error('Error fetching income:', err);
-    } finally {
-      setLoadingAccess(false);
     }
   };
 
   const fetchPensionsData = async () => {
     try {
       console.log('Fetching pensions data...');
-      setLoadingAccess(true);
       const response = await axios.get('/api/pension-accounts');
       console.log('Pensions response:', response.data);
       if (response.data.success) {
@@ -472,8 +456,6 @@ const AdminPanel = () => {
       }
     } catch (err) {
       console.error('Error fetching pensions:', err);
-    } finally {
-      setLoadingAccess(false);
     }
   };
 
