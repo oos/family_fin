@@ -682,10 +682,37 @@ def delete_business_account(account_id):
 @app.route('/api/income', methods=['GET'])
 @jwt_required()
 def get_income():
-    income_records = Income.query.all()
+    # Use join to avoid N+1 queries
+    income_with_person_family = db.session.query(Income, Person, Family).outerjoin(
+        Person, Income.person_id == Person.id
+    ).outerjoin(
+        Family, Person.family_id == Family.id
+    ).all()
+    
+    income_data = []
+    for income, person, family in income_with_person_family:
+        income_dict = {
+            'id': income.id,
+            'person_id': income.person_id,
+            'person_name': person.name if person else None,
+            'family': {
+                'id': family.id,
+                'name': family.name,
+                'code': family.code,
+                'description': family.description
+            } if family else None,
+            'income_type': income.income_type,
+            'income_category': income.income_category,
+            'amount_yearly': income.amount_yearly,
+            'amount_monthly': income.amount_monthly,
+            'created_at': income.created_at.isoformat() if income.created_at else None,
+            'updated_at': income.updated_at.isoformat() if income.updated_at else None
+        }
+        income_data.append(income_dict)
+    
     return jsonify({
         'success': True,
-        'incomes': [income.to_dict() for income in income_records]
+        'incomes': income_data
     })
 
 @app.route('/api/income', methods=['POST'])
@@ -2957,8 +2984,10 @@ def get_user_income_access(user_id):
                 'message': 'Admin access required'
             }), 403
         
-        # Get all income records
-        all_incomes = Income.query.all()
+        # Get all income records with person data joined to avoid N+1 queries
+        income_with_person = db.session.query(Income, Person).outerjoin(
+            Person, Income.person_id == Person.id
+        ).all()
         
         # Get user's current income access
         user_income_access = UserIncomeAccess.query.filter_by(user_id=user_id).all()
@@ -2966,10 +2995,10 @@ def get_user_income_access(user_id):
         
         # Format response
         incomes_data = []
-        for income in all_incomes:
+        for income, person in income_with_person:
             incomes_data.append({
                 'id': income.id,
-                'person_name': income.person.name if income.person else None,
+                'person_name': person.name if person else None,
                 'income_type': income.income_type,
                 'income_category': income.income_category,
                 'amount_yearly': income.amount_yearly,
