@@ -109,12 +109,6 @@ const GLTransactions = () => {
   const fetchTransactions = async () => {
     setLoading(true);
     try {
-      const token = localStorage.getItem('token');
-      if (!token) {
-        setError('No authentication token found. Please log in again.');
-        return;
-      }
-
       const params = new URLSearchParams({
         page: currentPage,
         per_page: rowsPerPage,
@@ -123,9 +117,7 @@ const GLTransactions = () => {
         ...filters
       });
 
-      const response = await axios.get(`/api/gl-transactions?${params}`, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
+      const response = await axios.get(`/gl-transactions?${params}`);
 
       setTransactions(response.data.transactions);
       setTotalPages(response.data.pagination.pages);
@@ -145,13 +137,8 @@ const GLTransactions = () => {
 
   const fetchFilterOptions = async () => {
     try {
-      const token = localStorage.getItem('token');
-      if (!token) return;
-
       // Fetch filter options from dedicated endpoint
-      const response = await axios.get('/api/gl-transactions/filter-options', {
-        headers: { Authorization: `Bearer ${token}` }
-      });
+      const response = await axios.get('/gl-transactions/filter-options');
 
       const data = response.data;
       setFilterOptions({
@@ -168,12 +155,7 @@ const GLTransactions = () => {
   // Fetch bank transactions for matching
   const fetchBankTransactions = async () => {
     try {
-      const token = localStorage.getItem('token');
-      if (!token) return;
-
-      const response = await axios.get('/api/transactions', {
-        headers: { Authorization: `Bearer ${token}` }
-      });
+      const response = await axios.get('/transactions');
       setBankTransactions(response.data.transactions || []);
     } catch (error) {
       console.error('Error fetching bank transactions:', error);
@@ -227,18 +209,13 @@ const GLTransactions = () => {
   // Fetch summary counts for all transactions
   const fetchSummaryCounts = async () => {
     try {
-      const token = localStorage.getItem('token');
-      if (!token) return;
-
       // Build query parameters including year filter
       const params = new URLSearchParams();
       if (filters.year) {
         params.append('year', filters.year);
       }
 
-      const response = await axios.get(`/api/gl-transactions/summary-counts?${params.toString()}`, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
+      const response = await axios.get(`/gl-transactions/summary-counts?${params.toString()}`);
       
       const counts = response.data;
       
@@ -580,12 +557,7 @@ const GLTransactions = () => {
   // Fetch all transactions for grouping (separate from paginated view)
   const fetchAllTransactionsForGrouping = async () => {
     try {
-      const token = localStorage.getItem('token');
-      if (!token) return;
-
-      const response = await axios.get(`/api/gl-transactions?per_page=10000&year=${filters.year}&sort_field=id&sort_direction=asc`, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
+      const response = await axios.get(`/gl-transactions?per_page=10000&year=${filters.year}&sort_field=id&sort_direction=asc`);
       
       return response.data.transactions;
     } catch (error) {
