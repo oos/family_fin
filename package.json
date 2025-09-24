@@ -1,6 +1,6 @@
 {
   "name": "family-finance-frontend",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "private": true,
   "dependencies": {
     "@testing-library/jest-dom": "^5.16.4",
@@ -19,7 +19,7 @@
   },
   "scripts": {
     "start": "PORT=3007 react-scripts start",
-    "build": "react-scripts build",
+    "build": "react-scripts build && echo 'Build completed at $(date)'",
     "test": "react-scripts test",
     "eject": "react-scripts eject"
   },
