@@ -268,9 +268,8 @@ function App() {
       }
     }
     
-    console.log('🔐 Authentication state set, redirecting to dashboard...');
-    // Redirect to dashboard after successful login
-    window.location.href = '/';
+    console.log('🔐 Authentication state set, React will handle routing...');
+    // Let React handle the routing - no need for manual redirect
   };
 
   const handleLogout = () => {
