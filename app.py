@@ -613,22 +613,41 @@ def get_business_accounts():
         account_ids = [access.business_account_id for access in user_account_access]
         accounts = BusinessAccount.query.filter(BusinessAccount.id.in_(account_ids)).all() if account_ids else []
     
+    # Get all last transactions in one query to avoid N+1 queries
+    account_ids = [account.id for account in accounts]
+    last_transactions = db.session.query(
+        BankTransaction.business_account_id,
+        BankTransaction.balance,
+        BankTransaction.transaction_date
+    ).filter(
+        BankTransaction.business_account_id.in_(account_ids),
+        BankTransaction.balance.isnot(None)
+    ).distinct(BankTransaction.business_account_id).order_by(
+        BankTransaction.business_account_id,
+        BankTransaction.transaction_date.desc()
+    ).all()
+    
+    # Create a lookup dictionary for last transactions
+    last_transaction_lookup = {}
+    for transaction in last_transactions:
+        if transaction.business_account_id not in last_transaction_lookup:
+            last_transaction_lookup[transaction.business_account_id] = {
+                'balance': transaction.balance,
+                'transaction_date': transaction.transaction_date
+            }
+    
     accounts_with_calculated_balance = []
     
     for account in accounts:
         account_dict = account.to_dict()
         
-        # Calculate current balance from last transaction
-        last_transaction = BankTransaction.query.filter_by(
-            business_account_id=account.id
-        ).filter(BankTransaction.balance.isnot(None)).order_by(
-            BankTransaction.transaction_date.desc()
-        ).first()
+        # Get last transaction from lookup
+        last_transaction = last_transaction_lookup.get(account.id)
         
         if last_transaction:
-            account_dict['balance'] = last_transaction.balance
+            account_dict['balance'] = last_transaction['balance']
             account_dict['balance_source'] = 'calculated_from_transactions'
-            account_dict['balance_date'] = last_transaction.transaction_date.isoformat()
+            account_dict['balance_date'] = last_transaction['transaction_date'].isoformat()
         else:
             account_dict['balance'] = 0.0
             account_dict['balance_source'] = 'no_transactions'
