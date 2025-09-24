@@ -34,13 +34,19 @@ axios.defaults.baseURL = process.env.REACT_APP_API_URL || 'http://localhost:5002
 // Function to validate and refresh token if needed
 const validateToken = async () => {
   const token = localStorage.getItem('token');
-  if (!token) return false;
+  if (!token) {
+    console.log('🔐 No token found in localStorage');
+    return false;
+  }
   
   try {
+    console.log('🔐 Validating token...');
     // Test the token with a simple API call
     await axios.get('/api/user-dashboard');
+    console.log('🔐 Token is valid');
     return true;
   } catch (error) {
+    console.error('🔐 Token validation failed:', error);
     // Token is invalid, clear it
     localStorage.removeItem('token');
     return false;
