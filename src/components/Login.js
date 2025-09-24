@@ -22,7 +22,7 @@ function Login({ onLogin }) {
 
     try {
       console.log('🔐 Login form submitting...');
-      const response = await axios.post('/auth/login', credentials);
+      const response = await axios.post('/api/auth/login', credentials);
       console.log('🔐 Login API response:', response.data);
       console.log('🔐 Calling onLogin with:', { token: response.data.access_token ? 'Present' : 'Missing', user: response.data.user });
       

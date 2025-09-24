@@ -29,7 +29,7 @@ import Login from './components/Login';
 import './sidebar.css';
 
 // Set up axios defaults
-axios.defaults.baseURL = process.env.REACT_APP_API_URL || 'http://localhost:5002/api';
+axios.defaults.baseURL = (process.env.REACT_APP_API_URL || 'http://localhost:5002') + '/api';
 
 // Function to validate and refresh token if needed
 const validateToken = async () => {
@@ -42,7 +42,7 @@ const validateToken = async () => {
   try {
     console.log('🔐 Validating token...');
     // Test the token with a simple API call
-    await axios.get('/user-dashboard');
+    await axios.get('/api/user-dashboard');
     console.log('🔐 Token is valid');
     return true;
   } catch (error) {
@@ -209,7 +209,7 @@ function App() {
           // Fetch user data for already logged in users
           try {
             setRoleLoading(true);
-            const response = await axios.get('/user-dashboard');
+            const response = await axios.get('/api/user-dashboard');
             if (response.data.success) {
               setUserRole(response.data.dashboard.user.role);
               setCurrentUser(response.data.dashboard.user);
@@ -252,7 +252,7 @@ function App() {
       setRoleLoading(true);
       try {
         const response = await Promise.race([
-          axios.get('/user-dashboard'),
+          axios.get('/api/user-dashboard'),
           new Promise((_, reject) => 
             setTimeout(() => reject(new Error('Timeout')), 10000)
           )
