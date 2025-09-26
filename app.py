@@ -2266,6 +2266,48 @@ def get_account_transactions(account_id):
         }), 500
 
 # User Management API
+@app.route('/api/setup-users', methods=['POST'])
+def setup_users():
+    """Setup endpoint to create initial users (no auth required)"""
+    try:
+        # Check if any users exist
+        if User.query.count() > 0:
+            return jsonify({'message': 'Users already exist'}), 400
+        
+        # Create admin user
+        admin_user = User(
+            username='omarosullivan',
+            email='omarosullivan@gmail.com',
+            password='admin123',  # Plain text password for v2.6.0
+            role='admin',
+            is_active=True
+        )
+        db.session.add(admin_user)
+        
+        # Create Sean user
+        sean_user = User(
+            username='sean',
+            email='sean.osullivan@gmail.com',
+            password='Secodwom01',  # Plain text password for v2.6.0
+            role='user',
+            is_active=True
+        )
+        db.session.add(sean_user)
+        
+        db.session.commit()
+        
+        return jsonify({
+            'message': 'Users created successfully',
+            'users': [
+                {'email': 'omarosullivan@gmail.com', 'password': 'admin123', 'role': 'admin'},
+                {'email': 'sean.osullivan@gmail.com', 'password': 'Secodwom01', 'role': 'user'}
+            ]
+        }), 201
+        
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'message': f'Setup failed: {str(e)}'}), 500
+
 @app.route('/api/users', methods=['POST'])
 @jwt_required()
 def create_user():
