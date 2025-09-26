@@ -2266,6 +2266,80 @@ def get_account_transactions(account_id):
         }), 500
 
 # User Management API
+@app.route('/api/import-users', methods=['POST'])
+def import_users():
+    """Import users from local database data"""
+    try:
+        # Check if any users exist
+        if User.query.count() > 0:
+            return jsonify({'message': 'Users already exist'}), 400
+        
+        # Import users from local database data
+        users_data = [
+            {
+                'username': 'omarosullivan@gmail.com',
+                'email': 'omarosullivan@gmail.com',
+                'password': 'admin123',
+                'role': 'admin',
+                'is_active': True
+            },
+            {
+                'username': 'dwayneosullivan',
+                'email': 'dwayneosullivan@gmail.com',
+                'password': 'dwayne123',
+                'role': 'user',
+                'is_active': True
+            },
+            {
+                'username': 'heidiosullivan',
+                'email': 'heidiosullivan@gmail.com',
+                'password': 'heidi123',
+                'role': 'user',
+                'is_active': True
+            },
+            {
+                'username': 'lenamosulivan',
+                'email': 'lenamosulivan@gmail.com',
+                'password': 'lena123',
+                'role': 'user',
+                'is_active': True
+            },
+            {
+                'username': 'sean',
+                'email': 'sean.osullivan@gmail.com',
+                'password': 'Secodwom01',
+                'role': 'user',
+                'is_active': True
+            }
+        ]
+        
+        imported_users = []
+        for user_data in users_data:
+            user = User(
+                username=user_data['username'],
+                email=user_data['email'],
+                password=user_data['password'],  # Plain text password for v2.6.0
+                role=user_data['role'],
+                is_active=user_data['is_active']
+            )
+            db.session.add(user)
+            imported_users.append({
+                'email': user_data['email'],
+                'password': user_data['password'],
+                'role': user_data['role']
+            })
+        
+        db.session.commit()
+        
+        return jsonify({
+            'message': 'Users imported successfully',
+            'users': imported_users
+        }), 201
+        
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'message': f'Import failed: {str(e)}'}), 500
+
 @app.route('/api/setup-users', methods=['POST'])
 def setup_users():
     """Setup endpoint to create initial users (no auth required)"""
