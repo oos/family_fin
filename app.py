@@ -2329,6 +2329,7 @@ def create_user():
     try:
         # Check if any users exist
         user_count = User.query.count()
+        print(f"User count: {user_count}")
         
         # If no users exist, allow creating first admin user without authentication
         if user_count == 0:
