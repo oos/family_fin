@@ -33,7 +33,6 @@ services:
       - key: REACT_APP_API_URL
         value: https://family-finance-api.onrender.com
 
-  # Database
-  - type: pserv
-    name: family-finance-db
+databases:
+  - name: family-finance-db
     plan: starter
