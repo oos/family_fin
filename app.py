@@ -2328,8 +2328,15 @@ def create_user():
     """Create a new user (admin only, or first user if none exist) - Updated"""
     try:
         # Check if any users exist
-        user_count = User.query.count()
-        print(f"User count: {user_count}")
+        try:
+            user_count = User.query.count()
+            print(f"User count: {user_count}")
+        except Exception as e:
+            print(f"Error counting users: {e}")
+            return jsonify({
+                'success': False,
+                'message': f'Database error: {str(e)}'
+            }), 500
         
         # If no users exist, allow creating first admin user without authentication
         if user_count == 0:
@@ -2348,6 +2355,7 @@ def create_user():
                         'message': 'Admin access required'
                     }), 403
             except Exception as e:
+                print(f"Authentication error: {e}")
                 return jsonify({
                     'success': False,
                     'message': 'Authentication required'
