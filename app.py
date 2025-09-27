@@ -4,17 +4,17 @@ from flask_cors import CORS
 from werkzeug.security import generate_password_hash, check_password_hash
 import hashlib
 from datetime import datetime, timedelta
-import pandas as pd
+# import pandas as pd  # Removed for deployment compatibility
 import json
 import re
 import math
-import pdfplumber
-import PyPDF2
-from sklearn.feature_extraction.text import TfidfVectorizer
-from sklearn.ensemble import RandomForestClassifier
-from sklearn.model_selection import train_test_split
-from sklearn.metrics import classification_report, accuracy_score, precision_recall_fscore_support
-import numpy as np
+# import pdfplumber  # Removed for deployment compatibility
+# import PyPDF2  # Removed for deployment compatibility
+# from sklearn.feature_extraction.text import TfidfVectorizer  # Removed for deployment compatibility
+# from sklearn.ensemble import RandomForestClassifier  # Removed for deployment compatibility
+# from sklearn.model_selection import train_test_split  # Removed for deployment compatibility
+# from sklearn.metrics import classification_report, accuracy_score, precision_recall_fscore_support  # Removed for deployment compatibility
+# import numpy as np  # Removed for deployment compatibility
 import os
 import csv
 import io
