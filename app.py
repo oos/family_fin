@@ -2309,18 +2309,33 @@ def get_account_transactions(account_id):
 
 # User Management API
 @app.route('/api/users', methods=['POST'])
-@jwt_required()
 def create_user():
-    """Create a new user (admin only)"""
+    """Create a new user (admin only, or first user if none exist)"""
     try:
-        current_user_id = int(get_jwt_identity())
-        current_user = User.query.filter_by(id=current_user_id).first()
+        # Check if any users exist
+        user_count = User.query.count()
         
-        if not current_user or current_user.role != 'admin':
-            return jsonify({
-                'success': False,
-                'message': 'Admin access required'
-            }), 403
+        # If no users exist, allow creating first admin user without authentication
+        if user_count == 0:
+            print("No users exist - allowing first admin user creation")
+        else:
+            # Require authentication for subsequent users
+            from flask_jwt_extended import verify_jwt_in_request, get_jwt_identity
+            try:
+                verify_jwt_in_request()
+                current_user_id = int(get_jwt_identity())
+                current_user = User.query.filter_by(id=current_user_id).first()
+                
+                if not current_user or current_user.role != 'admin':
+                    return jsonify({
+                        'success': False,
+                        'message': 'Admin access required'
+                    }), 403
+            except Exception as e:
+                return jsonify({
+                    'success': False,
+                    'message': 'Authentication required'
+                }), 401
         
         data = request.get_json()
         email = data.get('email')
