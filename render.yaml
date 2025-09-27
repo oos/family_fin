@@ -37,4 +37,3 @@ services:
   - type: pserv
     name: family-finance-db
     plan: starter
-    runtime: postgresql
