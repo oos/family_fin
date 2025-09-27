@@ -22,9 +22,8 @@ services:
     healthCheckPath: /api/health
 
   # Frontend Service
-  - type: web
+  - type: static
     name: family-finance-frontend
-    env: static
     buildCommand: |
       npm install
       npm run build
