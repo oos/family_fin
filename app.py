@@ -104,6 +104,21 @@ def health_check():
     """Health check endpoint for production deployment"""
     return jsonify({'status': 'healthy', 'message': 'Family Finance API is running - UPDATED v2.0'}), 200
 
+@app.route('/api/init-db', methods=['POST'])
+def init_database():
+    """Initialize database tables"""
+    try:
+        db.create_all()
+        return jsonify({
+            'success': True,
+            'message': 'Database tables created successfully'
+        })
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'message': f'Failed to create database tables: {str(e)}'
+        }), 500
+
 @app.route('/api/people', methods=['GET'])
 @jwt_required()
 def get_people():
