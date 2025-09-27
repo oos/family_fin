@@ -18,7 +18,7 @@ import math
 import os
 import csv
 import io
-# import requests  # Removed for deployment compatibility
+import requests
 import re
 from difflib import SequenceMatcher
 # from icalendar import Calendar  # Removed for deployment compatibility
