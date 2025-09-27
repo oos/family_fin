@@ -54,7 +54,7 @@ function Register({ onSwitchToLogin }) {
         });
         // Auto switch to login after 2 seconds
         setTimeout(() => {
-          navigate('/login');
+          onSwitchToLogin();
         }, 2000);
       } else {
         setError(response.data.message || 'Registration failed');
@@ -169,7 +169,7 @@ function Register({ onSwitchToLogin }) {
             <button 
               type="button" 
               className="btn btn-link"
-              onClick={() => navigate('/login')}
+              onClick={onSwitchToLogin}
             >
               Already have an account? Login here
             </button>

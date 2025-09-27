@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
 
-function Login({ onLogin }) {
+function Login({ onLogin, onSwitchToRegister }) {
   const navigate = useNavigate();
   const [credentials, setCredentials] = useState({
     email: '',
@@ -79,7 +79,7 @@ function Login({ onLogin }) {
             <button 
               type="button" 
               className="btn btn-link"
-              onClick={() => navigate('/register')}
+              onClick={onSwitchToRegister}
             >
               Don't have an account? Register here
             </button>
