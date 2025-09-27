@@ -2310,7 +2310,7 @@ def get_account_transactions(account_id):
 # User Management API
 @app.route('/api/users', methods=['POST'])
 def create_user():
-    """Create a new user (admin only, or first user if none exist)"""
+    """Create a new user (admin only, or first user if none exist) - Updated"""
     try:
         # Check if any users exist
         user_count = User.query.count()
