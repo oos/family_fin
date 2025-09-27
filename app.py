@@ -18,10 +18,10 @@ import math
 import os
 import csv
 import io
-import requests
+# import requests  # Removed for deployment compatibility
 import re
 from difflib import SequenceMatcher
-from icalendar import Calendar
+# from icalendar import Calendar  # Removed for deployment compatibility
 from dotenv import load_dotenv
 
 load_dotenv()
