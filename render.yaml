@@ -24,16 +24,16 @@ services:
         value: https://family-finance-frontend-v2.onrender.com
     healthCheckPath: /api/health
 
-  # Frontend Service
-  - type: static
-    name: family-finance-frontend-v2
-    buildCommand: |
-      npm install
-      npm run build
-    staticPublishPath: ./build
-    envVars:
-      - key: REACT_APP_API_URL
-        value: https://family-finance-api-v2.onrender.com
+  # Frontend Service - Temporarily disabled to focus on API
+  # - type: static
+  #   name: family-finance-frontend-v2
+  #   buildCommand: |
+  #     npm install
+  #     npm run build
+  #   staticPublishPath: ./build
+  #   envVars:
+  #     - key: REACT_APP_API_URL
+  #       value: https://family-finance-api-v2.onrender.com
 
 databases:
   - name: family-finance-db-v2
