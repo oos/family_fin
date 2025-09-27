@@ -35,4 +35,4 @@ services:
 
 databases:
   - name: family-finance-db
-    plan: starter
+    plan: free
