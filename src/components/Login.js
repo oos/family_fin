@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import axios from 'axios';
 
-function Login({ onLogin }) {
+function Login({ onLogin, onSwitchToRegister }) {
   const [credentials, setCredentials] = useState({
     email: '',
     password: ''
@@ -67,11 +67,21 @@ function Login({ onLogin }) {
           <button 
             type="submit" 
             className="btn btn-primary" 
-            style={{ width: '100%' }}
+            style={{ width: '100%', marginBottom: '15px' }}
             disabled={loading}
           >
             {loading ? 'Logging in...' : 'Login'}
           </button>
+
+          <div className="text-center">
+            <button 
+              type="button" 
+              className="btn btn-link"
+              onClick={onSwitchToRegister}
+            >
+              Don't have an account? Register here
+            </button>
+          </div>
         </form>
         
       </div>

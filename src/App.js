@@ -26,10 +26,11 @@ import UserDashboard from './components/UserDashboard';
 import UserLoans from './components/UserLoans';
 import UserAccounts from './components/UserAccounts';
 import Login from './components/Login';
+import Register from './components/Register';
 import './sidebar.css';
 
 // Set up axios defaults
-axios.defaults.baseURL = 'http://localhost:5002/api';
+axios.defaults.baseURL = 'https://family-finance-api.onrender.com/api';
 
 // Function to validate and refresh token if needed
 const validateToken = async () => {
@@ -182,6 +183,7 @@ function App() {
   const [currentUser, setCurrentUser] = useState(null);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [roleLoading, setRoleLoading] = useState(true);
+  const [showRegister, setShowRegister] = useState(false);
 
   useEffect(() => {
     const initializeAuth = async () => {
@@ -243,6 +245,14 @@ function App() {
     window.location.href = '/';
   };
 
+  const handleSwitchToRegister = () => {
+    setShowRegister(true);
+  };
+
+  const handleSwitchToLogin = () => {
+    setShowRegister(false);
+  };
+
   const handleLogout = () => {
     localStorage.removeItem('token');
     setIsAuthenticated(false);
@@ -261,7 +271,11 @@ function App() {
       <div className="App">
         {!isAuthenticated ? (
           <Routes>
-            <Route path="/login" element={<Login onLogin={handleLogin} />} />
+            <Route path="/login" element={
+              showRegister ? 
+                <Register onSwitchToLogin={handleSwitchToLogin} /> : 
+                <Login onLogin={handleLogin} onSwitchToRegister={handleSwitchToRegister} />
+            } />
             <Route path="*" element={<Navigate to="/login" replace />} />
           </Routes>
         ) : roleLoading ? (
