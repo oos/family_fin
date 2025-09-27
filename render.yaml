@@ -24,8 +24,9 @@ services:
         value: https://family-finance-frontend.onrender.com
 
   # Frontend Service
-  - type: static
+  - type: web
     name: family-finance-frontend
+    env: static
     buildCommand: |
       npm install
       npm run build
