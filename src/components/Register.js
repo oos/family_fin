@@ -1,7 +1,9 @@
 import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
 
-function Register({ onRegister, onSwitchToLogin }) {
+function Register({ onSwitchToLogin }) {
+  const navigate = useNavigate();
   const [formData, setFormData] = useState({
     email: '',
     password: '',
@@ -52,7 +54,7 @@ function Register({ onRegister, onSwitchToLogin }) {
         });
         // Auto switch to login after 2 seconds
         setTimeout(() => {
-          onSwitchToLogin();
+          navigate('/login');
         }, 2000);
       } else {
         setError(response.data.message || 'Registration failed');
@@ -167,7 +169,7 @@ function Register({ onRegister, onSwitchToLogin }) {
             <button 
               type="button" 
               className="btn btn-link"
-              onClick={onSwitchToLogin}
+              onClick={() => navigate('/login')}
             >
               Already have an account? Login here
             </button>

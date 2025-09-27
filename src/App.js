@@ -183,7 +183,6 @@ function App() {
   const [currentUser, setCurrentUser] = useState(null);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [roleLoading, setRoleLoading] = useState(true);
-  const [showRegister, setShowRegister] = useState(false);
 
   useEffect(() => {
     const initializeAuth = async () => {
@@ -245,13 +244,6 @@ function App() {
     window.location.href = '/';
   };
 
-  const handleSwitchToRegister = () => {
-    setShowRegister(true);
-  };
-
-  const handleSwitchToLogin = () => {
-    setShowRegister(false);
-  };
 
   const handleLogout = () => {
     localStorage.removeItem('token');
@@ -271,11 +263,8 @@ function App() {
       <div className="App">
         {!isAuthenticated ? (
           <Routes>
-            <Route path="/login" element={
-              showRegister ? 
-                <Register onSwitchToLogin={handleSwitchToLogin} /> : 
-                <Login onLogin={handleLogin} onSwitchToRegister={handleSwitchToRegister} />
-            } />
+            <Route path="/login" element={<Login onLogin={handleLogin} />} />
+            <Route path="/register" element={<Register />} />
             <Route path="*" element={<Navigate to="/login" replace />} />
           </Routes>
         ) : roleLoading ? (
