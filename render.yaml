@@ -4,7 +4,7 @@ services:
     name: family-finance-api-v2
     env: python
     plan: starter
-    runtime: python-3.11
+    pythonVersion: 3.11
     buildCommand: pip install -r requirements-prod.txt && flask db upgrade
     startCommand: gunicorn --bind 0.0.0.0:$PORT wsgi:app
     envVars:
