@@ -110,6 +110,49 @@ def get_people():
     people = Person.query.all()
     return jsonify([person.to_dict() for person in people])
 
+@app.route('/api/init', methods=['POST'])
+def initialize_app():
+    """Initialize the app with first admin user"""
+    try:
+        # Check if any users exist
+        user_count = User.query.count()
+        
+        if user_count > 0:
+            return jsonify({
+                'success': False,
+                'message': 'App already initialized'
+            }), 400
+        
+        data = request.get_json()
+        admin_email = data.get('email', 'admin@familyfinance.com')
+        admin_password = data.get('password', 'admin123')
+        
+        # Create admin user
+        admin_user = User(
+            username=admin_email.split('@')[0],
+            email=admin_email,
+            role='admin'
+        )
+        admin_user.set_password(admin_password)
+        
+        db.session.add(admin_user)
+        db.session.commit()
+        
+        return jsonify({
+            'success': True,
+            'message': 'App initialized successfully',
+            'admin_email': admin_email
+        })
+        
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({
+            'success': False,
+            'message': f'Failed to initialize app: {str(e)}'
+        }), 500
+
+
+
 @app.route('/api/people', methods=['POST'])
 @jwt_required()
 def create_person():
