@@ -1,7 +1,6 @@
 from flask import Flask, request, jsonify, Response
 from flask_jwt_extended import JWTManager, create_access_token, jwt_required, get_jwt_identity
 from flask_cors import CORS
-from flask_migrate import Migrate
 from werkzeug.security import generate_password_hash, check_password_hash
 import hashlib
 from datetime import datetime, timedelta
@@ -67,7 +66,7 @@ from models import db, User, Person, Property, Income, Loan, Family, BusinessAcc
 # Initialize extensions
 db.init_app(app)
 jwt = JWTManager(app)
-migrate = Migrate(app, db)
+# migrate = Migrate(app, db)  # Removed for deployment compatibility
 CORS(app, 
      origins=['http://localhost:3007'],
      methods=['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
