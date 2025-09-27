@@ -24,16 +24,15 @@ services:
         value: https://family-finance-frontend.onrender.com
 
   # Frontend Service
-  - type: web
+  - type: static
     name: family-finance-frontend
-    env: static
     buildCommand: |
       npm install
       npm run build
     staticPublishPath: ./build
     envVars:
       - key: REACT_APP_API_URL
-        value: https://family-finance-api.onrender.com
+        value: https://family-finance-api-t4oh.onrender.com
 
 databases:
   - name: family-finance-db
