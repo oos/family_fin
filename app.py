@@ -68,7 +68,7 @@ db.init_app(app)
 jwt = JWTManager(app)
 # migrate = Migrate(app, db)  # Removed for deployment compatibility
 CORS(app, 
-     origins=['http://localhost:3007'],
+     origins=['http://localhost:3007', 'https://family-finance-frontend.onrender.com'],
      methods=['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
      allow_headers=['Content-Type', 'Authorization'],
      supports_credentials=True)

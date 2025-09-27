@@ -15,7 +15,7 @@ function Login({ onLogin, onSwitchToRegister }) {
     setError('');
 
     try {
-      const response = await axios.post('/auth/login', credentials);
+      const response = await axios.post('/api/auth/login', credentials);
       onLogin(response.data.access_token, response.data.user);
     } catch (err) {
       setError('Invalid credentials. Please try again.');
