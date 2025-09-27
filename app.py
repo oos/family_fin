@@ -102,7 +102,7 @@ def login():
 @app.route('/api/health', methods=['GET'])
 def health_check():
     """Health check endpoint for production deployment"""
-    return jsonify({'status': 'healthy', 'message': 'Family Finance API is running'}), 200
+    return jsonify({'status': 'healthy', 'message': 'Family Finance API is running - UPDATED v2.0'}), 200
 
 @app.route('/api/people', methods=['GET'])
 @jwt_required()
