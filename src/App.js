@@ -30,7 +30,7 @@ import Register from './components/Register';
 import './sidebar.css';
 
 // Set up axios defaults
-axios.defaults.baseURL = 'https://family-finance-api.onrender.com';
+axios.defaults.baseURL = 'https://family-finance-api-t4oh.onrender.com';
 
 // Function to validate and refresh token if needed
 const validateToken = async () => {
