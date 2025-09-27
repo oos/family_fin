@@ -37,5 +37,3 @@ services:
   - type: pserv
     name: family-finance-db
     plan: starter
-    databaseName: family_finance
-    user: family_finance_user
